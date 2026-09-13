@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+spec:
+  selector:
+    app.kubernetes.io/name: api-gateway
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+    - name: grpc
+      port: 9090
+      targetPort: grpc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway-access
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: api-gateway
+  ports:
+    - name: grpc
+      port: 9090
+      targetPort: grpc
+      nodePort: 30090
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway-admin
+spec:
+  type: NodePort
+  # Keep diagnostics reachable while the application is not ready for traffic.
+  publishNotReadyAddresses: true
+  selector:
+    app.kubernetes.io/name: api-gateway
+  ports:
+    - name: admin
+      port: 8081
+      targetPort: admin
+      nodePort: 30081

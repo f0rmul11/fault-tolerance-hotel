@@ -1,0 +1,5 @@
+bin
+.local
+build/deployment
+*_test.go
+**/*_test.go

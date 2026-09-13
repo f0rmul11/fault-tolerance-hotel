@@ -1,0 +1,7 @@
+go 1.26.1
+
+use ./services/api-gateway
+
+// Clay uses grpc-middleware v1 with the pre-split genproto dependency.
+// Keep workspace resolution on the post-split module to avoid ambiguous imports.
+replace google.golang.org/genproto => google.golang.org/genproto v0.0.0-20251103181224-f26f9409b101

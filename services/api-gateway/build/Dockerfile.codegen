@@ -1,0 +1,4 @@
+FROM golang:1.26.1-alpine
+RUN go install github.com/bufbuild/buf/cmd/buf@v1.57.2 && \
+    go install github.com/not-for-prod/clay/cmd/protoc-gen-goclay@v0.3.0
+WORKDIR /workspace

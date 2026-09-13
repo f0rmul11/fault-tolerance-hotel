@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package api_gateway.echo.v1;
+
+import "google/api/annotations.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
+
+option go_package = "api-gateway/internal/pkg/pb/api-gateway/echo/v1;echoV1";
+
+option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
+  info: {
+    title: "HotelFlow API Gateway"
+    description: "Публичный API учебного гостиничного стенда HotelFlow."
+    version: "1.0"
+  }
+};
+
+service EchoService {
+  // Возвращает переданное сообщение без изменений.
+  rpc Echo(EchoRequest) returns (EchoResponse) {
+    option (google.api.http) = {
+      post: "/v1/echo"
+      body: "*"
+      additional_bindings: {get: "/v1/echo"}
+    };
+  }
+}
+
+message EchoRequest {
+  string message = 1;
+}
+
+message EchoResponse {
+  string message = 1;
+}
