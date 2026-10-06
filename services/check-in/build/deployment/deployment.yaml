@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: check-in
+  labels:
+    app.kubernetes.io/name: check-in
+    app.kubernetes.io/part-of: hotelflow
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: check-in
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: check-in
+        app.kubernetes.io/part-of: hotelflow
+    spec:
+      terminationGracePeriodSeconds: 20
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: check-in
+          image: hotelflow/check-in:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: grpc
+              containerPort: 9090
+            - name: admin
+              containerPort: 8081
+          env:
+            - name: GRPC_PORT
+              value: "9090"
+            - name: ADMIN_HTTP_PORT
+              value: "8081"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: "1"
+              memory: 256Mi
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          startupProbe:
+            httpGet:
+              path: /healthcheck/startup
+              port: admin
+            periodSeconds: 1
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /healthcheck/ready
+              port: admin
+            periodSeconds: 2
+            failureThreshold: 2
+          livenessProbe:
+            httpGet:
+              path: /healthcheck/live
+              port: admin
+            periodSeconds: 10
+            failureThreshold: 3

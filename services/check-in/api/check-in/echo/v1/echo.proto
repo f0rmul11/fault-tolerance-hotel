@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package check_in.echo.v1;
+
+option go_package = "check-in/internal/pkg/pb/check-in/echo/v1;echoV1";
+
+service EchoService {
+  // Проверяет доступность gRPC и возвращает исходное сообщение и имя сервиса.
+  rpc Echo(EchoRequest) returns (EchoResponse);
+}
+
+message EchoRequest {
+  string message = 1;
+}
+
+message EchoResponse {
+  string message = 1;
+  string service = 2;
+}

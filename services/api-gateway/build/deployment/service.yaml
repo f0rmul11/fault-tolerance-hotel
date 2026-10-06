@@ -22,6 +22,10 @@ spec:
   selector:
     app.kubernetes.io/name: api-gateway
   ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      nodePort: 30080
     - name: grpc
       port: 9090
       targetPort: grpc

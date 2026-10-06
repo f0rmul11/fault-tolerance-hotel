@@ -1,0 +1,11 @@
+runtime:
+  image: rancher/k3s:v1.35.2-k3s1
+
+services:
+  - api-gateway
+  - availability
+  - booking
+  - check-in
+  - room
+  - notification
+  - search

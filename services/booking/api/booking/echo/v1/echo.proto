@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package booking.echo.v1;
+
+option go_package = "booking/internal/pkg/pb/booking/echo/v1;echoV1";
+
+service EchoService {
+  // Проверяет доступность gRPC и возвращает исходное сообщение и имя сервиса.
+  rpc Echo(EchoRequest) returns (EchoResponse);
+}
+
+message EchoRequest {
+  string message = 1;
+}
+
+message EchoResponse {
+  string message = 1;
+  string service = 2;
+}
