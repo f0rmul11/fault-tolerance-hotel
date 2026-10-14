@@ -12,5 +12,8 @@ http_server:
   port: 8080
   admin_port: 8081
 
-# Echo has no downstream dependencies yet.
+kafka_brokers:
+  - kafka:9092
+consumer_group: notification-booking-events
+# Уведомления выводятся в stdout, внешнего провайдера нет.
 service: {}

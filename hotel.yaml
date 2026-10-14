@@ -3,9 +3,8 @@ runtime:
 
 services:
   - api-gateway
-  - availability
   - booking
   - check-in
-  - room
+  - review
   - notification
-  - search
+  - hotels

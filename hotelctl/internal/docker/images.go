@@ -31,13 +31,24 @@ func (e *Engine) Build(ctx context.Context, root string, s config.Service, out i
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return "", err
 	}
-	archiveReader, err := archive.TarWithOptions(dir, &archive.TarOptions{ExcludePatterns: excludes})
+	archiveReader, err := archive.TarWithOptions(dir, &archive.TarOptions{
+		ExcludePatterns: excludes,
+	})
 	if err != nil {
 		return "", err
 	}
 	defer archiveReader.Close()
 	tag := s.Image + ":local"
-	result, err := e.client.ImageBuild(ctx, archiveReader, build.ImageBuildOptions{Tags: []string{tag}, Dockerfile: filepath.ToSlash(s.Dockerfile), Remove: true, Version: build.BuilderV1})
+	result, err := e.client.ImageBuild(
+		ctx,
+		archiveReader,
+		build.ImageBuildOptions{
+			Tags:       []string{tag},
+			Dockerfile: filepath.ToSlash(s.Dockerfile),
+			Remove:     true,
+			Version:    build.BuilderV1,
+		},
+	)
 	if err != nil {
 		return "", fmt.Errorf("build %s: %w", s.Name, err)
 	}
@@ -110,7 +121,11 @@ func (e *Engine) Import(ctx context.Context, s *project.State, imageName, dir st
 	done := make(chan error, 1)
 	go func() {
 		tw := tar.NewWriter(writer)
-		err := tw.WriteHeader(&tar.Header{Name: "hotelctl-image.tar", Mode: 0600, Size: size})
+		err := tw.WriteHeader(&tar.Header{
+			Name: "hotelctl-image.tar",
+			Mode: 0600,
+			Size: size,
+		})
 		if err == nil {
 			_, err = io.Copy(tw, f)
 		}
@@ -129,13 +144,39 @@ func (e *Engine) Import(ctx context.Context, s *project.State, imageName, dir st
 	if copyErr != nil {
 		return copyErr
 	}
-	importErr := e.Exec(ctx, s, []string{"ctr", "-n", "k8s.io", "images", "import", "/tmp/hotelctl-image.tar"}, nil, out, out)
-	cleanupErr := e.Exec(ctx, s, []string{"rm", "-f", "/tmp/hotelctl-image.tar"}, nil, io.Discard, io.Discard)
+	importErr := e.Exec(ctx, s, []string{
+		"ctr",
+		"-n",
+		"k8s.io",
+		"images",
+		"import",
+		"/tmp/hotelctl-image.tar",
+	}, nil, out, out)
+	cleanupErr := e.Exec(ctx, s, []string{
+		"rm",
+		"-f",
+		"/tmp/hotelctl-image.tar",
+	}, nil, io.Discard, io.Discard)
 	return errors.Join(importErr, cleanupErr)
 }
 
-func (e *Engine) Exec(ctx context.Context, s *project.State, args []string, in io.Reader, out, errOut io.Writer) error {
-	result, err := e.client.ContainerExecCreate(ctx, ContainerName(s), container.ExecOptions{Cmd: args, AttachStdin: in != nil, AttachStdout: true, AttachStderr: true})
+func (e *Engine) Exec(
+	ctx context.Context,
+	s *project.State,
+	args []string,
+	in io.Reader,
+	out, errOut io.Writer,
+) error {
+	result, err := e.client.ContainerExecCreate(
+		ctx,
+		ContainerName(s),
+		container.ExecOptions{
+			Cmd:          args,
+			AttachStdin:  in != nil,
+			AttachStdout: true,
+			AttachStderr: true,
+		},
+	)
 	if err != nil {
 		return err
 	}
@@ -145,7 +186,10 @@ func (e *Engine) Exec(ctx context.Context, s *project.State, args []string, in i
 	}
 	defer attach.Close()
 	if in != nil {
-		go func() { _, _ = io.Copy(attach.Conn, in); _ = attach.CloseWrite() }()
+		go func() {
+			_, _ = io.Copy(attach.Conn, in)
+			_ = attach.CloseWrite()
+		}()
 	}
 	done := make(chan struct{})
 	defer close(done)

@@ -17,7 +17,9 @@ type Descriptor struct {
 var _ transport.ServiceDesc = (*Descriptor)(nil)
 
 func New(register func(*grpc.Server)) *Descriptor {
-	return &Descriptor{register: register}
+	return &Descriptor{
+		register: register,
+	}
 }
 
 func (d *Descriptor) RegisterGRPC(server *grpc.Server) {

@@ -12,5 +12,7 @@ http_server:
   port: 8080
   admin_port: 8081
 
-# Echo has no downstream dependencies yet.
-service: {}
+service:
+  hotels: "hotels:9090"
+  check-in: "check-in:9090"
+  booking: booking:9090

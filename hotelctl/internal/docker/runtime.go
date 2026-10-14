@@ -21,16 +21,26 @@ import (
 )
 
 const ownerLabel = "io.hotelflow.owner"
+
 const managedLabel = "io.hotelflow.managed-by"
 
-func ContainerName(s *project.State) string { return s.Name + "-k3s" }
+func ContainerName(s *project.State) string {
+	return s.Name + "-k3s"
+}
 
-func volumeName(s *project.State) string { return s.Name + "-k3s-data" }
+func volumeName(s *project.State) string {
+	return s.Name + "-k3s-data"
+}
 
-func networkName(s *project.State) string { return s.Name + "-network" }
+func networkName(s *project.State) string {
+	return s.Name + "-network"
+}
 
 func labels(s *project.State) map[string]string {
-	return map[string]string{ownerLabel: s.Owner, managedLabel: "hotelctl"}
+	return map[string]string{
+		ownerLabel:   s.Owner,
+		managedLabel: "hotelctl",
+	}
 }
 
 func checkOwner(kind, name string, got map[string]string, s *project.State) error {
@@ -41,7 +51,9 @@ func checkOwner(kind, name string, got map[string]string, s *project.State) erro
 }
 
 func (e *Engine) Status(ctx context.Context, s *project.State) (project.RuntimeStatus, error) {
-	result := project.RuntimeStatus{Name: ContainerName(s)}
+	result := project.RuntimeStatus{
+		Name: ContainerName(s),
+	}
 	info, err := e.client.ContainerInspect(ctx, result.Name)
 	if errdefs.IsNotFound(err) {
 		return result, nil
@@ -115,7 +127,10 @@ func (e *Engine) Ensure(ctx context.Context, s *project.State, out io.Writer) er
 	}
 	vol, err := e.client.VolumeInspect(ctx, volumeName(s))
 	if errdefs.IsNotFound(err) {
-		_, err = e.client.VolumeCreate(ctx, volume.CreateOptions{Name: volumeName(s), Labels: labels(s)})
+		_, err = e.client.VolumeCreate(ctx, volume.CreateOptions{
+			Name:   volumeName(s),
+			Labels: labels(s),
+		})
 	} else if err == nil {
 		err = checkOwner("volume", volumeName(s), vol.Labels, s)
 	}
@@ -124,7 +139,9 @@ func (e *Engine) Ensure(ctx context.Context, s *project.State, out io.Writer) er
 	}
 	net, err := e.client.NetworkInspect(ctx, networkName(s), network.InspectOptions{})
 	if errdefs.IsNotFound(err) {
-		_, err = e.client.NetworkCreate(ctx, networkName(s), network.CreateOptions{Labels: labels(s)})
+		_, err = e.client.NetworkCreate(ctx, networkName(s), network.CreateOptions{
+			Labels: labels(s),
+		})
 	} else if err == nil {
 		err = checkOwner("network", networkName(s), net.Labels, s)
 	}
@@ -138,14 +155,36 @@ func (e *Engine) Ensure(ctx context.Context, s *project.State, out io.Writer) er
 		exposed[p] = struct{}{}
 	}
 	created, err := e.client.ContainerCreate(ctx, &container.Config{
-		Image: s.Runtime.Image, Hostname: ContainerName(s), Labels: labels(s), ExposedPorts: exposed,
-		Cmd: []string{"server", "--node-name", ContainerName(s), "--disable=traefik,servicelb", "--tls-san=127.0.0.1", "--tls-san=localhost", "--write-kubeconfig-mode=600"},
+		Image:        s.Runtime.Image,
+		Hostname:     ContainerName(s),
+		Labels:       labels(s),
+		ExposedPorts: exposed,
+		Cmd: []string{
+			"server",
+			"--node-name",
+			ContainerName(s),
+			"--disable=traefik,servicelb",
+			"--tls-san=127.0.0.1",
+			"--tls-san=localhost",
+			"--write-kubeconfig-mode=600",
+		},
 	}, &container.HostConfig{
-		Privileged: true, CgroupnsMode: container.CgroupnsModeHost, PortBindings: ports,
-		NetworkMode:   container.NetworkMode(networkName(s)),
-		RestartPolicy: container.RestartPolicy{Name: container.RestartPolicyUnlessStopped},
-		Tmpfs:         map[string]string{"/run": "", "/var/run": ""},
-		Mounts:        []mount.Mount{{Type: mount.TypeVolume, Source: volumeName(s), Target: "/var/lib/rancher/k3s"}},
+		Privileged:   true,
+		CgroupnsMode: container.CgroupnsModeHost,
+		PortBindings: ports,
+		NetworkMode:  container.NetworkMode(networkName(s)),
+		RestartPolicy: container.RestartPolicy{
+			Name: container.RestartPolicyUnlessStopped,
+		},
+		Tmpfs: map[string]string{
+			"/run":     "",
+			"/var/run": "",
+		},
+		Mounts: []mount.Mount{{
+			Type:   mount.TypeVolume,
+			Source: volumeName(s),
+			Target: "/var/lib/rancher/k3s",
+		}},
 	}, nil, nil, ContainerName(s))
 	if err != nil {
 		return err
@@ -187,7 +226,9 @@ func (e *Engine) Stop(ctx context.Context, s *project.State) error {
 		return err
 	}
 	timeout := 30
-	return e.client.ContainerStop(ctx, ContainerName(s), container.StopOptions{Timeout: &timeout})
+	return e.client.ContainerStop(ctx, ContainerName(s), container.StopOptions{
+		Timeout: &timeout,
+	})
 }
 
 func (e *Engine) Destroy(ctx context.Context, s *project.State) error {
@@ -233,7 +274,15 @@ func (e *Engine) Destroy(ctx context.Context, s *project.State) error {
 }
 
 func (e *Engine) Logs(ctx context.Context, s *project.State, out io.Writer) error {
-	reader, err := e.client.ContainerLogs(ctx, ContainerName(s), container.LogsOptions{ShowStdout: true, ShowStderr: true, Tail: "50"})
+	reader, err := e.client.ContainerLogs(
+		ctx,
+		ContainerName(s),
+		container.LogsOptions{
+			ShowStdout: true,
+			ShowStderr: true,
+			Tail:       "50",
+		},
+	)
 	if err != nil {
 		return err
 	}
@@ -249,7 +298,10 @@ func publishedPorts(s *project.State) nat.PortMap {
 		if mapping.Node == 6443 {
 			bind = "127.0.0.1"
 		}
-		ports[p] = []nat.PortBinding{{HostIP: bind, HostPort: strconv.Itoa(mapping.Host)}}
+		ports[p] = []nat.PortBinding{{
+			HostIP:   bind,
+			HostPort: strconv.Itoa(mapping.Host),
+		}}
 	}
 	return ports
 }

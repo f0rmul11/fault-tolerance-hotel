@@ -17,7 +17,11 @@ var version = "dev"
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
-	command := cmd.NewDefaultHotelctlCommand(iostreams.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr}, version)
+	command := cmd.NewDefaultHotelctlCommand(iostreams.IOStreams{
+		In:     os.Stdin,
+		Out:    os.Stdout,
+		ErrOut: os.Stderr,
+	}, version)
 	if err := command.ExecuteContext(ctx); err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)
 		if errors.Is(err, context.Canceled) {

@@ -1,0 +1,121 @@
+syntax = "proto3";
+
+package api_gateway.booking.v1;
+
+import "google/api/annotations.proto";
+
+option go_package = "api-gateway/internal/pkg/pb/api-gateway/booking/v1;bookingV1";
+
+// Создание и чтение броней, проверка занятости номеров.
+service BookingService {
+  // Атомарно создаёт подтверждённую бронь; повтор ключа возвращает результат операции.
+  rpc CreateBooking(CreateBookingRequest) returns (CreateBookingResponse) {
+    option (google.api.http) = {
+      post: "/v1/bookings"
+      body: "*"
+    };
+  }
+
+  // Возвращает бронь по UUID с учётом прав вызывающего пользователя.
+  rpc GetBooking(GetBookingRequest) returns (GetBookingResponse) {
+    option (google.api.http) = {get: "/v1/bookings/{booking_id}"};
+  }
+
+  // Возвращает снимок доступности; занятость окончательно проверяется при создании брони.
+  rpc CheckAvailability(CheckAvailabilityRequest) returns (CheckAvailabilityResponse) {
+    option (google.api.http) = {
+      post: "/v1/rooms/availability"
+      body: "*"
+    };
+  }
+}
+
+// Параметры бронирования конкретного номера на непрерывный период.
+message CreateBookingRequest {
+  // Положительный числовой ID номера в системе, передаётся строкой, например "1".
+  string room_id = 1;
+
+  // Начало проживания включительно, RFC3339 с часовым поясом, до микросекунд.
+  string starts_at = 2;
+
+  // Конец проживания исключительно, RFC3339 с часовым поясом, до микросекунд.
+  string ends_at = 3;
+
+  // UUID операции. Повторяйте неизменным с теми же данными при потере ответа.
+  string idempotency_key = 4;
+}
+
+// Идентификатор запрашиваемой брони.
+message GetBookingRequest {
+  // UUID брони в Booking.
+  string booking_id = 1;
+}
+
+// Сохранённая бронь либо результат повтора той же операции.
+message CreateBookingResponse {
+  // Сведения о брони.
+  BookingView booking = 1;
+}
+
+// Текущее состояние брони.
+message GetBookingResponse {
+  // Сведения о брони.
+  BookingView booking = 1;
+}
+
+// Бронь клиента и снимок данных номера на момент её создания.
+message BookingView {
+  // UUID брони в Booking.
+  string id = 1;
+
+  // Версия сохранённого состояния сущности.
+  int32 version = 2;
+
+  // Время создания брони, RFC3339.
+  string created_at = 3;
+
+  // Время последнего изменения брони, RFC3339.
+  string updated_at = 4;
+
+  // UUID гостя, на которого оформлена бронь.
+  string guest_id = 5;
+
+  // CONFIRMED, ACTIVE или CANCELED.
+  string status = 6;
+
+  // UUID запроса для трассировки; не заменяет ключ идемпотентности.
+  string request_id = 7;
+
+  // Положительный числовой ID номера в системе, передаётся строкой, например "1".
+  string room_id = 8;
+
+  // Начало проживания включительно, RFC3339 с часовым поясом, до микросекунд.
+  string starts_at = 9;
+
+  // Конец проживания исключительно, RFC3339 с часовым поясом, до микросекунд.
+  string ends_at = 10;
+
+  // Снимок обозначения номера внутри отеля на момент создания брони.
+  string room_number = 11;
+
+  // Снимок типа номера при создании брони, например "Standard".
+  string room_type = 12;
+}
+
+// Отель и период для проверки доступности его номеров.
+message CheckAvailabilityRequest {
+  // UUID отеля в Hotels.
+  string hotel_id = 1;
+
+  // Начало проживания включительно, RFC3339 с часовым поясом, до микросекунд.
+  string starts_at = 2;
+
+  // Конец проживания исключительно, RFC3339 с часовым поясом, до микросекунд.
+  string ends_at = 3;
+}
+
+// Номера, свободные на момент выполнения запроса.
+message CheckAvailabilityResponse {
+  // Системные ID свободных номеров — положительные числа в строках.
+  repeated string room_ids = 1;
+}

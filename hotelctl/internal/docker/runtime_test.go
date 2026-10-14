@@ -41,9 +41,14 @@ func TestDestroyValidatesVolumeOwnershipBeforeDeletingContainer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	engine := &Engine{client: api}
+	engine := &Engine{
+		client: api,
+	}
 	defer engine.Close()
-	err = engine.Destroy(context.Background(), &project.State{Name: "test", Owner: "ours"})
+	err = engine.Destroy(context.Background(), &project.State{
+		Name:  "test",
+		Owner: "ours",
+	})
 	if err == nil || !strings.Contains(err.Error(), "another project") {
 		t.Fatalf("got %v", err)
 	}
@@ -53,26 +58,66 @@ func TestDestroyValidatesVolumeOwnershipBeforeDeletingContainer(t *testing.T) {
 }
 
 func TestServicePortUpdatePreservesVolumeAndOwner(t *testing.T) {
-	for _, owned := range []bool{true, false} {
+	for _, owned := range []bool{
+		true,
+		false,
+	} {
 		t.Run(fmt.Sprint("owned=", owned), func(t *testing.T) {
-			state := &project.State{Name: "test", Owner: "ours", Runtime: config.Runtime{Image: "rancher/k3s:test", BindAddress: "127.0.0.1", Ports: config.Ports{API: 6550, HTTP: 8080, GRPC: 9090, Admin: 8081}}}
+			state := &project.State{
+				Name:  "test",
+				Owner: "ours",
+				Runtime: config.Runtime{
+					Image:       "rancher/k3s:test",
+					BindAddress: "127.0.0.1",
+					Ports: config.Ports{
+						API:   6550,
+						HTTP:  8080,
+						GRPC:  9090,
+						Admin: 8081,
+					},
+				},
+			}
 			oldPorts := publishedPorts(state)
-			state.Bindings = append(state.Runtime.PortBindings(), config.PortBinding{Host: 9091, Node: 30091})
+			state.Bindings = append(state.Runtime.PortBindings(), config.PortBinding{
+				Host: 9091,
+				Node: 30091,
+			})
 			var removed, created atomic.Int32
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
 				path := strings.TrimPrefix(r.URL.Path, "/v1.51")
 				switch {
 				case r.Method == "GET" && path == "/containers/test-k3s/json":
-					_ = json.NewEncoder(w).Encode(map[string]any{"Id": "old", "Config": map[string]any{"Image": state.Runtime.Image, "Labels": labels(state)}, "State": map[string]any{"Running": false}, "HostConfig": map[string]any{"PortBindings": oldPorts}})
+					_ = json.NewEncoder(w).Encode(map[string]any{
+						"Id": "old",
+						"Config": map[string]any{
+							"Image":  state.Runtime.Image,
+							"Labels": labels(state),
+						},
+						"State": map[string]any{
+							"Running": false,
+						},
+						"HostConfig": map[string]any{
+							"PortBindings": oldPorts,
+						},
+					})
 				case r.Method == "GET" && path == "/volumes/test-k3s-data":
 					owner := "ours"
 					if !owned {
 						owner = "someone-else"
 					}
-					_ = json.NewEncoder(w).Encode(map[string]any{"Name": "test-k3s-data", "Labels": map[string]string{ownerLabel: owner, managedLabel: "hotelctl"}})
+					_ = json.NewEncoder(w).Encode(map[string]any{
+						"Name": "test-k3s-data",
+						"Labels": map[string]string{
+							ownerLabel:   owner,
+							managedLabel: "hotelctl",
+						},
+					})
 				case r.Method == "GET" && path == "/networks/test-network":
-					_ = json.NewEncoder(w).Encode(map[string]any{"Name": "test-network", "Labels": labels(state)})
+					_ = json.NewEncoder(w).Encode(map[string]any{
+						"Name":   "test-network",
+						"Labels": labels(state),
+					})
 				case r.Method == "GET" && strings.HasPrefix(path, "/images/"):
 					fmt.Fprint(w, `{"Id":"image"}`)
 				case r.Method == "DELETE" && path == "/containers/old":
@@ -86,7 +131,10 @@ func TestServicePortUpdatePreservesVolumeAndOwner(t *testing.T) {
 						Labels     map[string]string
 						HostConfig struct {
 							PortBindings nat.PortMap
-							Mounts       []struct{ Source, Target string }
+							Mounts       []struct {
+								Source string
+								Target string
+							}
 						}
 					}
 					if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -117,7 +165,9 @@ func TestServicePortUpdatePreservesVolumeAndOwner(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			engine := &Engine{client: api}
+			engine := &Engine{
+				client: api,
+			}
 			defer engine.Close()
 			err = engine.Ensure(context.Background(), state, io.Discard)
 			if owned {

@@ -12,5 +12,39 @@ http_server:
   port: 8080
   admin_port: 8081
 
-# Echo has no downstream dependencies yet.
-service: {}
+service:
+  {}
+
+postgres_dsn: "postgres://checkin:checkin-local@check-in-postgres:5432/checkin?sslmode=disable"
+
+kafka_brokers: ["localhost:9092"]
+
+postgres:
+  max_connections: 10
+  min_connections: 0
+  max_idle_connections: 0
+  max_conn_lifetime: 1h
+outbox:
+  limits:
+    locked_keys_limit: 100
+    messages_limit: 100
+    max_err_count_for_message: 10
+  topics:
+    checkin.events.v1:
+      batch_size: 50
+      worker:
+        interval: 1s
+        concurrency: 1
+
+consumer_group: "check-in-booking-events"
+inbox:
+  config:
+    messages_limit: 100
+    max_err_count_for_message: 5
+    normal_messages_poll_interval: 1s
+    error_messages_poll_interval: 5s
+  topics:
+    booking.events.v1:
+      batch_size: 1
+
+timezone: Europe/Moscow

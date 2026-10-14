@@ -24,6 +24,9 @@ func (m *Manager) Up(ctx context.Context, services []config.Service) (err error)
 	if err != nil {
 		return err
 	}
+	if state.Reset != nil {
+		return fmt.Errorf("сброс данных не завершён; выполните hotelctl reset --yes")
+	}
 	if err = m.compatible(state); err != nil {
 		return err
 	}
@@ -76,11 +79,24 @@ func (m *Manager) Up(ctx context.Context, services []config.Service) (err error)
 func (m *Manager) addresses() {
 	for _, service := range m.Config.Services {
 		if service.GRPC.Host != 0 {
-			fmt.Fprintf(m.Streams.Out, "%s: gRPC 127.0.0.1:%d, admin http://127.0.0.1:%d/healthcheck/live\n", service.Name, service.GRPC.Host, service.Admin.Host)
+			fmt.Fprintf(
+				m.Streams.Out,
+				"%s: gRPC 127.0.0.1:%d, admin http://127.0.0.1:%d/healthcheck/live\n",
+				service.Name,
+				service.GRPC.Host,
+				service.Admin.Host,
+			)
 		}
 	}
 	p := m.Config.Runtime.Ports
-	fmt.Fprintf(m.Streams.Out, "\nHTTP:    http://localhost:%d/v1/echo\nSwagger: http://localhost:%d/docs/\ngRPC:    127.0.0.1:%d\nAdmin:   http://localhost:%d/healthcheck/live\n", p.HTTP, p.HTTP, p.GRPC, p.Admin)
+	fmt.Fprintf(
+		m.Streams.Out,
+		"\nHTTP:    http://localhost:%d/v1/echo\nSwagger: http://localhost:%d/docs/\ngRPC:    127.0.0.1:%d\nAdmin:   http://localhost:%d/healthcheck/live\n",
+		p.HTTP,
+		p.HTTP,
+		p.GRPC,
+		p.Admin,
+	)
 }
 
 func (m *Manager) build(ctx context.Context, state *project.State, services []config.Service) error {
@@ -98,7 +114,12 @@ func (m *Manager) build(ctx context.Context, state *project.State, services []co
 	return nil
 }
 
-func (m *Manager) deploy(ctx context.Context, state *project.State, services []config.Service, client *kube.Client) error {
+func (m *Manager) deploy(
+	ctx context.Context,
+	state *project.State,
+	services []config.Service,
+	client *kube.Client,
+) error {
 	// Validate/render all selected manifests before mutating Kubernetes resources.
 	for _, service := range services {
 		image := state.Images[service.Name]
@@ -106,6 +127,38 @@ func (m *Manager) deploy(ctx context.Context, state *project.State, services []c
 			return fmt.Errorf("%s has no built image; run hotelctl build %s", service.Name, service.Name)
 		}
 		if _, err := kube.Render(m.Config.Root, service, image); err != nil {
+			return err
+		}
+	}
+	if kube.NeedsBookingDependencies(services) {
+		resources, err := kube.RenderBookingDependencies(m.Config.Root)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintln(m.Streams.Out, "Запуск отдельных PostgreSQL и общей Kafka")
+		if err = client.Apply(ctx, resources.Infrastructure, m.Streams.Out); err != nil {
+			return err
+		}
+		for _, name := range []string{
+			"booking-postgres",
+			"check-in-postgres",
+			"hotels-postgres",
+			"review-postgres",
+			"booking-kafka",
+		} {
+			if err = client.WaitDeployment(ctx, config.Service{
+				Name:       name,
+				Deployment: name,
+				Namespace:  "hotelflow",
+			}); err != nil {
+				return err
+			}
+		}
+		fmt.Fprintln(m.Streams.Out, "Применение миграций и учебных данных")
+		if err = client.Apply(ctx, resources.Migrations, m.Streams.Out); err != nil {
+			return err
+		}
+		if err = client.WaitJob(ctx, "hotelflow", resources.JobName); err != nil {
 			return err
 		}
 	}

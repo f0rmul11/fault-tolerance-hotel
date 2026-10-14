@@ -1,0 +1,14 @@
+--- a/loaders/postgres.go
++++ b/loaders/postgres.go
+@@ -331,6 +331,11 @@
+ 
+ 		// find column
+ 		found := false
++		// Expression indexes have no table column for attribute zero.
++		if cid == 0 {
++			return nil, nil
++		}
++
+ 		var c *models.IndexColumn
+ 		for _, ic := range cols {
+ 			if cid == ic.Cid {

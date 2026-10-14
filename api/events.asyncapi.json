@@ -1,0 +1,774 @@
+{
+  "asyncapi": "2.6.0",
+  "info": {
+    "title": "HotelFlow Booking / Check-in request-reply",
+    "version": "1.0.0",
+    "description": "Собственные сущности Booking и CheckIn. Явные события и идемпотентность по correlation-id."
+  },
+  "defaultContentType": "application/json",
+  "servers": {
+    "kafka": {
+      "url": "kafka:9092",
+      "protocol": "kafka"
+    }
+  },
+  "channels": {
+    "booking.events.v1": {
+      "publish": {
+        "operationId": "booking_publish",
+        "x-producer": "booking",
+        "message": {
+          "oneOf": [
+            {
+              "$ref": "#/components/messages/booking.confirmed.v1"
+            },
+            {
+              "$ref": "#/components/messages/booking.activated.v1"
+            },
+            {
+              "$ref": "#/components/messages/booking.canceled.v1"
+            },
+            {
+              "$ref": "#/components/messages/booking.checkin-rejected.v1"
+            }
+          ]
+        }
+      },
+      "subscribe": {
+        "operationId": "check_in_consume",
+        "x-consumer": "check-in",
+        "message": {
+          "oneOf": [
+            {
+              "$ref": "#/components/messages/booking.confirmed.v1"
+            },
+            {
+              "$ref": "#/components/messages/booking.activated.v1"
+            },
+            {
+              "$ref": "#/components/messages/booking.canceled.v1"
+            },
+            {
+              "$ref": "#/components/messages/booking.checkin-rejected.v1"
+            }
+          ]
+        }
+      },
+      "bindings": {
+        "kafka": {
+          "topic": "booking.events.v1",
+          "bindingVersion": "0.4.0"
+        }
+      }
+    },
+    "checkin.events.v1": {
+      "publish": {
+        "operationId": "check_in_publish",
+        "x-producer": "check-in",
+        "message": {
+          "oneOf": [
+            {
+              "$ref": "#/components/messages/checkin.arrival-requested.v1"
+            },
+            {
+              "$ref": "#/components/messages/checkin.cancellation-requested.v1"
+            }
+          ]
+        }
+      },
+      "subscribe": {
+        "operationId": "booking_consume",
+        "x-consumer": "booking",
+        "message": {
+          "oneOf": [
+            {
+              "$ref": "#/components/messages/checkin.arrival-requested.v1"
+            },
+            {
+              "$ref": "#/components/messages/checkin.cancellation-requested.v1"
+            }
+          ]
+        }
+      },
+      "bindings": {
+        "kafka": {
+          "topic": "checkin.events.v1",
+          "bindingVersion": "0.4.0"
+        }
+      }
+    }
+  },
+  "components": {
+    "messages": {
+      "booking.confirmed.v1": {
+        "name": "booking.confirmed.v1",
+        "contentType": "application/json",
+        "payload": {
+          "$ref": "#/components/schemas/booking.confirmed.v1"
+        },
+        "headers": {
+          "type": "object",
+          "properties": {
+            "x-correlation-id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "x-app-name": {
+              "type": "string"
+            },
+            "x-event-type": {
+              "type": "string",
+              "enum": [
+                "booking.confirmed.v1"
+              ]
+            }
+          },
+          "required": [
+            "x-correlation-id",
+            "x-app-name",
+            "x-event-type"
+          ]
+        },
+        "correlationId": {
+          "location": "$message.header#/x-correlation-id"
+        },
+        "x-idempotency": "x-correlation-id must equal payload correlation_id; a reply has a new ID and carries causation_id."
+      },
+      "checkin.arrival-requested.v1": {
+        "name": "checkin.arrival-requested.v1",
+        "contentType": "application/json",
+        "payload": {
+          "$ref": "#/components/schemas/checkin.arrival-requested.v1"
+        },
+        "headers": {
+          "type": "object",
+          "properties": {
+            "x-correlation-id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "x-app-name": {
+              "type": "string"
+            },
+            "x-event-type": {
+              "type": "string",
+              "enum": [
+                "checkin.arrival-requested.v1"
+              ]
+            }
+          },
+          "required": [
+            "x-correlation-id",
+            "x-app-name",
+            "x-event-type"
+          ]
+        },
+        "correlationId": {
+          "location": "$message.header#/x-correlation-id"
+        },
+        "x-idempotency": "x-correlation-id must equal payload correlation_id; a reply has a new ID and carries causation_id."
+      },
+      "checkin.cancellation-requested.v1": {
+        "name": "checkin.cancellation-requested.v1",
+        "contentType": "application/json",
+        "payload": {
+          "$ref": "#/components/schemas/checkin.cancellation-requested.v1"
+        },
+        "headers": {
+          "type": "object",
+          "properties": {
+            "x-correlation-id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "x-app-name": {
+              "type": "string"
+            },
+            "x-event-type": {
+              "type": "string",
+              "enum": [
+                "checkin.cancellation-requested.v1"
+              ]
+            }
+          },
+          "required": [
+            "x-correlation-id",
+            "x-app-name",
+            "x-event-type"
+          ]
+        },
+        "correlationId": {
+          "location": "$message.header#/x-correlation-id"
+        },
+        "x-idempotency": "x-correlation-id must equal payload correlation_id; a reply has a new ID and carries causation_id."
+      },
+      "booking.activated.v1": {
+        "name": "booking.activated.v1",
+        "contentType": "application/json",
+        "payload": {
+          "$ref": "#/components/schemas/booking.activated.v1"
+        },
+        "headers": {
+          "type": "object",
+          "properties": {
+            "x-correlation-id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "x-app-name": {
+              "type": "string"
+            },
+            "x-event-type": {
+              "type": "string",
+              "enum": [
+                "booking.activated.v1"
+              ]
+            }
+          },
+          "required": [
+            "x-correlation-id",
+            "x-app-name",
+            "x-event-type"
+          ]
+        },
+        "correlationId": {
+          "location": "$message.header#/x-correlation-id"
+        },
+        "x-idempotency": "x-correlation-id must equal payload correlation_id; a reply has a new ID and carries causation_id."
+      },
+      "booking.canceled.v1": {
+        "name": "booking.canceled.v1",
+        "contentType": "application/json",
+        "payload": {
+          "$ref": "#/components/schemas/booking.canceled.v1"
+        },
+        "headers": {
+          "type": "object",
+          "properties": {
+            "x-correlation-id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "x-app-name": {
+              "type": "string"
+            },
+            "x-event-type": {
+              "type": "string",
+              "enum": [
+                "booking.canceled.v1"
+              ]
+            }
+          },
+          "required": [
+            "x-correlation-id",
+            "x-app-name",
+            "x-event-type"
+          ]
+        },
+        "correlationId": {
+          "location": "$message.header#/x-correlation-id"
+        },
+        "x-idempotency": "x-correlation-id must equal payload correlation_id; a reply has a new ID and carries causation_id."
+      },
+      "booking.checkin-rejected.v1": {
+        "name": "booking.checkin-rejected.v1",
+        "contentType": "application/json",
+        "payload": {
+          "$ref": "#/components/schemas/booking.checkin-rejected.v1"
+        },
+        "headers": {
+          "type": "object",
+          "properties": {
+            "x-correlation-id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "x-app-name": {
+              "type": "string"
+            },
+            "x-event-type": {
+              "type": "string",
+              "enum": [
+                "booking.checkin-rejected.v1"
+              ]
+            }
+          },
+          "required": [
+            "x-correlation-id",
+            "x-app-name",
+            "x-event-type"
+          ]
+        },
+        "correlationId": {
+          "location": "$message.header#/x-correlation-id"
+        },
+        "x-idempotency": "x-correlation-id must equal payload correlation_id; a reply has a new ID and carries causation_id."
+      }
+    },
+    "schemas": {
+      "booking.confirmed.v1": {
+        "type": "object",
+        "properties": {
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "event_type": {
+            "type": "string",
+            "enum": [
+              "booking.confirmed.v1"
+            ]
+          },
+          "aggregate_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "aggregate_version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "payload": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "room_id": {
+                "type": "string",
+                "pattern": "^[1-9][0-9]*$",
+                "description": "Системный ID номера, положительное число в строке.",
+                "example": "1"
+              },
+              "guest_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "starts_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "ends_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "created_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "version": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "CONFIRMED"
+                ]
+              },
+              "room_number": {
+                "type": "string",
+                "description": "Номер внутри отеля на момент бронирования.",
+                "example": "101"
+              },
+              "room_type": {
+                "type": "string",
+                "description": "Тип номера на момент бронирования.",
+                "example": "Standard"
+              }
+            },
+            "required": [
+              "id",
+              "room_id",
+              "guest_id",
+              "starts_at",
+              "ends_at",
+              "created_at",
+              "version",
+              "status",
+              "room_number",
+              "room_type"
+            ]
+          }
+        },
+        "required": [
+          "correlation_id",
+          "event_type",
+          "aggregate_id",
+          "aggregate_version",
+          "occurred_at",
+          "request_id",
+          "payload"
+        ]
+      },
+      "checkin.arrival-requested.v1": {
+        "type": "object",
+        "properties": {
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "event_type": {
+            "type": "string",
+            "enum": [
+              "checkin.arrival-requested.v1"
+            ]
+          },
+          "aggregate_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "aggregate_version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "payload": {
+            "type": "object",
+            "properties": {
+              "checkin_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "booking_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "actor_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "request_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "checkin_version": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "requested_at": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "checkin_id",
+              "booking_id",
+              "actor_id",
+              "request_id",
+              "checkin_version",
+              "requested_at"
+            ]
+          }
+        },
+        "required": [
+          "correlation_id",
+          "event_type",
+          "aggregate_id",
+          "aggregate_version",
+          "occurred_at",
+          "request_id",
+          "payload"
+        ]
+      },
+      "checkin.cancellation-requested.v1": {
+        "type": "object",
+        "properties": {
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "event_type": {
+            "type": "string",
+            "enum": [
+              "checkin.cancellation-requested.v1"
+            ]
+          },
+          "aggregate_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "aggregate_version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "payload": {
+            "type": "object",
+            "properties": {
+              "checkin_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "booking_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "actor_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "request_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "checkin_version": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "requested_at": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "checkin_id",
+              "booking_id",
+              "actor_id",
+              "request_id",
+              "checkin_version",
+              "requested_at"
+            ]
+          }
+        },
+        "required": [
+          "correlation_id",
+          "event_type",
+          "aggregate_id",
+          "aggregate_version",
+          "occurred_at",
+          "request_id",
+          "payload"
+        ]
+      },
+      "booking.activated.v1": {
+        "type": "object",
+        "properties": {
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "event_type": {
+            "type": "string",
+            "enum": [
+              "booking.activated.v1"
+            ]
+          },
+          "aggregate_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "aggregate_version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "payload": {
+            "type": "object",
+            "properties": {
+              "checkin_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "booking_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "causation_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "checkin_version": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "required": [
+              "checkin_id",
+              "booking_id",
+              "causation_id",
+              "checkin_version"
+            ]
+          }
+        },
+        "required": [
+          "correlation_id",
+          "event_type",
+          "aggregate_id",
+          "aggregate_version",
+          "occurred_at",
+          "request_id",
+          "payload"
+        ]
+      },
+      "booking.canceled.v1": {
+        "type": "object",
+        "properties": {
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "event_type": {
+            "type": "string",
+            "enum": [
+              "booking.canceled.v1"
+            ]
+          },
+          "aggregate_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "aggregate_version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "payload": {
+            "type": "object",
+            "properties": {
+              "checkin_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "booking_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "causation_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "checkin_version": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "required": [
+              "checkin_id",
+              "booking_id",
+              "causation_id",
+              "checkin_version"
+            ]
+          }
+        },
+        "required": [
+          "correlation_id",
+          "event_type",
+          "aggregate_id",
+          "aggregate_version",
+          "occurred_at",
+          "request_id",
+          "payload"
+        ]
+      },
+      "booking.checkin-rejected.v1": {
+        "type": "object",
+        "properties": {
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "event_type": {
+            "type": "string",
+            "enum": [
+              "booking.checkin-rejected.v1"
+            ]
+          },
+          "aggregate_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "aggregate_version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "payload": {
+            "type": "object",
+            "properties": {
+              "checkin_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "booking_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "causation_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "checkin_version": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "checkin_id",
+              "booking_id",
+              "causation_id",
+              "checkin_version",
+              "message"
+            ]
+          }
+        },
+        "required": [
+          "correlation_id",
+          "event_type",
+          "aggregate_id",
+          "aggregate_version",
+          "occurred_at",
+          "request_id",
+          "payload"
+        ]
+      }
+    }
+  },
+  "x-delivery": "At-least-once. Immutable correlation-id is the idempotency key; Kafka key=booking_id. Inbox before offset commit; Booking receipt + transition + reply are atomic."
+}

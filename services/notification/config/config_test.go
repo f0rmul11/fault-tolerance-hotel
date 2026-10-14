@@ -27,3 +27,25 @@ func TestEnvironmentOverridesAndInvalidConfig(t *testing.T) {
 		t.Fatal("unbounded shutdown must fail")
 	}
 }
+
+func TestKafkaConfiguration(t *testing.T) {
+	t.Setenv("CONFIG_PATH", "config.yaml")
+	t.Setenv("KAFKA_BROKERS", "first:9092,second:9092")
+	t.Setenv("KAFKA_CONSUMER_GROUP", "notification-test")
+	cfg, err := Read()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.KafkaBrokers) != 2 || cfg.ConsumerGroup != "notification-test" {
+		t.Fatalf("Kafka environment was not applied: %+v", cfg)
+	}
+	cfg.ConsumerGroup = ""
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("missing consumer group accepted")
+	}
+	cfg.ConsumerGroup = "notification-test"
+	cfg.KafkaBrokers = nil
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("missing brokers accepted")
+	}
+}

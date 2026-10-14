@@ -24,8 +24,10 @@ import (
 
 	echoV1 "api-gateway/internal/pkg/pb/api-gateway/echo/v1"
 
+	"github.com/gofrs/uuid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 )
 
 // Проверяем именно App с Clay, настоящими TCP listeners и сгенерированными
@@ -57,7 +59,9 @@ func TestAppTransportsAndShutdown(t *testing.T) {
 		t.Fatal(err)
 	}
 	done := make(chan error, 1)
-	go func() { done <- process.Wait() }()
+	go func() {
+		done <- process.Wait()
+	}()
 	t.Cleanup(func() {
 		_ = process.Process.Signal(syscall.SIGTERM)
 		select {
@@ -72,7 +76,9 @@ func TestAppTransportsAndShutdown(t *testing.T) {
 		}
 	})
 
-	client := &http.Client{Timeout: time.Second}
+	client := &http.Client{
+		Timeout: time.Second,
+	}
 	defer client.CloseIdleConnections()
 	base := "http://127.0.0.1:" + httpPort
 	deadline := time.Now().Add(5 * time.Second)
@@ -102,9 +108,16 @@ func TestAppTransportsAndShutdown(t *testing.T) {
 	}
 	defer conn.Close()
 	grpcClient := echoV1.NewEchoServiceClient(conn)
-	for _, message := range []string{"HotelFlow", "Привет, отель! & + / ?", "", "line one\nline two"} {
+	for _, message := range []string{
+		"HotelFlow",
+		"Привет, отель! & + / ?",
+		"",
+		"line one\nline two",
+	} {
 		t.Run(fmt.Sprintf("message=%q", message), func(t *testing.T) {
-			payload, _ := json.Marshal(map[string]string{"message": message})
+			payload, _ := json.Marshal(map[string]string{
+				"message": message,
+			})
 			response, err := client.Post(base+"/v1/echo", "application/json", bytes.NewReader(payload))
 			if err != nil {
 				t.Fatal(err)
@@ -117,19 +130,66 @@ func TestAppTransportsAndShutdown(t *testing.T) {
 			assertEcho(t, response, message)
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
-			result, err := grpcClient.Echo(ctx, &echoV1.EchoRequest{Message: message}, grpc.WaitForReady(true))
+			var headers metadata.MD
+			result, err := grpcClient.Echo(ctx, &echoV1.EchoRequest{
+				Message: message,
+			}, grpc.WaitForReady(true), grpc.Header(&headers))
 			if err != nil || result.GetMessage() != message {
 				t.Fatalf("gRPC Echo = %v, %v", result, err)
 			}
+			if values := headers.Get("x-request-id"); len(values) != 1 {
+				t.Fatalf("gRPC request-id: %v", values)
+			} else if _, err := uuid.FromString(values[0]); err != nil {
+				t.Fatal(err)
+			}
 		})
 	}
+	t.Run("request ID preserved on both transports", func(t *testing.T) {
+		id := "1b085786-a2db-43aa-8387-4e67cd626647"
+		request, err := http.NewRequest(http.MethodGet, base+"/v1/echo", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		request.Header.Set("X-Request-Id", id)
+		response, err := client.Do(request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		response.Body.Close()
+		if response.StatusCode != http.StatusOK || response.Header.Get("X-Request-Id") != id {
+			t.Fatalf("HTTP request-id: status=%d, headers=%v", response.StatusCode, response.Header)
+		}
+		ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+		defer cancel()
+		ctx = metadata.NewOutgoingContext(ctx, metadata.Pairs("x-request-id", id))
+		var headers metadata.MD
+		if _, err := grpcClient.Echo(ctx, &echoV1.EchoRequest{}, grpc.Header(&headers)); err != nil {
+			t.Fatal(err)
+		}
+		if values := headers.Get("x-request-id"); len(values) != 1 || values[0] != id {
+			t.Fatalf("gRPC request-id: %v", values)
+		}
+	})
+	t.Run("request ID returned on forbidden HTTP request", func(t *testing.T) {
+		response, err := client.Post(base+"/v1/bookings", "application/json", strings.NewReader(`{}`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer response.Body.Close()
+		if response.StatusCode != http.StatusForbidden {
+			t.Fatalf("HTTP status: %d", response.StatusCode)
+		}
+		if _, err := uuid.FromString(response.Header.Get("X-Request-Id")); err != nil {
+			t.Fatal(err)
+		}
+	})
 	t.Run("invalid JSON", func(t *testing.T) {
 		response, err := client.Post(base+"/v1/echo", "application/json", strings.NewReader(`{"message":`))
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer response.Body.Close()
-		if response.StatusCode != http.StatusBadRequest {
+		if response.StatusCode != http.StatusUnprocessableEntity {
 			t.Fatalf("invalid JSON status: %d", response.StatusCode)
 		}
 	})
@@ -183,6 +243,9 @@ func assertEcho(t *testing.T, response *http.Response, want string) {
 	if err := json.NewDecoder(response.Body).Decode(&result); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := uuid.FromString(response.Header.Get("X-Request-Id")); err != nil {
+		t.Fatal(err)
+	}
 	if result.Message != want {
 		t.Fatalf("Echo message = %q, want %q", result.Message, want)
 	}
@@ -197,7 +260,9 @@ func TestGatewayProcess(t *testing.T) {
 }
 
 func TestHealthLifecycle(t *testing.T) {
-	app := &App{publicCloser: closer.New()}
+	app := &App{
+		publicCloser: closer.New(),
+	}
 	if err := app.initHealthCheck(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -229,7 +294,10 @@ func TestAdminStartsBeforeMain(t *testing.T) {
 	adminPort := availablePort(t)
 	t.Setenv("CONFIG_PATH", configPath)
 	t.Setenv("ADMIN_HTTP_PORT", adminPort)
-	app := &App{publicCloser: closer.New(), adminCloser: closer.New()}
+	app := &App{
+		publicCloser: closer.New(),
+		adminCloser:  closer.New(),
+	}
 	ctx := context.Background()
 	if err := app.initAdminServer(ctx); err != nil {
 		t.Fatal(err)
@@ -239,7 +307,9 @@ func TestAdminStartsBeforeMain(t *testing.T) {
 	if app.mainServer != nil {
 		t.Fatal("main server must not be initialized yet")
 	}
-	client := &http.Client{Timeout: time.Second}
+	client := &http.Client{
+		Timeout: time.Second,
+	}
 	defer client.CloseIdleConnections()
 	for path, want := range map[string]int{
 		healthcheck.LivenessPath:  http.StatusOK,

@@ -1,0 +1,274 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "api-gateway/checkin/v1/checkin.proto",
+    "version": "version not set"
+  },
+  "tags": [
+    {
+      "name": "CheckinService"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/v1/check-in/bookings": {
+      "get": {
+        "summary": "Возвращает EXPECTED/ARRIVING с началом проживания в заданном диапазоне.",
+        "operationId": "CheckinService_ListArrivals",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/api_gateway.checkin.v1.ListArrivalsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "startsAt",
+            "description": "Начало фильтра включительно, RFC3339. Без обеих границ — сегодня по часовому поясу Check-in\n(Europe/Moscow по умолчанию).",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "endsAt",
+            "description": "Конец фильтра исключительно, RFC3339. При явном фильтре обе границы обязательны.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "CheckinService"
+        ]
+      }
+    },
+    "/v1/check-in/bookings/{bookingId}/activate": {
+      "post": {
+        "summary": "Запрашивает активацию брони. Итог подтверждается ответным событием Booking.",
+        "operationId": "CheckinService_ActivateBooking",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/api_gateway.checkin.v1.ActivateBookingResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "bookingId",
+            "description": "UUID брони в Booking.",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/api_gateway.checkin.v1.CheckinService.ActivateBookingBody"
+            }
+          }
+        ],
+        "tags": [
+          "CheckinService"
+        ]
+      }
+    },
+    "/v1/check-in/bookings/{bookingId}/cancel": {
+      "post": {
+        "summary": "Запрашивает отмену брони. Итог подтверждается ответным событием Booking.",
+        "operationId": "CheckinService_CancelBooking",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/api_gateway.checkin.v1.CancelBookingResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "bookingId",
+            "description": "UUID брони в Booking.",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/api_gateway.checkin.v1.CheckinService.CancelBookingBody"
+            }
+          }
+        ],
+        "tags": [
+          "CheckinService"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "api_gateway.checkin.v1.ActivateBookingResponse": {
+      "type": "object",
+      "properties": {
+        "checkin": {
+          "$ref": "#/definitions/api_gateway.checkin.v1.CheckInView",
+          "description": "Сведения об оформлении заселения."
+        }
+      },
+      "description": "Текущее заселение; ответ Booking применяется асинхронно."
+    },
+    "api_gateway.checkin.v1.CancelBookingResponse": {
+      "type": "object",
+      "properties": {
+        "checkin": {
+          "$ref": "#/definitions/api_gateway.checkin.v1.CheckInView",
+          "description": "Сведения об оформлении заселения."
+        }
+      },
+      "description": "Текущее заселение; ответ Booking применяется асинхронно."
+    },
+    "api_gateway.checkin.v1.CheckInView": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "UUID заселения в Check-in."
+        },
+        "bookingId": {
+          "type": "string",
+          "description": "UUID брони в Booking."
+        },
+        "roomId": {
+          "type": "string",
+          "description": "Положительный числовой ID номера в системе, передаётся строкой, например \"1\"."
+        },
+        "guestId": {
+          "type": "string",
+          "description": "UUID гостя, на которого оформлена бронь."
+        },
+        "startsAt": {
+          "type": "string",
+          "description": "Начало проживания включительно, RFC3339 с часовым поясом, до микросекунд."
+        },
+        "endsAt": {
+          "type": "string",
+          "description": "Конец проживания исключительно, RFC3339 с часовым поясом, до микросекунд."
+        },
+        "status": {
+          "type": "string",
+          "description": "EXPECTED, ARRIVING, CHECKED_IN, CANCELING или CANCELED."
+        },
+        "version": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Версия сохранённого состояния сущности."
+        },
+        "failure": {
+          "type": "string",
+          "description": "Русское пояснение последнего отказа Booking; пустая строка, если отказа нет."
+        },
+        "roomNumber": {
+          "type": "string",
+          "description": "Снимок обозначения номера внутри отеля на момент создания брони."
+        },
+        "roomType": {
+          "type": "string",
+          "description": "Снимок типа номера при создании брони, например \"Standard\"."
+        }
+      },
+      "description": "Состояние оформления заселения, связанного с бронью через booking_id."
+    },
+    "api_gateway.checkin.v1.CheckinService.ActivateBookingBody": {
+      "type": "object",
+      "properties": {
+        "idempotencyKey": {
+          "type": "string",
+          "description": "UUID операции. Повторяйте неизменным с теми же данными при потере ответа."
+        }
+      },
+      "description": "Запрос на оформление прибытия гостя по брони."
+    },
+    "api_gateway.checkin.v1.CheckinService.CancelBookingBody": {
+      "type": "object",
+      "properties": {
+        "idempotencyKey": {
+          "type": "string",
+          "description": "UUID операции. Повторяйте неизменным с теми же данными при потере ответа."
+        }
+      },
+      "description": "Запрос на отмену подтверждённой или активной брони."
+    },
+    "api_gateway.checkin.v1.ListArrivalsResponse": {
+      "type": "object",
+      "properties": {
+        "checkins": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/api_gateway.checkin.v1.CheckInView"
+          },
+          "description": "Заселения, соответствующие фильтру."
+        }
+      },
+      "description": "Ожидаемые и оформляемые прибытия в запрошенном диапазоне."
+    },
+    "google.protobuf.Any": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": {}
+    },
+    "google.rpc.Status": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/google.protobuf.Any"
+          }
+        }
+      }
+    }
+  }
+}

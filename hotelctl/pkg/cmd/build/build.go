@@ -15,7 +15,9 @@ type BuildOptions struct {
 }
 
 func NewBuildOptions(streams iostreams.IOStreams) *BuildOptions {
-	return &BuildOptions{Options: util.NewOptions(streams)}
+	return &BuildOptions{
+		Options: util.NewOptions(streams),
+	}
 }
 
 func NewCmdBuild(f util.Factory, streams iostreams.IOStreams) *cobra.Command {
@@ -47,7 +49,9 @@ func (o *BuildOptions) Complete(f util.Factory, args []string) error {
 	return err
 }
 
-func (o *BuildOptions) Validate() error { return o.Options.Validate() }
+func (o *BuildOptions) Validate() error {
+	return o.Options.Validate()
+}
 
 func (o *BuildOptions) Run(ctx context.Context) error {
 	runner, err := o.NewStand()

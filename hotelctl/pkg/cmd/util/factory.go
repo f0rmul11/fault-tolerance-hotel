@@ -16,19 +16,31 @@ type Factory interface {
 	Config() (config.Config, error)
 	NewStand(config.Config, iostreams.IOStreams) (stand.Interface, error)
 }
+
 type ConfigFlags struct {
 	Project    string
 	ConfigFile string
 }
 
 func (f *ConfigFlags) AddFlags(flags *pflag.FlagSet) {
-	flags.StringVar(&f.Project, "project", "", "Project directory (defaults to the closest parent with hotel.yaml)")
+	flags.StringVar(
+		&f.Project,
+		"project",
+		"",
+		"Project directory (defaults to the closest parent with hotel.yaml)",
+	)
 	flags.StringVar(&f.ConfigFile, "config", "", "Path to an alternative hotel.yaml")
 }
 
-type factory struct{ flags *ConfigFlags }
+type factory struct {
+	flags *ConfigFlags
+}
 
-func NewFactory(flags *ConfigFlags) Factory { return &factory{flags: flags} }
+func NewFactory(flags *ConfigFlags) Factory {
+	return &factory{
+		flags: flags,
+	}
+}
 
 func (f *factory) Config() (config.Config, error) {
 	return config.Load(f.flags.Project, f.flags.ConfigFile)
@@ -51,7 +63,10 @@ type Options struct {
 }
 
 func NewOptions(streams iostreams.IOStreams) Options {
-	return Options{Timeout: 5 * time.Minute, IOStreams: streams}
+	return Options{
+		Timeout:   5 * time.Minute,
+		IOStreams: streams,
+	}
 }
 
 func (o *Options) Complete(f Factory) error {

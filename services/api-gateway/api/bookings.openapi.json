@@ -1,0 +1,1044 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "HotelFlow — бронирование и заселение",
+    "version": "5.0.0-checkin",
+    "description": "Clay gateway проксирует Booking. Booking атомарно сохраняет бронь, период, ключ идемпотентности и outbox. Room владеет каталогом и условиями номеров."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Logical forwarded gateway address; map to existing stand port when implementing."
+    }
+  ],
+  "paths": {
+    "/v1/bookings": {
+      "post": {
+        "operationId": "createBooking",
+        "summary": "Создать бронь конкретного номера на период.",
+        "parameters": [
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Demo-Role",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "GUEST"
+              ]
+            },
+            "description": "Учебная роль; владелец повторно проверяет права."
+          },
+          {
+            "name": "X-Demo-Actor",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Обязателен для GUEST. Владение бронью проверяет Booking."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Сохранённая подтверждённая бронь.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Нет прав на операцию или чужую бронь.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RpcStatus"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ресурс не найден.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RpcStatus"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "FailedPrecondition или Aborted: конфликт либо запрещённое состояние.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RpcStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Некорректное тело запроса, UUID, период или длительность для выбранного номера.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RpcStatus"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Внутренняя ошибка.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RpcStatus"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Сервис временно недоступен.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RpcStatus"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Истекло время ожидания ответа.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RpcStatus"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBookingInput"
+              }
+            }
+          }
+        },
+        "description": "Gateway выполняет один RPC Booking.CreateBooking без повторов. Идемпотентность публичного POST отсутствует: повтор может создать другую бронь. Для чтения owner trailers HTTP-клиент передаёт TE: trailers; Grpc-Trailer-X-Error-Code содержит машинную причину, Grpc-Trailer-X-Booking-Id — известный ID брони."
+      }
+    },
+    "/v1/bookings/{booking_id}": {
+      "get": {
+        "operationId": "getBooking",
+        "summary": "Прочитать бронь; GUEST видит только свою.",
+        "parameters": [
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Demo-Role",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "GUEST",
+                "RECEPTION",
+                "OPERATOR"
+              ]
+            },
+            "description": "Учебная роль; владелец повторно проверяет права."
+          },
+          {
+            "name": "X-Demo-Actor",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Обязателен для GUEST. Владение бронью проверяет Booking."
+          },
+          {
+            "name": "booking_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Сохранённая подтверждённая бронь.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Нет прав на операцию или чужую бронь.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RpcStatus"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ресурс не найден.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RpcStatus"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "FailedPrecondition или Aborted: конфликт либо запрещённое состояние.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RpcStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Некорректное тело запроса, UUID, период или длительность для выбранного номера.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RpcStatus"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Внутренняя ошибка.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RpcStatus"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Сервис временно недоступен.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RpcStatus"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Истекло время ожидания ответа.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RpcStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/rooms/availability": {
+      "post": {
+        "operationId": "checkAvailability",
+        "summary": "Свободные номера отеля на период. Результат не резервирует номер.",
+        "parameters": [
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Demo-Role",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "GUEST",
+                "RECEPTION",
+                "OPERATOR"
+              ]
+            },
+            "description": "Учебная роль; владелец повторно проверяет права."
+          },
+          {
+            "name": "X-Demo-Actor",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Обязателен для GUEST."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "hotel_id",
+                  "starts_at",
+                  "ends_at"
+                ],
+                "properties": {
+                  "hotel_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "starts_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Начало периода, RFC3339 с часовым поясом; точность до микросекунд."
+                  },
+                  "ends_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Исключительная правая граница периода."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Снимок доступности; при создании бронь проверяется повторно.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "room_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^[1-9][0-9]*$",
+                        "example": "1"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/check-in/bookings": {
+      "get": {
+        "summary": "Ожидающие заселения брони по дате начала",
+        "parameters": [
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Demo-Role",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "RECEPTION",
+                "OPERATOR"
+              ]
+            },
+            "description": "Учебная роль; владелец повторно проверяет права."
+          },
+          {
+            "name": "X-Demo-Actor",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "UUID оператора"
+          },
+          {
+            "name": "starts_at",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "ends_at",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Текущий результат",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "bookings": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Arrival"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Нет прав на операцию или чужую бронь.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RpcStatus"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "FailedPrecondition или Aborted: конфликт либо запрещённое состояние.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RpcStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Некорректное тело запроса, UUID, период или длительность для выбранного номера.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RpcStatus"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Внутренняя ошибка.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RpcStatus"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Сервис временно недоступен.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RpcStatus"
+                }
+              }
+            }
+          }
+        },
+        "description": "CONFIRMED и starts_at в [starts_at,ends_at). Обе query-границы вместе; без них текущие сутки Europe/Moscow."
+      }
+    },
+    "/v1/check-in/bookings/{booking_id}/activate": {
+      "post": {
+        "summary": "Запросить активацию",
+        "parameters": [
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Demo-Role",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "RECEPTION",
+                "OPERATOR"
+              ]
+            },
+            "description": "Учебная роль; владелец повторно проверяет права."
+          },
+          {
+            "name": "X-Demo-Actor",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "UUID оператора"
+          },
+          {
+            "name": "booking_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Текущий результат",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "operation": {
+                      "$ref": "#/components/schemas/CheckinOperation"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Нет прав на операцию или чужую бронь.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RpcStatus"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "FailedPrecondition или Aborted: конфликт либо запрещённое состояние.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RpcStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Некорректное тело запроса, UUID, период или длительность для выбранного номера.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RpcStatus"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Внутренняя ошибка.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RpcStatus"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Сервис временно недоступен.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RpcStatus"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "idempotency_key"
+                ],
+                "properties": {
+                  "idempotency_key": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "description": "Повтор того же ключа возвращает текущую операцию. PENDING означает ожидание ответа Booking; REJECTED содержит русское пояснение."
+      }
+    },
+    "/v1/check-in/bookings/{booking_id}/cancel": {
+      "post": {
+        "summary": "Запросить отмену CONFIRMED или ACTIVE",
+        "parameters": [
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Demo-Role",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "RECEPTION",
+                "OPERATOR"
+              ]
+            },
+            "description": "Учебная роль; владелец повторно проверяет права."
+          },
+          {
+            "name": "X-Demo-Actor",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "UUID оператора"
+          },
+          {
+            "name": "booking_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Текущий результат",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "operation": {
+                      "$ref": "#/components/schemas/CheckinOperation"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Нет прав на операцию или чужую бронь.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RpcStatus"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "FailedPrecondition или Aborted: конфликт либо запрещённое состояние.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RpcStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Некорректное тело запроса, UUID, период или длительность для выбранного номера.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RpcStatus"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Внутренняя ошибка.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RpcStatus"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Сервис временно недоступен.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RpcStatus"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "idempotency_key"
+                ],
+                "properties": {
+                  "idempotency_key": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "description": "Повтор того же ключа возвращает текущую операцию. PENDING означает ожидание ответа Booking; REJECTED содержит русское пояснение."
+      }
+    }
+  },
+  "components": {
+    "headers": {
+      "X-Request-Id": {
+        "description": "UUID запроса, установленный interceptor после разбора тела. Создаётся при отсутствии входного заголовка.",
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      }
+    },
+    "schemas": {
+      "CreateBookingInput": {
+        "type": "object",
+        "properties": {
+          "room_id": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$",
+            "description": "Системный ID номера, положительное число в строке.",
+            "example": "1"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Ключ операции, уникальный в пределах гостя. Повтор с тем же составом возвращает ту же бронь; другой состав — 409."
+          },
+          "starts_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Начало периода, RFC3339 с часовым поясом; точность до микросекунд."
+          },
+          "ends_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Исключительная правая граница периода."
+          }
+        },
+        "required": [
+          "room_id",
+          "idempotency_key",
+          "starts_at",
+          "ends_at"
+        ],
+        "additionalProperties": false
+      },
+      "BookingResponse": {
+        "type": "object",
+        "description": "",
+        "properties": {
+          "booking": {
+            "$ref": "#/components/schemas/BookingView"
+          }
+        },
+        "required": [
+          "booking"
+        ],
+        "additionalProperties": false
+      },
+      "BookingView": {
+        "type": "object",
+        "description": "Снимок владельца Booking. Version участвует в CAS владельца; gateway её не изменяет.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "guest_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "CONFIRMED",
+              "ACTIVE",
+              "CANCELED"
+            ]
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "room_id": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$",
+            "description": "Системный ID номера, положительное число в строке.",
+            "example": "1"
+          },
+          "starts_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Начало периода, RFC3339 с часовым поясом; точность до микросекунд."
+          },
+          "ends_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Исключительная правая граница периода."
+          },
+          "room_number": {
+            "type": "string",
+            "description": "Номер внутри отеля на момент бронирования.",
+            "example": "101"
+          },
+          "room_type": {
+            "type": "string",
+            "description": "Тип номера на момент бронирования.",
+            "example": "Standard"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "created_at",
+          "updated_at",
+          "guest_id",
+          "status",
+          "request_id",
+          "room_id",
+          "starts_at",
+          "ends_at",
+          "room_number",
+          "room_type"
+        ],
+        "additionalProperties": false
+      },
+      "RpcStatus": {
+        "type": "object",
+        "description": "Стандартное JSON-представление gRPC Status; сообщение владельца на русском. Машинная причина и идентификатор брони передаются в trailers.",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "Числовой gRPC-код, например 3 (InvalidArgument) или 9 (FailedPrecondition)."
+          },
+          "message": {
+            "type": "string"
+          },
+          "details": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "details"
+        ]
+      },
+      "Arrival": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "room_id": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$",
+            "description": "Системный ID номера, положительное число в строке.",
+            "example": "1"
+          },
+          "guest_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "CONFIRMED",
+              "ACTIVE",
+              "CANCELED"
+            ]
+          },
+          "starts_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Начало периода, RFC3339 с часовым поясом; точность до микросекунд."
+          },
+          "ends_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Исключительная правая граница периода."
+          },
+          "room_number": {
+            "type": "string",
+            "description": "Номер внутри отеля на момент бронирования.",
+            "example": "101"
+          },
+          "room_type": {
+            "type": "string",
+            "description": "Тип номера на момент бронирования.",
+            "example": "Standard"
+          }
+        },
+        "required": [
+          "id",
+          "room_id",
+          "guest_id",
+          "version",
+          "status",
+          "starts_at",
+          "ends_at",
+          "room_number",
+          "room_type"
+        ]
+      },
+      "CheckinOperation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "booking_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "ACTIVATE",
+              "CANCEL"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "SUCCEEDED",
+              "REJECTED"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "requested_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    }
+  }
+}

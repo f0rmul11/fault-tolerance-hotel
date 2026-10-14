@@ -1,0 +1,14 @@
+version: v2
+clean: true
+# Generate clients directly from the provider's local contract.
+plugins:
+  - local: protoc-gen-go
+    out: internal/pkg/pb/external
+    opt: paths=source_relative
+  - local: protoc-gen-go-grpc
+    out: internal/pkg/pb/external
+    opt: paths=source_relative
+inputs:
+  - directory: ../hotels/api
+    paths:
+      - ../hotels/api/hotels/hotels/v1/hotels.proto

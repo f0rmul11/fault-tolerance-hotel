@@ -18,3 +18,5 @@ type HttpServer struct {
 type Graceful struct {
 	Timeout time.Duration `yaml:"timeout" env:"GRACEFUL_TIMEOUT"`
 }
+
+const CheckinService = "check-in"

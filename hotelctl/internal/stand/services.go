@@ -2,6 +2,7 @@ package stand
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/internal/config"
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/internal/kube"
@@ -36,6 +37,9 @@ func (m *Manager) Deploy(ctx context.Context, services []config.Service) error {
 	if err != nil {
 		return err
 	}
+	if state.Reset != nil {
+		return fmt.Errorf("сброс данных не завершён; выполните hotelctl reset --yes")
+	}
 	client, err := kube.New(m.Config.Kubeconfig())
 	if err != nil {
 		return err
@@ -59,6 +63,9 @@ func (m *Manager) Kubectl(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	command := append([]string{"kubectl", "--kubeconfig=/etc/rancher/k3s/k3s.yaml"}, args...)
+	command := append([]string{
+		"kubectl",
+		"--kubeconfig=/etc/rancher/k3s/k3s.yaml",
+	}, args...)
 	return m.Runtime.Exec(ctx, state, command, m.Streams.In, m.Streams.Out, m.Streams.ErrOut)
 }

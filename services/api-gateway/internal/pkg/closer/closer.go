@@ -29,7 +29,9 @@ type Closer struct {
 }
 
 func New(sig ...os.Signal) *Closer {
-	c := &Closer{done: make(chan struct{})}
+	c := &Closer{
+		done: make(chan struct{}),
+	}
 	if len(sig) > 0 {
 		go func() {
 			ch := make(chan os.Signal, 1)

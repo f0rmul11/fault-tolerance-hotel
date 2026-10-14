@@ -1,8 +1,8 @@
 # Фундаменты сервисов
 
-`availability`, `booking`, `check-in`, `room`, `notification`, `search` — независимые Go-модули.
+`booking`, `check-in`, `review`, `notification`, `hotels` — независимые Go-модули.
 Структура и группировка зависимостей в `App` повторяют api-gateway; admin запускается до основного сервера.
-Базы данных, очереди, кеши и бизнес-операции пока не подключены.
+Hotels владеет каталогом в PostgreSQL. Booking атомарно сохраняет бронь, период, ключ идемпотентности и outbox в собственной БД. Check-in хранит собственное заселение CheckIn и обменивается командами/ответами с Booking через Kafka и inbox/outbox. Review хранит пользовательские рейтинги отелей и читает их батчем. Notification читает события Booking напрямую из Kafka и выводит push-заглушки в stdout, без inbox и БД. У Booking, Check-in, Hotels и Review отдельные PostgreSQL, все таблицы в public. Подробности — [бронирование](booking.md).
 
 ## Проверка
 
@@ -15,8 +15,8 @@ grpcui --plaintext 127.0.0.1:9091
 
 У каждого сервиса есть `<service>.echo.v1.EchoService/Echo`.
 Для `check-in` protobuf package называется `check_in.echo.v1`.
-Запрос `{"message":"Hello"}` возвращает `{"message":"Hello","service":"availability"}`
-для availability; поле `service` всегда содержит имя ответившего сервиса.
+Запрос `{"message":"Hello"}` возвращает `{"message":"Hello","service":"booking"}`
+для booking; поле `service` всегда содержит имя ответившего сервиса.
 Reflection позволяет использовать grpcui/grpcurl без локальных proto-файлов.
 В кластере адрес имеет вид `<service>.hotelflow.svc.cluster.local:9090`.
 
@@ -37,8 +37,8 @@ Liveness не зависит от readiness. До старта основног�
 ## Контракты
 
 ```bash
-make -C services/availability generate
-make -C services/availability test
+make -C services/booking generate
+make -C services/booking test
 ```
 
 Buf выполняет lint, build и generate. В `build/Dockerfile.codegen` закреплены Buf v1.57.2,
@@ -58,7 +58,7 @@ protoc-gen-go v1.36.10 и protoc-gen-go-grpc v1.5.1. Внешние `.proto` н�
 ```yaml
 services:
   - api-gateway
-  - name: availability
+  - name: booking
     grpc: {host: 19091, node: 31091}
     admin: {host: 18082, node: 31082}
 ```

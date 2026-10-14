@@ -7,6 +7,7 @@ require (
 	github.com/docker/docker v28.3.3+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/gofrs/flock v0.12.1
+	github.com/gofrs/uuid v4.4.0+incompatible
 	github.com/moby/go-archive v0.3.3
 	github.com/moby/patternmatcher v0.6.1
 	github.com/spf13/cobra v1.10.2

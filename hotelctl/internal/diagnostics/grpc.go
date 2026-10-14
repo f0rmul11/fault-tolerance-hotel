@@ -32,7 +32,11 @@ func echoRPC(ctx context.Context, address, method, serviceName string) error {
 		return err
 	}
 	defer stream.CloseSend()
-	if err = stream.Send(&reflection.ServerReflectionRequest{MessageRequest: &reflection.ServerReflectionRequest_FileContainingSymbol{FileContainingSymbol: parts[0]}}); err != nil {
+	if err = stream.Send(&reflection.ServerReflectionRequest{
+		MessageRequest: &reflection.ServerReflectionRequest_FileContainingSymbol{
+			FileContainingSymbol: parts[0],
+		},
+	}); err != nil {
 		return err
 	}
 	response, err := stream.Recv()
@@ -67,7 +71,12 @@ func echoRPC(ctx context.Context, address, method, serviceName string) error {
 		return fmt.Errorf("Echo method %s is missing", method)
 	}
 	input, output := rpc.Input().Fields().ByName("message"), rpc.Output().Fields().ByName("message")
-	if input == nil || output == nil || input.Kind() != protoreflect.StringKind || output.Kind() != protoreflect.StringKind || input.IsList() || output.IsList() {
+	if input == nil ||
+		output == nil ||
+		input.Kind() != protoreflect.StringKind ||
+		output.Kind() != protoreflect.StringKind ||
+		input.IsList() ||
+		output.IsList() {
 		return fmt.Errorf("%s must have a string message in request and response", method)
 	}
 	const message = "Привет, HotelFlow!"
@@ -81,7 +90,9 @@ func echoRPC(ctx context.Context, address, method, serviceName string) error {
 		return fmt.Errorf("%s returned a different message", method)
 	}
 	if identity := rpc.Output().Fields().ByName("service"); identity != nil {
-		if identity.Kind() != protoreflect.StringKind || identity.IsList() || result.Get(identity).String() != serviceName {
+		if identity.Kind() != protoreflect.StringKind ||
+			identity.IsList() ||
+			result.Get(identity).String() != serviceName {
 			return fmt.Errorf("%s response came from an unexpected service", method)
 		}
 	}

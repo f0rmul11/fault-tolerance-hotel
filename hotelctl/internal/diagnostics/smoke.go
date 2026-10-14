@@ -15,27 +15,60 @@ import (
 )
 
 func gatewayHTTP(ctx context.Context, ports config.Ports, out io.Writer) error {
-	transport := &http.Transport{Proxy: nil}
+	transport := &http.Transport{
+		Proxy: nil,
+	}
 	defer transport.CloseIdleConnections()
-	client := &http.Client{Transport: transport, Timeout: 3 * time.Second}
+	client := &http.Client{
+		Transport: transport,
+		Timeout:   3 * time.Second,
+	}
 	base := "http://127.0.0.1:" + strconv.Itoa(ports.HTTP)
 	message := "Привет, HotelFlow!"
-	body, _ := json.Marshal(map[string]string{"message": message})
+	body, _ := json.Marshal(map[string]string{
+		"message": message,
+	})
 	requests := []struct {
-		method, url string
-		body        []byte
-		echo        bool
+		method string
+		url    string
+		body   []byte
+		echo   bool
 	}{
-		{"POST", base + "/v1/echo", body, true},
-		{"GET", base + "/v1/echo?message=" + url.QueryEscape(message), nil, true},
-		{"GET", base + "/swagger.json", nil, false},
+		{
+			"POST",
+			base + "/v1/echo",
+			body,
+			true,
+		},
+		{
+			"GET",
+			base + "/v1/echo?message=" + url.QueryEscape(message),
+			nil,
+			true,
+		},
+		{
+			"GET",
+			base + "/swagger.json",
+			nil,
+			false,
+		},
 	}
-	for _, probe := range []string{"live", "ready", "startup"} {
+	for _, probe := range []string{
+		"live",
+		"ready",
+		"startup",
+	} {
 		requests = append(requests, struct {
-			method, url string
-			body        []byte
-			echo        bool
-		}{"GET", "http://127.0.0.1:" + strconv.Itoa(ports.Admin) + "/healthcheck/" + probe, nil, false})
+			method string
+			url    string
+			body   []byte
+			echo   bool
+		}{
+			"GET",
+			"http://127.0.0.1:" + strconv.Itoa(ports.Admin) + "/healthcheck/" + probe,
+			nil,
+			false,
+		})
 	}
 	for _, r := range requests {
 		if err := retry(ctx, func() error {
@@ -97,9 +130,14 @@ func retry(ctx context.Context, fn func() error) error {
 
 // Smoke checks only the selected services so up SERVICE is usable on its own.
 func Smoke(ctx context.Context, cfg config.Config, services []config.Service, out io.Writer) error {
-	transport := &http.Transport{Proxy: nil}
+	transport := &http.Transport{
+		Proxy: nil,
+	}
 	defer transport.CloseIdleConnections()
-	client := &http.Client{Transport: transport, Timeout: 3 * time.Second}
+	client := &http.Client{
+		Transport: transport,
+		Timeout:   3 * time.Second,
+	}
 	for _, service := range services {
 		port := service.GRPC.Host
 		method := service.EchoMethod
@@ -125,7 +163,11 @@ func Smoke(ctx context.Context, cfg config.Config, services []config.Service, ou
 		if service.Admin.Host == 0 {
 			continue
 		}
-		for _, probe := range []string{"live", "ready", "startup"} {
+		for _, probe := range []string{
+			"live",
+			"ready",
+			"startup",
+		} {
 			address := "http://127.0.0.1:" + strconv.Itoa(service.Admin.Host) + "/healthcheck/" + probe
 			if err := retry(ctx, func() error {
 				req, err := http.NewRequestWithContext(ctx, http.MethodGet, address, nil)

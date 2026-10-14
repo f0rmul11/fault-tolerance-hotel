@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package hotels.echo.v1;
+
+option go_package = "hotels/internal/pkg/pb/hotels/echo/v1;echoV1";
+
+// Проверка доступности транспортного слоя сервиса.
+service EchoService {
+  // Возвращает исходное сообщение для проверки доступности сервиса.
+  rpc Echo(EchoRequest) returns (EchoResponse);
+}
+
+// Сообщение для проверки транспорта.
+message EchoRequest {
+  // Произвольный текст, возвращаемый без изменений.
+  string message = 1;
+}
+
+// Исходное сообщение и результат проверки транспорта.
+message EchoResponse {
+  // Произвольный текст, возвращаемый без изменений.
+  string message = 1;
+
+  // Имя сервиса, обработавшего запрос.
+  string service = 2;
+}

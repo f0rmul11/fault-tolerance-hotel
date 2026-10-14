@@ -8,10 +8,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type SmokeOptions struct{ util.Options }
+type SmokeOptions struct {
+	util.Options
+	Business bool
+}
 
 func NewSmokeOptions(streams iostreams.IOStreams) *SmokeOptions {
-	return &SmokeOptions{Options: util.NewOptions(streams)}
+	return &SmokeOptions{
+		Options: util.NewOptions(streams),
+	}
 }
 
 func NewCmdSmoke(f util.Factory, streams iostreams.IOStreams) *cobra.Command {
@@ -31,12 +36,17 @@ func NewCmdSmoke(f util.Factory, streams iostreams.IOStreams) *cobra.Command {
 		},
 	}
 	o.AddFlags(command.Flags())
+	command.Flags().BoolVar(&o.Business, "business", false, "Also create, activate and cancel a test booking; verify Kafka notifications")
 	return command
 }
 
-func (o *SmokeOptions) Complete(f util.Factory) error { return o.Options.Complete(f) }
+func (o *SmokeOptions) Complete(f util.Factory) error {
+	return o.Options.Complete(f)
+}
 
-func (o *SmokeOptions) Validate() error { return o.Options.Validate() }
+func (o *SmokeOptions) Validate() error {
+	return o.Options.Validate()
+}
 
 func (o *SmokeOptions) Run(ctx context.Context) error {
 	runner, err := o.NewStand()
@@ -46,5 +56,11 @@ func (o *SmokeOptions) Run(ctx context.Context) error {
 	defer runner.Close()
 	ctx, cancel := o.Context(ctx)
 	defer cancel()
-	return runner.Smoke(ctx)
+	if err := runner.Smoke(ctx); err != nil {
+		return err
+	}
+	if o.Business {
+		return runner.BusinessSmoke(ctx)
+	}
+	return nil
 }

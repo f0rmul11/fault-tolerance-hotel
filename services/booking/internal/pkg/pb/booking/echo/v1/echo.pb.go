@@ -21,9 +21,11 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// Сообщение для проверки транспорта.
 type EchoRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Message       string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Произвольный текст, возвращаемый без изменений.
+	Message       string `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -65,10 +67,13 @@ func (x *EchoRequest) GetMessage() string {
 	return ""
 }
 
+// Исходное сообщение и результат проверки транспорта.
 type EchoResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Message       string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
-	Service       string                 `protobuf:"bytes,2,opt,name=service,proto3" json:"service,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Произвольный текст, возвращаемый без изменений.
+	Message string `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
+	// Имя сервиса, обработавшего запрос.
+	Service       string `protobuf:"bytes,2,opt,name=service,proto3" json:"service,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }

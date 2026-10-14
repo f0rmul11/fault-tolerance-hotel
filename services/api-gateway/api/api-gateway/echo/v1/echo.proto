@@ -6,7 +6,6 @@ import "google/api/annotations.proto";
 import "protoc-gen-openapiv2/options/annotations.proto";
 
 option go_package = "api-gateway/internal/pkg/pb/api-gateway/echo/v1;echoV1";
-
 option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
   info: {
     title: "HotelFlow API Gateway"
@@ -15,8 +14,9 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
   }
 };
 
+// Проверка доступности транспортного слоя сервиса.
 service EchoService {
-  // Возвращает переданное сообщение без изменений.
+  // Возвращает исходное сообщение для проверки доступности сервиса.
   rpc Echo(EchoRequest) returns (EchoResponse) {
     option (google.api.http) = {
       post: "/v1/echo"
@@ -26,10 +26,14 @@ service EchoService {
   }
 }
 
+// Сообщение для проверки транспорта.
 message EchoRequest {
+  // Произвольный текст, возвращаемый без изменений.
   string message = 1;
 }
 
+// Исходное сообщение и результат проверки транспорта.
 message EchoResponse {
+  // Произвольный текст, возвращаемый без изменений.
   string message = 1;
 }

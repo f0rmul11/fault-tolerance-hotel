@@ -55,7 +55,11 @@ func New(path string) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Client{Typed: typed, Dynamic: dyn, REST: cfg}, nil
+	return &Client{
+		Typed:   typed,
+		Dynamic: dyn,
+		REST:    cfg,
+	}, nil
 }
 
 func Poll(ctx context.Context, description string, check func(context.Context) (bool, error)) error {
@@ -112,6 +116,9 @@ func (c *Client) WaitDeployment(ctx context.Context, s config.Service) error {
 				return false, fmt.Errorf("deployment exceeded its progress deadline: %s", condition.Message)
 			}
 		}
-		return d.Status.ObservedGeneration >= d.Generation && d.Status.UpdatedReplicas == desired && d.Status.AvailableReplicas == desired && d.Status.Replicas == desired, nil
+		return d.Status.ObservedGeneration >= d.Generation &&
+			d.Status.UpdatedReplicas == desired &&
+			d.Status.AvailableReplicas == desired &&
+			d.Status.Replicas == desired, nil
 	})
 }

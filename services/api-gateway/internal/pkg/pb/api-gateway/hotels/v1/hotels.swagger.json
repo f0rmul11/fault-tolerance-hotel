@@ -1,0 +1,357 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "api-gateway/hotels/v1/hotels.proto",
+    "version": "version not set"
+  },
+  "tags": [
+    {
+      "name": "HotelsService"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/v1/hotels": {
+      "get": {
+        "summary": "Возвращает страницу отелей с рейтингами, полученными одним batch-запросом в Review.",
+        "operationId": "HotelsService_ListHotels",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/api_gateway.hotels.v1.ListHotelsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "limit",
+            "description": "Размер страницы: по умолчанию 20, допустимо от 1 до 100.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "offset",
+            "description": "Число пропускаемых отелей; неотрицательное значение.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          }
+        ],
+        "tags": [
+          "HotelsService"
+        ]
+      }
+    },
+    "/v1/hotels/{hotelId}": {
+      "get": {
+        "summary": "Возвращает сведения об отеле и его пользовательский рейтинг.",
+        "operationId": "HotelsService_GetHotel",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/api_gateway.hotels.v1.GetHotelResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "hotelId",
+            "description": "UUID отеля в Hotels.",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "HotelsService"
+        ]
+      }
+    },
+    "/v1/hotels/{hotelId}/rooms": {
+      "get": {
+        "summary": "Возвращает номера выбранного отеля без обращения в Review.",
+        "operationId": "HotelsService_ListRooms",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/api_gateway.hotels.v1.ListRoomsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "hotelId",
+            "description": "UUID отеля в Hotels.",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "HotelsService"
+        ]
+      }
+    },
+    "/v1/rooms/{roomId}": {
+      "get": {
+        "summary": "Возвращает номер и его условия бронирования без обращения в Review.",
+        "operationId": "HotelsService_GetRoom",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/api_gateway.hotels.v1.GetRoomResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "roomId",
+            "description": "Положительный числовой ID номера в системе, передаётся строкой, например \"1\".",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "HotelsService"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "api_gateway.hotels.v1.GetHotelResponse": {
+      "type": "object",
+      "properties": {
+        "hotel": {
+          "$ref": "#/definitions/api_gateway.hotels.v1.Hotel",
+          "description": "Сведения об отеле."
+        }
+      },
+      "description": "Сведения о выбранном отеле."
+    },
+    "api_gateway.hotels.v1.GetRoomResponse": {
+      "type": "object",
+      "properties": {
+        "room": {
+          "$ref": "#/definitions/api_gateway.hotels.v1.Room",
+          "description": "Сведения о номере."
+        }
+      },
+      "description": "Сведения о номере, включая условия бронирования."
+    },
+    "api_gateway.hotels.v1.Hotel": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "UUID отеля в Hotels."
+        },
+        "name": {
+          "type": "string",
+          "description": "Название для отображения пользователю."
+        },
+        "description": {
+          "type": "string",
+          "description": "Описание для отображения пользователю."
+        },
+        "stars": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Официальная категория отеля: 0–5, где 0 — не присвоена. Не рейтинг пользователей."
+        },
+        "country": {
+          "type": "string",
+          "description": "Страна расположения отеля."
+        },
+        "city": {
+          "type": "string",
+          "description": "Город расположения отеля."
+        },
+        "address": {
+          "type": "string",
+          "description": "Адрес отеля."
+        },
+        "latitude": {
+          "type": "number",
+          "format": "double",
+          "description": "Географическая широта в градусах."
+        },
+        "longitude": {
+          "type": "number",
+          "format": "double",
+          "description": "Географическая долгота в градусах."
+        },
+        "rating": {
+          "type": "number",
+          "format": "double",
+          "description": "Средняя оценка от 0 до 5; поле отсутствует, если оценок ещё нет."
+        },
+        "reviewCount": {
+          "type": "string",
+          "format": "int64",
+          "description": "Количество пользовательских оценок отеля."
+        }
+      },
+      "description": "Основные сведения об отеле без вложенного списка номеров."
+    },
+    "api_gateway.hotels.v1.ListHotelsResponse": {
+      "type": "object",
+      "properties": {
+        "hotels": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/api_gateway.hotels.v1.Hotel"
+          },
+          "description": "Сведения об отелях."
+        }
+      },
+      "description": "Отели в стабильном порядке по UUID, с пользовательскими рейтингами."
+    },
+    "api_gateway.hotels.v1.ListRoomsResponse": {
+      "type": "object",
+      "properties": {
+        "rooms": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/api_gateway.hotels.v1.Room"
+          },
+          "description": "Сведения о номерах."
+        }
+      },
+      "description": "Номера отеля; пустой список, если номеров нет."
+    },
+    "api_gateway.hotels.v1.Room": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Системный ID: положительное число в строке, например \"1\"."
+        },
+        "hotelId": {
+          "type": "string",
+          "description": "UUID отеля в Hotels."
+        },
+        "number": {
+          "type": "string",
+          "description": "Обозначение номера внутри отеля, например \"101\"; отличается от системного ID."
+        },
+        "name": {
+          "type": "string",
+          "description": "Название для отображения пользователю."
+        },
+        "roomType": {
+          "type": "string",
+          "description": "Строковое значение типа номера, например \"Standard\"; не UUID."
+        },
+        "description": {
+          "type": "string",
+          "description": "Описание для отображения пользователю."
+        },
+        "capacity": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Максимальное число гостей в номере."
+        },
+        "roomCount": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Количество комнат внутри номера."
+        },
+        "bedCount": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Количество кроватей."
+        },
+        "areaSquareMeters": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Площадь номера в квадратных метрах."
+        },
+        "amenities": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Теги удобств, например air_conditioning или tv."
+        },
+        "minDurationSeconds": {
+          "type": "string",
+          "format": "int64",
+          "description": "Минимальная длительность бронирования в секундах."
+        },
+        "maxDurationSeconds": {
+          "type": "string",
+          "format": "int64",
+          "description": "Максимальная длительность в секундах; отсутствие поля означает, что предела нет."
+        }
+      },
+      "description": "Номер в отеле, его оснащение и ограничения длительности бронирования."
+    },
+    "google.protobuf.Any": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": {}
+    },
+    "google.rpc.Status": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/google.protobuf.Any"
+          }
+        }
+      }
+    }
+  }
+}

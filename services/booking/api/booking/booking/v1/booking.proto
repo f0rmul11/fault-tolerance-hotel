@@ -1,0 +1,158 @@
+syntax = "proto3";
+
+package booking.booking.v1;
+
+option go_package = "booking/internal/pkg/pb/booking/booking/v1;bookingV1";
+
+// Создание и чтение броней, проверка занятости номеров.
+service BookingService {
+  // Атомарно создаёт подтверждённую бронь; повтор ключа возвращает результат операции.
+  rpc CreateBooking(CreateBookingRequest) returns (CreateBookingResponse);
+
+  // Возвращает бронь по UUID с учётом прав вызывающего пользователя.
+  rpc GetBooking(GetBookingRequest) returns (GetBookingResponse);
+
+  // Возвращает снимок доступности; занятость окончательно проверяется при создании брони.
+  rpc CheckAvailability(CheckAvailabilityRequest) returns (CheckAvailabilityResponse);
+}
+
+// Параметры бронирования конкретного номера на непрерывный период.
+message CreateBookingRequest {
+  // Контекст запроса и пользователя; проверяется interceptor сервиса.
+  RequestContext context = 1;
+
+  // Положительный числовой ID номера в системе, передаётся строкой, например "1".
+  string room_id = 2;
+
+  // Начало проживания включительно, RFC3339 с часовым поясом, до микросекунд.
+  string starts_at = 3;
+
+  // Конец проживания исключительно, RFC3339 с часовым поясом, до микросекунд.
+  string ends_at = 4;
+
+  // UUID операции. Повторяйте неизменным с теми же данными при потере ответа.
+  string idempotency_key = 5;
+}
+
+// Идентификатор запрашиваемой брони.
+message GetBookingRequest {
+  // Контекст запроса и пользователя; проверяется interceptor сервиса.
+  RequestContext context = 1;
+
+  // UUID брони в Booking.
+  string booking_id = 2;
+}
+
+// Сохранённая бронь либо результат повтора той же операции.
+message CreateBookingResponse {
+  // Сведения о брони.
+  BookingView booking = 1;
+}
+
+// Текущее состояние брони.
+message GetBookingResponse {
+  // Сведения о брони.
+  BookingView booking = 1;
+}
+
+// Бронь клиента и снимок данных номера на момент её создания.
+message BookingView {
+  // Состояние брони в Booking.
+  enum Status {
+    // Состояние не задано.
+    STATUS_UNSPECIFIED = 0;
+
+    // Номер забронирован, прибытие ещё не оформлено.
+    CONFIRMED = 1;
+
+    // Гость прибыл, бронь активирована.
+    ACTIVE = 2;
+
+    // Бронь отменена, номер освобождён.
+    CANCELED = 3;
+  }
+
+  // UUID брони в Booking.
+  string id = 1;
+
+  // Версия сохранённого состояния сущности.
+  int32 version = 2;
+
+  // Время создания брони, RFC3339.
+  string created_at = 3;
+
+  // Время последнего изменения брони, RFC3339.
+  string updated_at = 4;
+
+  // UUID гостя, на которого оформлена бронь.
+  string guest_id = 5;
+
+  // CONFIRMED, ACTIVE или CANCELED.
+  Status status = 6;
+
+  // UUID запроса для трассировки; не заменяет ключ идемпотентности.
+  string request_id = 7;
+
+  // Положительный числовой ID номера в системе, передаётся строкой, например "1".
+  string room_id = 8;
+
+  // Начало проживания включительно, RFC3339 с часовым поясом, до микросекунд.
+  string starts_at = 9;
+
+  // Конец проживания исключительно, RFC3339 с часовым поясом, до микросекунд.
+  string ends_at = 10;
+
+  // Снимок обозначения номера внутри отеля на момент создания брони.
+  string room_number = 11;
+
+  // Снимок типа номера при создании брони, например "Standard".
+  string room_type = 12;
+}
+
+// Идентификация запроса и пользователя учебного стенда.
+message RequestContext {
+  // Учебные роли доступа.
+  enum DemoRole {
+    // Роль не задана.
+    DEMO_ROLE_UNSPECIFIED = 0;
+
+    // Гость.
+    GUEST = 1;
+
+    // Сотрудник ресепшн.
+    RECEPTION = 2;
+
+    // Оператор стенда.
+    OPERATOR = 3;
+  }
+
+  // UUID запроса для трассировки; не заменяет ключ идемпотентности.
+  string request_id = 1;
+
+  // Роль пользователя учебного стенда.
+  optional DemoRole demo_role = 2;
+
+  // UUID пользователя учебного стенда.
+  optional string demo_actor = 3;
+}
+
+// Отель и период для проверки доступности его номеров.
+message CheckAvailabilityRequest {
+  // Контекст запроса и пользователя; проверяется interceptor сервиса.
+  RequestContext context = 1;
+
+  // UUID отеля в Hotels.
+  string hotel_id = 2;
+
+  // Начало проживания включительно, RFC3339 с часовым поясом, до микросекунд.
+  string starts_at = 3;
+
+  // Конец проживания исключительно, RFC3339 с часовым поясом, до микросекунд.
+  string ends_at = 4;
+}
+
+// Номера, свободные на момент выполнения запроса.
+message CheckAvailabilityResponse {
+  // Системные ID свободных номеров — положительные числа в строках.
+  repeated string room_ids = 1;
+}

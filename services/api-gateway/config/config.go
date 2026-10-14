@@ -50,7 +50,11 @@ func Read() (*Config, error) {
 }
 
 func (c *Config) Validate() error {
-	for name, port := range map[string]int{"HTTP_PORT": c.HttpServer.Port, "GRPC_PORT": c.GrpcServer.Port, "ADMIN_HTTP_PORT": c.HttpServer.AdminPort} {
+	for name, port := range map[string]int{
+		"HTTP_PORT":       c.HttpServer.Port,
+		"GRPC_PORT":       c.GrpcServer.Port,
+		"ADMIN_HTTP_PORT": c.HttpServer.AdminPort,
+	} {
 		if port < 1 || port > 65535 {
 			return fmt.Errorf("%s must be between 1 and 65535", name)
 		}

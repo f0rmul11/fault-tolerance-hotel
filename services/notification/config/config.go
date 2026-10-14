@@ -26,10 +26,12 @@ func Instance() *Config {
 }
 
 type Config struct {
-	Targets    map[string]string `yaml:"service"`
-	GrpcServer GrpcServer        `yaml:"grpc_server"`
-	HttpServer HttpServer        `yaml:"http_server"`
-	Graceful   Graceful          `yaml:"graceful"`
+	KafkaBrokers  []string          `yaml:"kafka_brokers" env:"KAFKA_BROKERS" env-separator:","`
+	ConsumerGroup string            `yaml:"consumer_group" env:"KAFKA_CONSUMER_GROUP"`
+	Targets       map[string]string `yaml:"service"`
+	GrpcServer    GrpcServer        `yaml:"grpc_server"`
+	HttpServer    HttpServer        `yaml:"http_server"`
+	Graceful      Graceful          `yaml:"graceful"`
 }
 
 // Read загружает конфигурацию из YAML и применяет переменные окружения.
@@ -50,7 +52,18 @@ func Read() (*Config, error) {
 }
 
 func (c *Config) Validate() error {
-	for name, port := range map[string]int{"HTTP_PORT": c.HttpServer.Port, "GRPC_PORT": c.GrpcServer.Port, "ADMIN_HTTP_PORT": c.HttpServer.AdminPort} {
+	if len(c.KafkaBrokers) == 0 {
+		return fmt.Errorf("KAFKA_BROKERS обязателен")
+	}
+	if c.ConsumerGroup == "" {
+		return fmt.Errorf("не указана Kafka consumer group")
+	}
+
+	for name, port := range map[string]int{
+		"HTTP_PORT":       c.HttpServer.Port,
+		"GRPC_PORT":       c.GrpcServer.Port,
+		"ADMIN_HTTP_PORT": c.HttpServer.AdminPort,
+	} {
 		if port < 1 || port > 65535 {
 			return fmt.Errorf("%s must be between 1 and 65535", name)
 		}

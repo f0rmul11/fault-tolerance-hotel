@@ -31,7 +31,13 @@ func (c *Client) Services(ctx context.Context, services []config.Service) ([]Ser
 		if d.Spec.Replicas != nil {
 			desired = *d.Spec.Replicas
 		}
-		item := ServiceStatus{Name: s.Name, Ready: d.Status.ReadyReplicas, Desired: desired, GRPCPort: s.GRPC.Host, AdminPort: s.Admin.Host}
+		item := ServiceStatus{
+			Name:      s.Name,
+			Ready:     d.Status.ReadyReplicas,
+			Desired:   desired,
+			GRPCPort:  s.GRPC.Host,
+			AdminPort: s.Admin.Host,
+		}
 		if len(d.Spec.Template.Spec.Containers) > 0 {
 			item.Image = d.Spec.Template.Spec.Containers[0].Image
 		}
@@ -49,17 +55,24 @@ func (c *Client) Logs(ctx context.Context, s config.Service, follow bool, tail i
 	if err != nil {
 		return err
 	}
-	pods, err := c.Typed.CoreV1().Pods(s.Namespace).List(ctx, metav1.ListOptions{LabelSelector: selector.String()})
+	pods, err := c.Typed.CoreV1().Pods(s.Namespace).List(ctx, metav1.ListOptions{
+		LabelSelector: selector.String(),
+	})
 	if err != nil {
 		return err
 	}
 	if len(pods.Items) == 0 {
 		return fmt.Errorf("no pods for %s", s.Name)
 	}
-	sort.Slice(pods.Items, func(i, j int) bool { return pods.Items[j].CreationTimestamp.Before(&pods.Items[i].CreationTimestamp) })
+	sort.Slice(pods.Items, func(i, j int) bool {
+		return pods.Items[j].CreationTimestamp.Before(&pods.Items[i].CreationTimestamp)
+	})
 	pod := pods.Items[0]
 	fmt.Fprintf(out, "Pod: %s\n", pod.Name)
-	stream, err := c.Typed.CoreV1().Pods(s.Namespace).GetLogs(pod.Name, &corev1.PodLogOptions{Follow: follow, TailLines: &tail}).Stream(ctx)
+	stream, err := c.Typed.CoreV1().Pods(s.Namespace).GetLogs(pod.Name, &corev1.PodLogOptions{
+		Follow:    follow,
+		TailLines: &tail,
+	}).Stream(ctx)
 	if err != nil {
 		return err
 	}
@@ -88,7 +101,9 @@ func (c *Client) Diagnostics(ctx context.Context, services []config.Service, out
 				}
 			}
 		}
-		events, err := c.Typed.CoreV1().Events(s.Namespace).List(ctx, metav1.ListOptions{FieldSelector: "type=Warning"})
+		events, err := c.Typed.CoreV1().Events(s.Namespace).List(ctx, metav1.ListOptions{
+			FieldSelector: "type=Warning",
+		})
 		if err == nil {
 			for _, event := range events.Items {
 				fmt.Fprintf(out, "%s: %s\n", event.Reason, event.Message)

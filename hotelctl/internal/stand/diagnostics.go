@@ -69,7 +69,16 @@ func (m *Manager) Status(ctx context.Context, format string) error {
 		if s.Name == "api-gateway" {
 			grpcPort, adminPort = m.Config.Runtime.Ports.GRPC, m.Config.Runtime.Ports.Admin
 		}
-		fmt.Fprintf(w, "%s\t%d/%d\t127.0.0.1:%d\t127.0.0.1:%d\t%s\n", s.Name, s.Ready, s.Desired, grpcPort, adminPort, s.Image)
+		fmt.Fprintf(
+			w,
+			"%s\t%d/%d\t127.0.0.1:%d\t127.0.0.1:%d\t%s\n",
+			s.Name,
+			s.Ready,
+			s.Desired,
+			grpcPort,
+			adminPort,
+			s.Image,
+		)
 	}
 	_ = w.Flush()
 	if result.Error != "" {
@@ -118,4 +127,16 @@ func (m *Manager) Doctor(ctx context.Context) error {
 	}
 	fmt.Fprintln(m.Streams.Out, "OK host ports are available. Run hotelctl up.")
 	return nil
+}
+
+// BusinessSmoke проверяет публичный сценарий и результат доставки в stdout Notification.
+func (m *Manager) BusinessSmoke(ctx context.Context) error {
+	if _, err := m.running(ctx); err != nil {
+		return err
+	}
+	client, err := kube.New(m.Config.Kubeconfig())
+	if err != nil {
+		return err
+	}
+	return diagnostics.BusinessSmoke(ctx, m.Config, client, m.Streams.Out)
 }

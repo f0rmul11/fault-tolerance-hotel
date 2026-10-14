@@ -21,6 +21,7 @@ type Ports struct {
 	Admin int `json:"admin"`
 	API   int `json:"api"`
 }
+
 type Runtime struct {
 	Image       string `json:"image"`
 	BindAddress string `json:"bindAddress"`
@@ -45,6 +46,7 @@ type Service struct {
 	Admin      PortBinding `json:"admin,omitempty"`
 	EchoMethod string      `json:"echoMethod,omitempty"`
 }
+
 type Config struct {
 	APIVersion string    `json:"apiVersion"`
 	Name       string    `json:"name"`
@@ -102,6 +104,7 @@ func Load(project, filename string) (Config, error) {
 }
 
 var namePattern = regexp.MustCompile(`^[a-z][a-z0-9-]{0,40}$`)
+
 var methodPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_.]*/[A-Za-z_][A-Za-z0-9_]*$`)
 
 func (c Config) Validate() error {
@@ -127,14 +130,22 @@ func (c Config) Validate() error {
 	if len(c.Services) == 0 {
 		return fmt.Errorf("configure at least one service")
 	}
-	nodes := map[int]bool{6443: true, 30080: true, 30090: true, 30081: true}
+	nodes := map[int]bool{
+		6443:  true,
+		30080: true,
+		30090: true,
+		30081: true,
+	}
 	names := map[string]bool{}
 	for _, s := range c.Services {
 		if !namePattern.MatchString(s.Name) || names[s.Name] {
 			return fmt.Errorf("invalid or duplicate service %q", s.Name)
 		}
 		names[s.Name] = true
-		for _, binding := range []PortBinding{s.GRPC, s.Admin} {
+		for _, binding := range []PortBinding{
+			s.GRPC,
+			s.Admin,
+		} {
 			if binding == (PortBinding{}) {
 				continue
 			}
@@ -157,7 +168,11 @@ func (c Config) Validate() error {
 		if s.Image == "" || !namePattern.MatchString(s.Namespace) || !namePattern.MatchString(s.Deployment) {
 			return fmt.Errorf("service %s: image, namespace and deployment are required", s.Name)
 		}
-		for _, p := range []string{s.Context, s.Dockerfile, s.Manifests} {
+		for _, p := range []string{
+			s.Context,
+			s.Dockerfile,
+			s.Manifests,
+		} {
 			clean := filepath.Clean(p)
 			if p == "" || filepath.IsAbs(p) || clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
 				return fmt.Errorf("service %s: paths must stay within the project", s.Name)
@@ -167,7 +182,14 @@ func (c Config) Validate() error {
 	return nil
 }
 
-func (p Ports) All() []int { return []int{p.HTTP, p.GRPC, p.Admin, p.API} }
+func (p Ports) All() []int {
+	return []int{
+		p.HTTP,
+		p.GRPC,
+		p.Admin,
+		p.API,
+	}
+}
 
 func (c Config) Select(names []string) ([]Service, error) {
 	if len(names) == 0 {
@@ -176,7 +198,9 @@ func (c Config) Select(names []string) ([]Service, error) {
 	result := make([]Service, 0, len(names))
 	seen := map[string]bool{}
 	for _, name := range names {
-		i := slices.IndexFunc(c.Services, func(s Service) bool { return s.Name == name })
+		i := slices.IndexFunc(c.Services, func(s Service) bool {
+			return s.Name == name
+		})
 		if i < 0 {
 			return nil, fmt.Errorf("unknown service %q; run hotelctl status to list services", name)
 		}
@@ -189,24 +213,50 @@ func (c Config) Select(names []string) ([]Service, error) {
 	return result, nil
 }
 
-func (c Config) StateDir() string { return filepath.Join(c.Root, ".local", "hotelctl") }
+func (c Config) StateDir() string {
+	return filepath.Join(c.Root, ".local", "hotelctl")
+}
 
-func (c Config) Kubeconfig() string { return filepath.Join(c.StateDir(), "kubeconfig") }
+func (c Config) Kubeconfig() string {
+	return filepath.Join(c.StateDir(), "kubeconfig")
+}
 
 func (r Runtime) PortBindings() []PortBinding {
-	return []PortBinding{{Host: r.Ports.API, Node: 6443}, {Host: r.Ports.HTTP, Node: 30080}, {Host: r.Ports.Admin, Node: 30081}, {Host: r.Ports.GRPC, Node: 30090}}
+	return []PortBinding{
+		{
+			Host: r.Ports.API,
+			Node: 6443,
+		},
+		{
+			Host: r.Ports.HTTP,
+			Node: 30080,
+		},
+		{
+			Host: r.Ports.Admin,
+			Node: 30081,
+		},
+		{
+			Host: r.Ports.GRPC,
+			Node: 30090,
+		},
+	}
 }
 
 func (c Config) PortBindings() []PortBinding {
 	result := c.Runtime.PortBindings()
 	for _, service := range c.Services {
-		for _, binding := range []PortBinding{service.GRPC, service.Admin} {
+		for _, binding := range []PortBinding{
+			service.GRPC,
+			service.Admin,
+		} {
 			if binding != (PortBinding{}) {
 				result = append(result, binding)
 			}
 		}
 	}
-	slices.SortFunc(result, func(a, b PortBinding) int { return a.Node - b.Node })
+	slices.SortFunc(result, func(a, b PortBinding) int {
+		return a.Node - b.Node
+	})
 	return result
 }
 

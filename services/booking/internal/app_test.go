@@ -28,6 +28,10 @@ import (
 // Проверяем App с Clay, настоящими TCP listeners и сгенерированными
 // gRPC обработчиками, а не отдельную тривиальную реализацию Echo.
 func TestAppTransportsAndShutdown(t *testing.T) {
+	if os.Getenv("HOTELFLOW_RUNTIME_TEST") != "1" {
+		t.Skip("требуются PostgreSQL и Kafka: HOTELFLOW_RUNTIME_TEST=1, POSTGRES_DSN, KAFKA_BROKERS")
+	}
+
 	httpPort, grpcPort := availablePort(t), availablePort(t)
 	for httpPort == grpcPort {
 		grpcPort = availablePort(t)
@@ -54,7 +58,9 @@ func TestAppTransportsAndShutdown(t *testing.T) {
 		t.Fatal(err)
 	}
 	done := make(chan error, 1)
-	go func() { done <- process.Wait() }()
+	go func() {
+		done <- process.Wait()
+	}()
 	t.Cleanup(func() {
 		_ = process.Process.Signal(syscall.SIGTERM)
 		select {
@@ -69,7 +75,9 @@ func TestAppTransportsAndShutdown(t *testing.T) {
 		}
 	})
 
-	client := &http.Client{Timeout: time.Second}
+	client := &http.Client{
+		Timeout: time.Second,
+	}
 	defer client.CloseIdleConnections()
 	deadline := time.Now().Add(5 * time.Second)
 	for {
@@ -92,19 +100,33 @@ func TestAppTransportsAndShutdown(t *testing.T) {
 	}
 	defer conn.Close()
 	grpcClient := echoV1.NewEchoServiceClient(conn)
-	for _, message := range []string{"HotelFlow", "Привет, отель! & + / ?", "", "line one\nline two"} {
+	for _, message := range []string{
+		"HotelFlow",
+		"Привет, отель! & + / ?",
+		"",
+		"line one\nline two",
+	} {
 		t.Run(fmt.Sprintf("message=%q", message), func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
-			result, err := grpcClient.Echo(ctx, &echoV1.EchoRequest{Message: message}, grpc.WaitForReady(true))
+			result, err := grpcClient.Echo(ctx, &echoV1.EchoRequest{
+				Message: message,
+			}, grpc.WaitForReady(true))
 			if err != nil || result.GetMessage() != message || result.GetService() != "booking" {
 				t.Fatalf("gRPC Echo = %v, %v", result, err)
 			}
 		})
 	}
 	t.Run("no HTTP RPC", func(t *testing.T) {
-		for _, path := range []string{"/v1/echo", "/booking.echo.v1.EchoService/Echo"} {
-			response, err := client.Post("http://127.0.0.1:"+httpPort+path, "application/json", bytes.NewBufferString(`{"message":"test"}`))
+		for _, path := range []string{
+			"/v1/echo",
+			"/booking.echo.v1.EchoService/Echo",
+		} {
+			response, err := client.Post(
+				"http://127.0.0.1:"+httpPort+path,
+				"application/json",
+				bytes.NewBufferString(`{"message":"test"}`),
+			)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -122,7 +144,11 @@ func TestAppTransportsAndShutdown(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer stream.CloseSend()
-		if err := stream.Send(&reflection.ServerReflectionRequest{MessageRequest: &reflection.ServerReflectionRequest_ListServices{ListServices: ""}}); err != nil {
+		if err := stream.Send(&reflection.ServerReflectionRequest{
+			MessageRequest: &reflection.ServerReflectionRequest_ListServices{
+				ListServices: "",
+			},
+		}); err != nil {
 			t.Fatal(err)
 		}
 		result, err := stream.Recv()
@@ -157,7 +183,9 @@ func TestServiceProcess(t *testing.T) {
 }
 
 func TestHealthLifecycle(t *testing.T) {
-	app := &App{publicCloser: closer.New()}
+	app := &App{
+		publicCloser: closer.New(),
+	}
 	if err := app.initHealthCheck(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -189,7 +217,10 @@ func TestAdminStartsBeforeMain(t *testing.T) {
 	adminPort := availablePort(t)
 	t.Setenv("CONFIG_PATH", configPath)
 	t.Setenv("ADMIN_HTTP_PORT", adminPort)
-	app := &App{publicCloser: closer.New(), adminCloser: closer.New()}
+	app := &App{
+		publicCloser: closer.New(),
+		adminCloser:  closer.New(),
+	}
 	ctx := context.Background()
 	if err := app.initAdminServer(ctx); err != nil {
 		t.Fatal(err)
@@ -199,7 +230,9 @@ func TestAdminStartsBeforeMain(t *testing.T) {
 	if app.mainServer != nil {
 		t.Fatal("main server must not be initialized yet")
 	}
-	client := &http.Client{Timeout: time.Second}
+	client := &http.Client{
+		Timeout: time.Second,
+	}
 	defer client.CloseIdleConnections()
 	for path, want := range map[string]int{
 		healthcheck.LivenessPath:  http.StatusOK,

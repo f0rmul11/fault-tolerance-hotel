@@ -18,7 +18,10 @@ type LogsOptions struct {
 }
 
 func NewLogsOptions(streams iostreams.IOStreams) *LogsOptions {
-	return &LogsOptions{Options: util.NewOptions(streams), Tail: 100}
+	return &LogsOptions{
+		Options: util.NewOptions(streams),
+		Tail:    100,
+	}
 }
 
 func NewCmdLogs(f util.Factory, streams iostreams.IOStreams) *cobra.Command {

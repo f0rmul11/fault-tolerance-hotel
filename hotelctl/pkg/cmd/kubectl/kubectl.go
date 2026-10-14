@@ -14,7 +14,9 @@ type KubectlOptions struct {
 }
 
 func NewKubectlOptions(streams iostreams.IOStreams) *KubectlOptions {
-	return &KubectlOptions{Options: util.NewOptions(streams)}
+	return &KubectlOptions{
+		Options: util.NewOptions(streams),
+	}
 }
 
 func NewCmdKubectl(f util.Factory, streams iostreams.IOStreams) *cobra.Command {
@@ -44,7 +46,9 @@ func (o *KubectlOptions) Complete(f util.Factory, args []string) error {
 	return o.Options.Complete(f)
 }
 
-func (o *KubectlOptions) Validate() error { return nil }
+func (o *KubectlOptions) Validate() error {
+	return nil
+}
 
 func (o *KubectlOptions) Run(ctx context.Context) error {
 	runner, err := o.NewStand()

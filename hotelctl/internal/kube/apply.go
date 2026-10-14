@@ -46,6 +46,7 @@ func Render(root string, s config.Service, image string) ([]*unstructured.Unstru
 		}
 		replaceImage(object.Object, s.Image, image)
 		configureNodePorts(object, s)
+		configureBookingRuntime(object, s)
 		objects = append(objects, object)
 	}
 	return objects, nil
@@ -56,7 +57,8 @@ func replaceImage(value any, repository, image string) {
 	case map[string]any:
 		for key, item := range v {
 			if key == "image" {
-				if name, ok := item.(string); ok && (name == repository || strings.HasPrefix(name, repository+":") || strings.HasPrefix(name, repository+"@")) {
+				if name, ok := item.(string); ok &&
+					(name == repository || strings.HasPrefix(name, repository+":") || strings.HasPrefix(name, repository+"@")) {
 					v[key] = image
 				}
 			}
@@ -89,7 +91,10 @@ func (c *Client) Apply(ctx context.Context, objects []*unstructured.Unstructured
 			return err
 		}
 		resource := c.Dynamic.Resource(mapping.Resource)
-		options := metav1.PatchOptions{FieldManager: "hotelctl", FieldValidation: "Strict"}
+		options := metav1.PatchOptions{
+			FieldManager:    "hotelctl",
+			FieldValidation: "Strict",
+		}
 		if mapping.Scope.Name() == meta.RESTScopeNameNamespace {
 			_, err = resource.Namespace(object.GetNamespace()).Patch(ctx, object.GetName(), types.ApplyPatchType, data, options)
 		} else {

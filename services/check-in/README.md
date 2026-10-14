@@ -1,21 +1,9 @@
-# check-in
+# Check-in
 
-Фундамент сервиса на Clay: gRPC Echo, reflection, admin healthcheck и graceful shutdown. Хранилищ нет.
+Собственная сущность CheckIn и сценарии ресепшн: ListArrivals, ActivateBooking, CancelBooking. Обмен с Booking через Kafka, inbox/outbox; собственная БД checkin. [Протокол, API и запуск](../../docs/check-in.md).
 
-Из корня проекта:
-
-```bash
-go run ./hotelctl/cmd/hotelctl up
-./bin/hotelctl build check-in
-./bin/hotelctl deploy check-in
-./bin/hotelctl logs check-in -f
-make -C services/check-in test
-make -C services/check-in generate
-grpcui --plaintext 127.0.0.1:9093
-```
-
-- RPC: `check_in.echo.v1.EchoService/Echo`, запрос `{"message":"Hello"}`.
-- Ответ: `{"message":"Hello","service":"check-in"}`.
-- В кластере: `check-in.hotelflow.svc.cluster.local:9090`.
-- С компьютера: gRPC `127.0.0.1:9093`, admin `http://127.0.0.1:8084/healthcheck/{live,ready,startup}`.
-- Admin запускается раньше основного сервера и доступен при неготовом Pod.
+- gRPC в кластере: `check-in.hotelflow.svc.cluster.local:9090`.
+- Контракт: `api/check-in/checkin/v1/checkin.proto`.
+- `make test`: unit и существующие lifecycle-проверки; полный runtime-тест включается через HOTELFLOW_RUNTIME_TEST=1 с POSTGRES_DSN/KAFKA_BROKERS.
+- `make generate`: Buf; сгенерированные файлы не редактируются вручную.
+- `timezone: Europe/Moscow`; используется реальное время.

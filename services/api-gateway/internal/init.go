@@ -11,30 +11,42 @@ import (
 	"sync/atomic"
 	"time"
 
-	"api-gateway/config"
-	"api-gateway/internal/pkg/healthcheck"
-
-	chimw "github.com/go-chi/chi/v5/middleware"
-
-	"api-gateway/internal/app/echo/v1"
-
-	"api-gateway/internal/pkg/closer"
-
-	echoV1 "api-gateway/internal/pkg/pb/api-gateway/echo/v1"
-
 	"github.com/go-chi/chi/v5"
-
+	chimw "github.com/go-chi/chi/v5/middleware"
 	"github.com/not-for-prod/clay/server"
 	"github.com/not-for-prod/clay/transport"
-
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
+
+	"api-gateway/config"
+	booking "api-gateway/internal/app/booking/v1"
+	checkin "api-gateway/internal/app/checkin/v1"
+	"api-gateway/internal/app/echo/v1"
+	hotels "api-gateway/internal/app/hotels/v1"
+	"api-gateway/internal/pkg/auth"
+	"api-gateway/internal/pkg/closer"
+	"api-gateway/internal/pkg/grpc/intercept"
+	"api-gateway/internal/pkg/healthcheck"
+	"api-gateway/internal/pkg/httptransport"
+	bookingV1 "api-gateway/internal/pkg/pb/api-gateway/booking/v1"
+	checkinV1 "api-gateway/internal/pkg/pb/api-gateway/checkin/v1"
+	echoV1 "api-gateway/internal/pkg/pb/api-gateway/echo/v1"
+	hotelsV1 "api-gateway/internal/pkg/pb/api-gateway/hotels/v1"
+	externalV1 "api-gateway/internal/pkg/pb/external/booking/booking/v1"
+	externalCheckinV1 "api-gateway/internal/pkg/pb/external/check-in/checkin/v1"
+	externalHotelsV1 "api-gateway/internal/pkg/pb/external/hotels/hotels/v1"
+	"api-gateway/internal/pkg/requestid"
 )
 
 func (a *App) initControllers(_ context.Context) error {
 	a.controllers = []transport.ServiceDesc{
+		hotelsV1.NewHotelsServiceServiceDesc(hotels.NewHotelsService(externalHotelsV1.NewHotelsServiceClient(a.grpcConn[config.HotelsService]))),
+		checkinV1.NewCheckinServiceServiceDesc(checkin.NewCheckinService(externalCheckinV1.NewCheckinServiceClient(a.grpcConn[config.CheckinService]))),
 		echoV1.NewEchoServiceServiceDesc(echo.NewEchoService()),
+		bookingV1.NewBookingServiceServiceDesc(booking.NewBookingService(
+			externalV1.NewBookingServiceClient(a.grpcConn[config.BookingService]),
+		)),
 	}
 	return nil
 }
@@ -50,10 +62,17 @@ func (a *App) initMainServer(ctx context.Context) error {
 		server.WithHTTPMiddlewares(func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				// HTTP Serve starts after both Clay servers have been initialized.
-				readyOnce.Do(func() { close(serverReady) })
+				readyOnce.Do(func() {
+					close(serverReady)
+				})
 				next.ServeHTTP(w, r)
 			})
 		}),
+		server.WithRuntimeServeMuxOpts(httptransport.Options()...),
+		server.WithGRPCUnaryMiddlewares(
+			requestid.Interceptor(),
+			auth.Interceptor(),
+		),
 		server.WithGRPCOpts(
 			grpc.KeepaliveParams(keepalive.ServerParameters{
 				MaxConnectionIdle: config.Instance().GrpcServer.MaxConnectionIdle,
@@ -70,7 +89,12 @@ func (a *App) initMainServer(ctx context.Context) error {
 
 		// Synchronize Stop with Clay initialization, including a shutdown before
 		// the first external request. The admin listener starts independently.
-		client := &http.Client{Timeout: 100 * time.Millisecond, Transport: &http.Transport{DisableKeepAlives: true}}
+		client := &http.Client{
+			Timeout: 100 * time.Millisecond,
+			Transport: &http.Transport{
+				DisableKeepAlives: true,
+			},
+		}
 		defer client.CloseIdleConnections()
 		ticker := time.NewTicker(20 * time.Millisecond)
 		defer ticker.Stop()
@@ -93,7 +117,13 @@ func (a *App) initMainServer(ctx context.Context) error {
 		go func() {
 			err := a.mainServer.Stop(gracefulCtx)
 			if err != nil {
-				slog.Error(fmt.Sprintf("stop main server error: %s", err.Error()))
+				slog.Error(
+					"Ошибка остановки основного сервера",
+					"service",
+					"api-gateway",
+					"error",
+					err,
+				)
 			}
 			close(done)
 		}()
@@ -144,10 +174,16 @@ func (a *App) initGrpcConn(_ context.Context) error {
 		var err error
 
 		conn, err := grpc.NewClient(address,
-			grpc.WithTransportCredentials(insecure.NewCredentials()))
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithUnaryInterceptor(intercept.ProxyMetadata()),
+		)
 
 		if err != nil {
-			return fmt.Errorf("не удалось инициализировать grpc соединение к %s : %s", srv, err.Error())
+			return fmt.Errorf(
+				"не удалось инициализировать grpc соединение к %s : %s",
+				srv,
+				err.Error(),
+			)
 		}
 
 		a.grpcConn[srv] = conn
@@ -190,8 +226,8 @@ func (a *App) initHealthCheck(_ context.Context) error {
 	})
 
 	a.publicCloser.Add(func() error {
-		slog.Warn(fmt.Sprintf("app got termination signal, graceful config timeout: %s",
-			config.Instance().Graceful.Timeout.String()))
+		slog.Info("Получен сигнал завершения", "service", "api-gateway",
+			"graceful_timeout", config.Instance().Graceful.Timeout)
 
 		atomic.StoreInt32(&a.terminated, 1)
 		return nil

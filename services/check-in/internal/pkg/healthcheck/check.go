@@ -47,7 +47,10 @@ func (h *handler) check(checks map[string]CheckFunc, out map[string]string) int 
 				name:   name,
 				output: output,
 			}
-		}(name, check)
+		}(
+			name,
+			check,
+		)
 	}
 
 	go func() {

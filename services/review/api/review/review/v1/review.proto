@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package review.review.v1;
+
+option go_package = "review/internal/pkg/pb/review/review/v1;reviewV1";
+
+// Пакетное чтение пользовательских рейтингов отелей.
+service ReviewService {
+  // Читает рейтинги всех переданных отелей одним запросом к БД.
+  rpc GetHotelRatings(GetHotelRatingsRequest) returns (GetHotelRatingsResponse);
+}
+
+// Набор отелей для пакетного чтения рейтингов.
+message GetHotelRatingsRequest {
+  // UUID отелей. Отсутствие ID в ответе означает, что оценок нет.
+  repeated string hotel_ids = 1;
+}
+
+// Рейтинги найденных отелей; порядок не связан с порядком входных ID.
+message GetHotelRatingsResponse {
+  // Рейтинги отелей с оценками.
+  repeated HotelRating ratings = 1;
+}
+
+// Пользовательский рейтинг отеля; рейтингов номеров нет.
+message HotelRating {
+  // UUID отеля в Hotels.
+  string hotel_id = 1;
+
+  // Средняя пользовательская оценка от 0 до 5.
+  double rating = 2;
+
+  // Количество пользовательских оценок отеля.
+  int64 review_count = 3;
+}

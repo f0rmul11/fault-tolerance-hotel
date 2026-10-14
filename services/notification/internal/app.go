@@ -13,7 +13,11 @@ import (
 	"time"
 
 	"notification/config"
+	"notification/internal/application/usecase"
+	"notification/internal/infrastructure/gateway"
+	"notification/internal/infrastructure/messagebus"
 	"notification/internal/pkg/closer"
+	event_router "notification/internal/pkg/event-router"
 	"notification/internal/pkg/healthcheck"
 
 	"github.com/go-chi/chi/v5"
@@ -24,7 +28,11 @@ import (
 
 // App application
 type App struct {
-	mainServer *server.Server
+	gateway     *gateway.Registry
+	usecases    *usecase.Registry
+	eventRouter *event_router.EventRouter[string, []byte]
+	messageBus  *messagebus.Registry
+	mainServer  *server.Server
 
 	adminListener net.Listener
 	adminMux      *chi.Mux
@@ -69,7 +77,9 @@ func New(ctx context.Context) *App {
 
 // runAdminServer запускает служебный сервер (debug endpoint'ы, healthcheck etc.)
 func (a *App) runAdminServer(_ context.Context) {
-	adminServer := &http.Server{Handler: a.adminMux}
+	adminServer := &http.Server{
+		Handler: a.adminMux,
+	}
 
 	go func() {
 		if err := adminServer.Serve(a.adminListener); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -90,23 +100,26 @@ func (a *App) runAdminServer(_ context.Context) {
 }
 
 // Run запуск приложения
-func (a *App) Run(_ context.Context) {
+func (a *App) Run(ctx context.Context) {
 	if a.mainServer != nil {
 		go func() {
 			if err := a.mainServer.Run(a.controllers...); err != nil {
-				slog.Error(fmt.Sprintf("main server: %s", err.Error()))
+				slog.Error("Ошибка основного сервера", "error", err)
 				a.publicCloser.CloseAll()
 			}
 		}()
 	}
 
+	a.messageBus.Run(ctx)
+
 	// start signal
 	atomic.StoreInt32(&a.started, 1)
 
-	slog.Info(fmt.Sprintf("APP STARTED ON PORTS => GRPC: %d, HTTP: %d",
-		config.Instance().GrpcServer.Port,
-		config.Instance().HttpServer.Port,
-	))
+	slog.Info("Приложение запущено",
+		"service", "notification",
+		"grpc_port", config.Instance().GrpcServer.Port,
+		"http_port", config.Instance().HttpServer.Port,
+	)
 
 	a.publicCloser.Wait()
 
@@ -119,6 +132,10 @@ func (a *App) init(ctx context.Context) error {
 	initFuncs := []func(context.Context) error{
 		a.initMainServer,
 		a.initGrpcConn,
+		a.initGateway,
+		a.initUsecases,
+		a.initHandlers,
+		a.initMessageBus,
 		a.initControllers,
 	}
 

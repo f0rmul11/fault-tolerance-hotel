@@ -8,10 +8,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type DoctorOptions struct{ util.Options }
+type DoctorOptions struct {
+	util.Options
+}
 
 func NewDoctorOptions(streams iostreams.IOStreams) *DoctorOptions {
-	return &DoctorOptions{Options: util.NewOptions(streams)}
+	return &DoctorOptions{
+		Options: util.NewOptions(streams),
+	}
 }
 
 func NewCmdDoctor(f util.Factory, streams iostreams.IOStreams) *cobra.Command {
@@ -34,9 +38,13 @@ func NewCmdDoctor(f util.Factory, streams iostreams.IOStreams) *cobra.Command {
 	return command
 }
 
-func (o *DoctorOptions) Complete(f util.Factory) error { return o.Options.Complete(f) }
+func (o *DoctorOptions) Complete(f util.Factory) error {
+	return o.Options.Complete(f)
+}
 
-func (o *DoctorOptions) Validate() error { return o.Options.Validate() }
+func (o *DoctorOptions) Validate() error {
+	return o.Options.Validate()
+}
 
 func (o *DoctorOptions) Run(ctx context.Context) error {
 	runner, err := o.NewStand()

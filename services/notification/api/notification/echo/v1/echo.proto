@@ -4,16 +4,23 @@ package notification.echo.v1;
 
 option go_package = "notification/internal/pkg/pb/notification/echo/v1;echoV1";
 
+// Проверка доступности транспортного слоя сервиса.
 service EchoService {
-  // Проверяет доступность gRPC и возвращает исходное сообщение и имя сервиса.
+  // Возвращает исходное сообщение для проверки доступности сервиса.
   rpc Echo(EchoRequest) returns (EchoResponse);
 }
 
+// Сообщение для проверки транспорта.
 message EchoRequest {
+  // Произвольный текст, возвращаемый без изменений.
   string message = 1;
 }
 
+// Исходное сообщение и результат проверки транспорта.
 message EchoResponse {
+  // Произвольный текст, возвращаемый без изменений.
   string message = 1;
+
+  // Имя сервиса, обработавшего запрос.
   string service = 2;
 }

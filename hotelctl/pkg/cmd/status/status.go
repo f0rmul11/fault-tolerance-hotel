@@ -15,7 +15,10 @@ type StatusOptions struct {
 }
 
 func NewStatusOptions(streams iostreams.IOStreams) *StatusOptions {
-	return &StatusOptions{Options: util.NewOptions(streams), Output: "table"}
+	return &StatusOptions{
+		Options: util.NewOptions(streams),
+		Output:  "table",
+	}
 }
 
 func NewCmdStatus(f util.Factory, streams iostreams.IOStreams) *cobra.Command {
@@ -39,7 +42,9 @@ func NewCmdStatus(f util.Factory, streams iostreams.IOStreams) *cobra.Command {
 	return command
 }
 
-func (o *StatusOptions) Complete(f util.Factory) error { return o.Options.Complete(f) }
+func (o *StatusOptions) Complete(f util.Factory) error {
+	return o.Options.Complete(f)
+}
 
 func (o *StatusOptions) Validate() error {
 	if o.Output != "table" && o.Output != "json" {

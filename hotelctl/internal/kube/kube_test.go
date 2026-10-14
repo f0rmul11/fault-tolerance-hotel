@@ -51,11 +51,32 @@ func TestRenderKeepsUnreadyAdminAccessAndSetsImmutableImage(t *testing.T) {
 
 func TestOldReadyReplicaDoesNotCompleteNewRollout(t *testing.T) {
 	replicas := int32(1)
-	deployment := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "gateway", Namespace: "hotel", Generation: 2}, Spec: appsv1.DeploymentSpec{Replicas: &replicas}, Status: appsv1.DeploymentStatus{ObservedGeneration: 1, ReadyReplicas: 1, AvailableReplicas: 1, Replicas: 1}}
-	client := &Client{Typed: fake.NewSimpleClientset(deployment)}
+	deployment := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "gateway",
+			Namespace:  "hotel",
+			Generation: 2,
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &replicas,
+		},
+		Status: appsv1.DeploymentStatus{
+			ObservedGeneration: 1,
+			ReadyReplicas:      1,
+			AvailableReplicas:  1,
+			Replicas:           1,
+		},
+	}
+	client := &Client{
+		Typed: fake.NewSimpleClientset(deployment),
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Millisecond)
 	defer cancel()
-	if err := client.WaitDeployment(ctx, config.Service{Name: "gateway", Namespace: "hotel", Deployment: "gateway"}); !errors.Is(err, context.DeadlineExceeded) {
+	if err := client.WaitDeployment(ctx, config.Service{
+		Name:       "gateway",
+		Namespace:  "hotel",
+		Deployment: "gateway",
+	}); !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("old replica incorrectly completed rollout: %v", err)
 	}
 }

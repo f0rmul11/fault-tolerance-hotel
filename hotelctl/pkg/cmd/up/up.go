@@ -16,7 +16,9 @@ type UpOptions struct {
 }
 
 func NewUpOptions(streams iostreams.IOStreams) *UpOptions {
-	options := &UpOptions{Options: util.NewOptions(streams)}
+	options := &UpOptions{
+		Options: util.NewOptions(streams),
+	}
 	options.Timeout = 15 * time.Minute
 	return options
 }
@@ -50,7 +52,9 @@ func (o *UpOptions) Complete(f util.Factory, args []string) error {
 	return err
 }
 
-func (o *UpOptions) Validate() error { return o.Options.Validate() }
+func (o *UpOptions) Validate() error {
+	return o.Options.Validate()
+}
 
 func (o *UpOptions) Run(ctx context.Context) error {
 	runner, err := o.NewStand()

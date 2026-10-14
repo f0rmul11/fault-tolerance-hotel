@@ -3,12 +3,11 @@ go 1.26.1
 use (
 	./hotelctl
 	./services/api-gateway
-	./services/availability
 	./services/booking
 	./services/check-in
-	./services/room
+	./services/review
 	./services/notification
-	./services/search
+	./services/hotels
 )
 
 // Clay uses grpc-middleware v1 with the pre-split genproto dependency.

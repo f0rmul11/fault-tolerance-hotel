@@ -13,8 +13,19 @@ import (
 	"time"
 
 	"booking/config"
+	"booking/internal/application/service"
+	"booking/internal/application/usecase"
+	"booking/internal/infrastructure/gateway"
+	"booking/internal/infrastructure/messagebus"
+	"booking/internal/infrastructure/storage"
 	"booking/internal/pkg/closer"
+	event_router "booking/internal/pkg/event-router"
 	"booking/internal/pkg/healthcheck"
+	"booking/internal/pkg/inbox"
+	"booking/internal/pkg/outbox"
+	"booking/internal/pkg/worker"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/not-for-prod/clay/server"
@@ -24,7 +35,18 @@ import (
 
 // App application
 type App struct {
-	mainServer *server.Server
+	inbox        *inbox.Inbox
+	eventRouter  *event_router.EventRouter[string, []byte]
+	inboxWorkers []worker.Worker
+	storage      *storage.Registry
+	messageBus   *messagebus.Registry
+	outbox       *outbox.Outbox
+	messageRelay worker.Worker
+	gateway      *gateway.Registry
+	pool         *pgxpool.Pool
+	usecases     *usecase.Registry
+	services     *service.Registry
+	mainServer   *server.Server
 
 	adminListener net.Listener
 	adminMux      *chi.Mux
@@ -69,7 +91,9 @@ func New(ctx context.Context) *App {
 
 // runAdminServer запускает служебный сервер (debug endpoint'ы, healthcheck etc.)
 func (a *App) runAdminServer(_ context.Context) {
-	adminServer := &http.Server{Handler: a.adminMux}
+	adminServer := &http.Server{
+		Handler: a.adminMux,
+	}
 
 	go func() {
 		if err := adminServer.Serve(a.adminListener); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -90,23 +114,33 @@ func (a *App) runAdminServer(_ context.Context) {
 }
 
 // Run запуск приложения
-func (a *App) Run(_ context.Context) {
+func (a *App) Run(ctx context.Context) {
 	if a.mainServer != nil {
 		go func() {
 			if err := a.mainServer.Run(a.controllers...); err != nil {
-				slog.Error(fmt.Sprintf("main server: %s", err.Error()))
+				slog.Error("Ошибка основного сервера", "service", "booking", "error", err)
 				a.publicCloser.CloseAll()
 			}
 		}()
 	}
 
+	if err := a.messageRelay.Start(ctx); err != nil {
+		slog.ErrorContext(ctx, "Не удалось запустить outbox worker", "error", err)
+	}
+
+	a.messageBus.Run(ctx)
+	for _, background := range a.inboxWorkers {
+		if err := background.Start(ctx); err != nil {
+			return
+		}
+	}
 	// start signal
 	atomic.StoreInt32(&a.started, 1)
 
-	slog.Info(fmt.Sprintf("APP STARTED ON PORTS => GRPC: %d, HTTP: %d",
-		config.Instance().GrpcServer.Port,
-		config.Instance().HttpServer.Port,
-	))
+	slog.Info("Сервис запущен", "service", "booking",
+		"grpc_port", config.Instance().GrpcServer.Port,
+		"http_port", config.Instance().HttpServer.Port,
+	)
 
 	a.publicCloser.Wait()
 
@@ -119,6 +153,16 @@ func (a *App) init(ctx context.Context) error {
 	initFuncs := []func(context.Context) error{
 		a.initMainServer,
 		a.initGrpcConn,
+		a.initPostgres,
+		a.initStorage,
+		a.initGateway,
+		a.initInbox,
+		a.initMessageBus,
+		a.initOutbox,
+		a.initServices,
+		a.initUsecases,
+		a.initHandlers,
+		a.initInboxWorkers,
 		a.initControllers,
 	}
 

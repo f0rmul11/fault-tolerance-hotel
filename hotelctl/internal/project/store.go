@@ -19,7 +19,19 @@ type RuntimeStatus struct {
 	Running bool   `json:"running"`
 }
 
+type ServiceReplicas struct {
+	Service  config.Service `json:"service"`
+	Replicas int32          `json:"replicas"`
+}
+
+type ResetState struct {
+	JobName   string            `json:"jobName"`
+	Services  []ServiceReplicas `json:"services"`
+	DataReset bool              `json:"dataReset"`
+}
+
 type State struct {
+	Reset    *ResetState          `json:"reset,omitempty"`
 	Version  int                  `json:"version"`
 	Owner    string               `json:"owner"`
 	Name     string               `json:"name"`
@@ -27,7 +39,10 @@ type State struct {
 	Images   map[string]string    `json:"images"`
 	Bindings []config.PortBinding `json:"bindings,omitempty"`
 }
-type Store struct{ Dir string }
+
+type Store struct {
+	Dir string
+}
 
 func (s Store) Lock() (func(), error) {
 	if err := os.MkdirAll(s.Dir, 0700); err != nil {
@@ -41,7 +56,9 @@ func (s Store) Lock() (func(), error) {
 	if !ok {
 		return nil, fmt.Errorf("another hotelctl operation is running for this project")
 	}
-	return func() { _ = lock.Unlock() }, nil
+	return func() {
+		_ = lock.Unlock()
+	}, nil
 }
 
 func (s Store) Load() (*State, error) {
@@ -70,7 +87,14 @@ func NewState(c config.Config) (*State, error) {
 	if _, err := rand.Read(id); err != nil {
 		return nil, err
 	}
-	return &State{Version: 1, Owner: hex.EncodeToString(id), Name: c.Name, Runtime: c.Runtime, Images: map[string]string{}, Bindings: c.PortBindings()}, nil
+	return &State{
+		Version:  1,
+		Owner:    hex.EncodeToString(id),
+		Name:     c.Name,
+		Runtime:  c.Runtime,
+		Images:   map[string]string{},
+		Bindings: c.PortBindings(),
+	}, nil
 }
 
 func (s Store) Save(state *State) error {
@@ -105,7 +129,10 @@ func AtomicWrite(path string, data []byte) error {
 }
 
 func (s Store) Clear() error {
-	for _, name := range []string{"state.json", "kubeconfig"} {
+	for _, name := range []string{
+		"state.json",
+		"kubeconfig",
+	} {
 		if err := os.Remove(filepath.Join(s.Dir, name)); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
 		}

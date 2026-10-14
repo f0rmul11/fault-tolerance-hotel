@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: hotelflow
+resources:
+  - namespace.yaml
+  - credentials.yaml
+  - booking-postgres.yaml
+  - check-in-postgres.yaml
+  - hotels-postgres.yaml
+  - review-postgres.yaml
+  - kafka.yaml
+  - akhq.yaml

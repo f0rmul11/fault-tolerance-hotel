@@ -1,0 +1,113 @@
+syntax = "proto3";
+
+package api_gateway.checkin.v1;
+
+import "google/api/annotations.proto";
+
+option go_package = "api-gateway/internal/pkg/pb/api-gateway/checkin/v1;checkinV1";
+
+// Оформление прибытия и отмены через асинхронный обмен с Booking.
+service CheckinService {
+  // Возвращает EXPECTED/ARRIVING с началом проживания в заданном диапазоне.
+  rpc ListArrivals(ListArrivalsRequest) returns (ListArrivalsResponse) {
+    option (google.api.http) = {get: "/v1/check-in/bookings"};
+  }
+
+  // Запрашивает активацию брони. Итог подтверждается ответным событием Booking.
+  rpc ActivateBooking(ActivateBookingRequest) returns (ActivateBookingResponse) {
+    option (google.api.http) = {
+      post: "/v1/check-in/bookings/{booking_id}/activate"
+      body: "*"
+    };
+  }
+
+  // Запрашивает отмену брони. Итог подтверждается ответным событием Booking.
+  rpc CancelBooking(CancelBookingRequest) returns (CancelBookingResponse) {
+    option (google.api.http) = {
+      post: "/v1/check-in/bookings/{booking_id}/cancel"
+      body: "*"
+    };
+  }
+}
+
+// Фильтр по началу проживания в полуоткрытом диапазоне [starts_at, ends_at).
+message ListArrivalsRequest {
+  // Начало фильтра включительно, RFC3339. Без обеих границ — сегодня по часовому поясу Check-in
+  // (Europe/Moscow по умолчанию).
+  string starts_at = 1;
+
+  // Конец фильтра исключительно, RFC3339. При явном фильтре обе границы обязательны.
+  string ends_at = 2;
+}
+
+// Запрос на оформление прибытия гостя по брони.
+message ActivateBookingRequest {
+  // UUID брони в Booking.
+  string booking_id = 1;
+
+  // UUID операции. Повторяйте неизменным с теми же данными при потере ответа.
+  string idempotency_key = 2;
+}
+
+// Запрос на отмену подтверждённой или активной брони.
+message CancelBookingRequest {
+  // UUID брони в Booking.
+  string booking_id = 1;
+
+  // UUID операции. Повторяйте неизменным с теми же данными при потере ответа.
+  string idempotency_key = 2;
+}
+
+// Состояние оформления заселения, связанного с бронью через booking_id.
+message CheckInView {
+  // UUID заселения в Check-in.
+  string id = 1;
+
+  // UUID брони в Booking.
+  string booking_id = 2;
+
+  // Положительный числовой ID номера в системе, передаётся строкой, например "1".
+  string room_id = 3;
+
+  // UUID гостя, на которого оформлена бронь.
+  string guest_id = 4;
+
+  // Начало проживания включительно, RFC3339 с часовым поясом, до микросекунд.
+  string starts_at = 5;
+
+  // Конец проживания исключительно, RFC3339 с часовым поясом, до микросекунд.
+  string ends_at = 6;
+
+  // EXPECTED, ARRIVING, CHECKED_IN, CANCELING или CANCELED.
+  string status = 7;
+
+  // Версия сохранённого состояния сущности.
+  int32 version = 8;
+
+  // Русское пояснение последнего отказа Booking; пустая строка, если отказа нет.
+  string failure = 9;
+
+  // Снимок обозначения номера внутри отеля на момент создания брони.
+  string room_number = 10;
+
+  // Снимок типа номера при создании брони, например "Standard".
+  string room_type = 11;
+}
+
+// Ожидаемые и оформляемые прибытия в запрошенном диапазоне.
+message ListArrivalsResponse {
+  // Заселения, соответствующие фильтру.
+  repeated CheckInView checkins = 1;
+}
+
+// Текущее заселение; ответ Booking применяется асинхронно.
+message ActivateBookingResponse {
+  // Сведения об оформлении заселения.
+  CheckInView checkin = 1;
+}
+
+// Текущее заселение; ответ Booking применяется асинхронно.
+message CancelBookingResponse {
+  // Сведения об оформлении заселения.
+  CheckInView checkin = 1;
+}

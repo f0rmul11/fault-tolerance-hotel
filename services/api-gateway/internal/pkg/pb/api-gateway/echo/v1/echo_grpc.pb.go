@@ -25,8 +25,10 @@ const (
 // EchoServiceClient is the client API for EchoService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// Проверка доступности транспортного слоя сервиса.
 type EchoServiceClient interface {
-	// Возвращает переданное сообщение без изменений.
+	// Возвращает исходное сообщение для проверки доступности сервиса.
 	Echo(ctx context.Context, in *EchoRequest, opts ...grpc.CallOption) (*EchoResponse, error)
 }
 
@@ -51,8 +53,10 @@ func (c *echoServiceClient) Echo(ctx context.Context, in *EchoRequest, opts ...g
 // EchoServiceServer is the server API for EchoService service.
 // All implementations should embed UnimplementedEchoServiceServer
 // for forward compatibility.
+//
+// Проверка доступности транспортного слоя сервиса.
 type EchoServiceServer interface {
-	// Возвращает переданное сообщение без изменений.
+	// Возвращает исходное сообщение для проверки доступности сервиса.
 	Echo(context.Context, *EchoRequest) (*EchoResponse, error)
 }
 

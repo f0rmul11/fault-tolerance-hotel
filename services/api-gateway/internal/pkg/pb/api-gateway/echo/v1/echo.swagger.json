@@ -19,7 +19,7 @@
   "paths": {
     "/v1/echo": {
       "get": {
-        "summary": "Возвращает переданное сообщение без изменений.",
+        "summary": "Возвращает исходное сообщение для проверки доступности сервиса.",
         "operationId": "EchoService_Echo2",
         "responses": {
           "200": {
@@ -38,6 +38,7 @@
         "parameters": [
           {
             "name": "message",
+            "description": "Произвольный текст, возвращаемый без изменений.",
             "in": "query",
             "required": false,
             "type": "string"
@@ -48,7 +49,7 @@
         ]
       },
       "post": {
-        "summary": "Возвращает переданное сообщение без изменений.",
+        "summary": "Возвращает исходное сообщение для проверки доступности сервиса.",
         "operationId": "EchoService_Echo",
         "responses": {
           "200": {
@@ -67,6 +68,7 @@
         "parameters": [
           {
             "name": "body",
+            "description": "Сообщение для проверки транспорта.",
             "in": "body",
             "required": true,
             "schema": {
@@ -85,17 +87,21 @@
       "type": "object",
       "properties": {
         "message": {
-          "type": "string"
+          "type": "string",
+          "description": "Произвольный текст, возвращаемый без изменений."
         }
-      }
+      },
+      "description": "Сообщение для проверки транспорта."
     },
     "api_gateway.echo.v1.EchoResponse": {
       "type": "object",
       "properties": {
         "message": {
-          "type": "string"
+          "type": "string",
+          "description": "Произвольный текст, возвращаемый без изменений."
         }
-      }
+      },
+      "description": "Исходное сообщение и результат проверки транспорта."
     },
     "google.protobuf.Any": {
       "type": "object",

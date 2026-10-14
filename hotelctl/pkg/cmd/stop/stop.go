@@ -8,10 +8,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type StopOptions struct{ util.Options }
+type StopOptions struct {
+	util.Options
+}
 
 func NewStopOptions(streams iostreams.IOStreams) *StopOptions {
-	return &StopOptions{Options: util.NewOptions(streams)}
+	return &StopOptions{
+		Options: util.NewOptions(streams),
+	}
 }
 
 func NewCmdStop(f util.Factory, streams iostreams.IOStreams) *cobra.Command {
@@ -34,9 +38,13 @@ func NewCmdStop(f util.Factory, streams iostreams.IOStreams) *cobra.Command {
 	return command
 }
 
-func (o *StopOptions) Complete(f util.Factory) error { return o.Options.Complete(f) }
+func (o *StopOptions) Complete(f util.Factory) error {
+	return o.Options.Complete(f)
+}
 
-func (o *StopOptions) Validate() error { return o.Options.Validate() }
+func (o *StopOptions) Validate() error {
+	return o.Options.Validate()
+}
 
 func (o *StopOptions) Run(ctx context.Context) error {
 	runner, err := o.NewStand()

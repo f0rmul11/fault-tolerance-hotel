@@ -8,10 +8,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type DestroyOptions struct{ util.Options }
+type DestroyOptions struct {
+	util.Options
+}
 
 func NewDestroyOptions(streams iostreams.IOStreams) *DestroyOptions {
-	return &DestroyOptions{Options: util.NewOptions(streams)}
+	return &DestroyOptions{
+		Options: util.NewOptions(streams),
+	}
 }
 
 func NewCmdDestroy(f util.Factory, streams iostreams.IOStreams) *cobra.Command {
@@ -34,9 +38,13 @@ func NewCmdDestroy(f util.Factory, streams iostreams.IOStreams) *cobra.Command {
 	return command
 }
 
-func (o *DestroyOptions) Complete(f util.Factory) error { return o.Options.Complete(f) }
+func (o *DestroyOptions) Complete(f util.Factory) error {
+	return o.Options.Complete(f)
+}
 
-func (o *DestroyOptions) Validate() error { return o.Options.Validate() }
+func (o *DestroyOptions) Validate() error {
+	return o.Options.Validate()
+}
 
 func (o *DestroyOptions) Run(ctx context.Context) error {
 	runner, err := o.NewStand()

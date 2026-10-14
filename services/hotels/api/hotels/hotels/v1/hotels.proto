@@ -1,0 +1,149 @@
+syntax = "proto3";
+
+package hotels.hotels.v1;
+
+option go_package = "hotels/internal/pkg/pb/hotels/hotels/v1;hotelsV1";
+
+// Справочник отелей и номеров с условиями бронирования.
+service HotelsService {
+  // Возвращает страницу отелей с рейтингами, полученными одним batch-запросом в Review.
+  rpc ListHotels(ListHotelsRequest) returns (ListHotelsResponse);
+
+  // Возвращает сведения об отеле и его пользовательский рейтинг.
+  rpc GetHotel(GetHotelRequest) returns (GetHotelResponse);
+
+  // Возвращает номера выбранного отеля без обращения в Review.
+  rpc ListRooms(ListRoomsRequest) returns (ListRoomsResponse);
+
+  // Возвращает номер и его условия бронирования без обращения в Review.
+  rpc GetRoom(GetRoomRequest) returns (GetRoomResponse);
+}
+
+// Основные сведения об отеле без вложенного списка номеров.
+message Hotel {
+  // UUID отеля в Hotels.
+  string id = 1;
+
+  // Название для отображения пользователю.
+  string name = 2;
+
+  // Описание для отображения пользователю.
+  string description = 3;
+
+  // Официальная категория отеля: 0–5, где 0 — не присвоена. Не рейтинг пользователей.
+  int32 stars = 4;
+
+  // Страна расположения отеля.
+  string country = 5;
+
+  // Город расположения отеля.
+  string city = 6;
+
+  // Адрес отеля.
+  string address = 7;
+
+  // Географическая широта в градусах.
+  double latitude = 8;
+
+  // Географическая долгота в градусах.
+  double longitude = 9;
+
+  // Средняя оценка от 0 до 5; поле отсутствует, если оценок ещё нет.
+  optional double rating = 10;
+
+  // Количество пользовательских оценок отеля.
+  int64 review_count = 11;
+}
+
+// Номер в отеле, его оснащение и ограничения длительности бронирования.
+message Room {
+  // Системный ID: положительное число в строке, например "1".
+  string id = 1;
+
+  // UUID отеля в Hotels.
+  string hotel_id = 2;
+
+  // Обозначение номера внутри отеля, например "101"; отличается от системного ID.
+  string number = 3;
+
+  // Название для отображения пользователю.
+  string name = 4;
+
+  // Строковое значение типа номера, например "Standard"; не UUID.
+  string room_type = 5;
+
+  // Описание для отображения пользователю.
+  string description = 6;
+
+  // Максимальное число гостей в номере.
+  int32 capacity = 7;
+
+  // Количество комнат внутри номера.
+  int32 room_count = 8;
+
+  // Количество кроватей.
+  int32 bed_count = 9;
+
+  // Площадь номера в квадратных метрах.
+  int32 area_square_meters = 10;
+
+  // Теги удобств, например air_conditioning или tv.
+  repeated string amenities = 11;
+
+  // Минимальная длительность бронирования в секундах.
+  int64 min_duration_seconds = 12;
+
+  // Максимальная длительность в секундах; отсутствие поля означает, что предела нет.
+  optional int64 max_duration_seconds = 13;
+}
+
+// Параметры страницы справочника отелей.
+message ListHotelsRequest {
+  // Размер страницы: по умолчанию 20, допустимо от 1 до 100.
+  optional int32 limit = 1;
+
+  // Число пропускаемых отелей; неотрицательное значение.
+  int32 offset = 2;
+}
+
+// Отели в стабильном порядке по UUID, с пользовательскими рейтингами.
+message ListHotelsResponse {
+  // Сведения об отелях.
+  repeated Hotel hotels = 1;
+}
+
+// Идентификатор отеля в справочнике.
+message GetHotelRequest {
+  // UUID отеля в Hotels.
+  string hotel_id = 1;
+}
+
+// Сведения о выбранном отеле.
+message GetHotelResponse {
+  // Сведения об отеле.
+  Hotel hotel = 1;
+}
+
+// Идентификатор отеля для получения его номеров.
+message ListRoomsRequest {
+  // UUID отеля в Hotels.
+  string hotel_id = 1;
+}
+
+// Номера отеля; пустой список, если номеров нет.
+message ListRoomsResponse {
+  // Сведения о номерах.
+  repeated Room rooms = 1;
+}
+
+// Системный идентификатор номера.
+message GetRoomRequest {
+  // Положительный числовой ID номера в системе, передаётся строкой, например "1".
+  string room_id = 1;
+}
+
+// Сведения о номере, включая условия бронирования.
+message GetRoomResponse {
+  // Сведения о номере.
+  Room room = 1;
+}

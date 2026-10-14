@@ -1,0 +1,135 @@
+syntax = "proto3";
+
+package check_in.checkin.v1;
+
+option go_package = "check-in/internal/pkg/pb/check-in/checkin/v1;checkinV1";
+
+// Оформление прибытия и отмены через асинхронный обмен с Booking.
+service CheckinService {
+  // Возвращает EXPECTED/ARRIVING с началом проживания в заданном диапазоне.
+  rpc ListArrivals(ListArrivalsRequest) returns (ListArrivalsResponse);
+
+  // Запрашивает активацию брони. Итог подтверждается ответным событием Booking.
+  rpc ActivateBooking(ActivateBookingRequest) returns (ActivateBookingResponse);
+
+  // Запрашивает отмену брони. Итог подтверждается ответным событием Booking.
+  rpc CancelBooking(CancelBookingRequest) returns (CancelBookingResponse);
+}
+
+// Фильтр по началу проживания в полуоткрытом диапазоне [starts_at, ends_at).
+message ListArrivalsRequest {
+  // Контекст запроса и пользователя; проверяется interceptor сервиса.
+  RequestContext context = 1;
+
+  // Начало фильтра включительно, RFC3339. Без обеих границ — сегодня по часовому поясу Check-in
+  // (Europe/Moscow по умолчанию).
+  string starts_at = 2;
+
+  // Конец фильтра исключительно, RFC3339. При явном фильтре обе границы обязательны.
+  string ends_at = 3;
+}
+
+// Запрос на оформление прибытия гостя по брони.
+message ActivateBookingRequest {
+  // Контекст запроса и пользователя; проверяется interceptor сервиса.
+  RequestContext context = 1;
+
+  // UUID брони в Booking.
+  string booking_id = 2;
+
+  // UUID операции. Повторяйте неизменным с теми же данными при потере ответа.
+  string idempotency_key = 3;
+}
+
+// Запрос на отмену подтверждённой или активной брони.
+message CancelBookingRequest {
+  // Контекст запроса и пользователя; проверяется interceptor сервиса.
+  RequestContext context = 1;
+
+  // UUID брони в Booking.
+  string booking_id = 2;
+
+  // UUID операции. Повторяйте неизменным с теми же данными при потере ответа.
+  string idempotency_key = 3;
+}
+
+// Состояние оформления заселения, связанного с бронью через booking_id.
+message CheckInView {
+  // UUID заселения в Check-in.
+  string id = 1;
+
+  // UUID брони в Booking.
+  string booking_id = 2;
+
+  // Положительный числовой ID номера в системе, передаётся строкой, например "1".
+  string room_id = 3;
+
+  // UUID гостя, на которого оформлена бронь.
+  string guest_id = 4;
+
+  // Начало проживания включительно, RFC3339 с часовым поясом, до микросекунд.
+  string starts_at = 5;
+
+  // Конец проживания исключительно, RFC3339 с часовым поясом, до микросекунд.
+  string ends_at = 6;
+
+  // EXPECTED, ARRIVING, CHECKED_IN, CANCELING или CANCELED.
+  string status = 7;
+
+  // Версия сохранённого состояния сущности.
+  int32 version = 8;
+
+  // Русское пояснение последнего отказа Booking; пустая строка, если отказа нет.
+  string failure = 9;
+
+  // Снимок обозначения номера внутри отеля на момент создания брони.
+  string room_number = 10;
+
+  // Снимок типа номера при создании брони, например "Standard".
+  string room_type = 11;
+}
+
+// Ожидаемые и оформляемые прибытия в запрошенном диапазоне.
+message ListArrivalsResponse {
+  // Заселения, соответствующие фильтру.
+  repeated CheckInView checkins = 1;
+}
+
+// Текущее заселение; ответ Booking применяется асинхронно.
+message ActivateBookingResponse {
+  // Сведения об оформлении заселения.
+  CheckInView checkin = 1;
+}
+
+// Текущее заселение; ответ Booking применяется асинхронно.
+message CancelBookingResponse {
+  // Сведения об оформлении заселения.
+  CheckInView checkin = 1;
+}
+
+// Идентификация запроса и пользователя учебного стенда.
+message RequestContext {
+  // Учебные роли доступа.
+  enum DemoRole {
+    // Роль не задана.
+    DEMO_ROLE_UNSPECIFIED = 0;
+
+    // Гость.
+    GUEST = 1;
+
+    // Сотрудник ресепшн.
+    RECEPTION = 2;
+
+    // Оператор стенда.
+    OPERATOR = 3;
+  }
+
+  // UUID запроса для трассировки; не заменяет ключ идемпотентности.
+  string request_id = 1;
+
+  // Роль пользователя учебного стенда.
+  optional DemoRole demo_role = 2;
+
+  // UUID пользователя учебного стенда.
+  optional string demo_actor = 3;
+}

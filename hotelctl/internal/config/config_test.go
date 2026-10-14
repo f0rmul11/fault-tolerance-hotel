@@ -17,8 +17,8 @@ func TestConfigRejectsTyposAndInvalidPorts(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, data := range map[string]string{
-		"unknown service field":  strings.Replace(string(raw), "- availability", "- name: availability\n    typo: true", 1),
-		"duplicate service port": strings.Replace(string(raw), "- availability", "- name: availability\n    grpc: {host: 9090}", 1),
+		"unknown service field":  strings.Replace(string(raw), "- review", "- name: review\n    typo: true", 1),
+		"duplicate service port": strings.Replace(string(raw), "- review", "- name: review\n    grpc: {host: 9090}", 1),
 		"unknown field":          string(raw) + "agents: 2\n",
 		"duplicate port":         strings.Replace(string(raw), "runtime:", "runtime:\n  ports: {grpc: 8080}", 1),
 		"escaping source":        strings.Replace(string(raw), "- api-gateway", "- name: api-gateway\n    context: ../outside", 1),
@@ -58,14 +58,15 @@ func TestServiceDefaultsAndExplicitOverrides(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(c.Services) != 7 || len(c.PortBindings()) != 16 {
+	if len(c.Services) != 6 || len(c.PortBindings()) != 14 {
 		t.Fatalf("unexpected service/port count: %d/%d", len(c.Services), len(c.PortBindings()))
 	}
 	for i, service := range c.Services[1:] {
 		if service.GRPC.Host != 9091+i || service.Admin.Host != 8082+i {
 			t.Fatalf("wrong ports for %s", service.Name)
 		}
-		if service.Context != "services/"+service.Name || service.Manifests != "services/"+service.Name+"/build/deployment" {
+		if service.Context != "services/"+service.Name ||
+			service.Manifests != "services/"+service.Name+"/build/deployment" {
 			t.Fatalf("wrong paths for %s", service.Name)
 		}
 	}

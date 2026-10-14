@@ -35,9 +35,11 @@ type Interface interface {
 	Status(context.Context, string) error
 	Doctor(context.Context) error
 	Smoke(context.Context) error
+	BusinessSmoke(context.Context) error
 	Logs(context.Context, config.Service, bool, int64) error
 	Stop(context.Context) error
 	Destroy(context.Context) error
+	Reset(context.Context) error
 	Kubectl(context.Context, []string) error
 }
 
@@ -49,10 +51,19 @@ type Manager struct {
 }
 
 func New(c config.Config, runtime Runtime, streams iostreams.IOStreams) *Manager {
-	return &Manager{Config: c, Runtime: runtime, Store: project.Store{Dir: c.StateDir()}, Streams: streams}
+	return &Manager{
+		Config:  c,
+		Runtime: runtime,
+		Store: project.Store{
+			Dir: c.StateDir(),
+		},
+		Streams: streams,
+	}
 }
 
-func (m *Manager) Close() error { return m.Runtime.Close() }
+func (m *Manager) Close() error {
+	return m.Runtime.Close()
+}
 
 func (m *Manager) load(create bool) (*project.State, error) {
 	state, err := m.Store.Load()

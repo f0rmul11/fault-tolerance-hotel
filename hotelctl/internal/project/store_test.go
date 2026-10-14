@@ -10,7 +10,9 @@ import (
 )
 
 func TestStoreLockAndOwnershipPersistence(t *testing.T) {
-	store := Store{Dir: t.TempDir()}
+	store := Store{
+		Dir: t.TempDir(),
+	}
 	unlock, err := store.Lock()
 	if err != nil {
 		t.Fatal(err)
@@ -19,7 +21,9 @@ func TestStoreLockAndOwnershipPersistence(t *testing.T) {
 		second()
 		t.Fatal("concurrent operation was allowed")
 	}
-	original, err := NewState(config.Config{Name: "test"})
+	original, err := NewState(config.Config{
+		Name: "test",
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,8 +54,14 @@ func TestStoreLockAndOwnershipPersistence(t *testing.T) {
 }
 
 func TestMalformedStateIsNeverTreatedAsFreshInstall(t *testing.T) {
-	store := Store{Dir: t.TempDir()}
-	for _, data := range []string{`{`, `{"version":1,"owner":"","name":"test"}`, `{"version":2,"owner":"owner","name":"test"}`} {
+	store := Store{
+		Dir: t.TempDir(),
+	}
+	for _, data := range []string{
+		`{`,
+		`{"version":1,"owner":"","name":"test"}`,
+		`{"version":2,"owner":"owner","name":"test"}`,
+	} {
 		if err := os.WriteFile(filepath.Join(store.Dir, "state.json"), []byte(data), 0600); err != nil {
 			t.Fatal(err)
 		}

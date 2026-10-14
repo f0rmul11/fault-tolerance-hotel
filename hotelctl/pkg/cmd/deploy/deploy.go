@@ -15,7 +15,9 @@ type DeployOptions struct {
 }
 
 func NewDeployOptions(streams iostreams.IOStreams) *DeployOptions {
-	return &DeployOptions{Options: util.NewOptions(streams)}
+	return &DeployOptions{
+		Options: util.NewOptions(streams),
+	}
 }
 
 func NewCmdDeploy(f util.Factory, streams iostreams.IOStreams) *cobra.Command {
@@ -47,7 +49,9 @@ func (o *DeployOptions) Complete(f util.Factory, args []string) error {
 	return err
 }
 
-func (o *DeployOptions) Validate() error { return o.Options.Validate() }
+func (o *DeployOptions) Validate() error {
+	return o.Options.Validate()
+}
 
 func (o *DeployOptions) Run(ctx context.Context) error {
 	runner, err := o.NewStand()

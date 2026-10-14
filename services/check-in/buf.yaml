@@ -6,6 +6,9 @@ lint:
     - STANDARD
   except:
     - PACKAGE_DIRECTORY_MATCH
+  ignore_only:
+    ENUM_VALUE_PREFIX:
+      - api/check-in/checkin/v1/checkin.proto
 breaking:
   use:
     - FILE

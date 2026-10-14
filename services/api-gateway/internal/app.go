@@ -69,7 +69,9 @@ func New(ctx context.Context) *App {
 
 // runAdminServer запускает служебный сервер (debug endpoint'ы, healthcheck etc.)
 func (a *App) runAdminServer(_ context.Context) {
-	adminServer := &http.Server{Handler: a.adminMux}
+	adminServer := &http.Server{
+		Handler: a.adminMux,
+	}
 
 	go func() {
 		if err := adminServer.Serve(a.adminListener); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -94,7 +96,7 @@ func (a *App) Run(_ context.Context) {
 	if a.mainServer != nil {
 		go func() {
 			if err := a.mainServer.Run(a.controllers...); err != nil {
-				slog.Error(fmt.Sprintf("main server: %s", err.Error()))
+				slog.Error("Ошибка основного сервера", "service", "api-gateway", "error", err)
 				a.publicCloser.CloseAll()
 			}
 		}()
@@ -103,10 +105,10 @@ func (a *App) Run(_ context.Context) {
 	// start signal
 	atomic.StoreInt32(&a.started, 1)
 
-	slog.Info(fmt.Sprintf("APP STARTED ON PORTS => GRPC: %d, HTTP: %d",
-		config.Instance().GrpcServer.Port,
-		config.Instance().HttpServer.Port,
-	))
+	slog.Info("Сервис запущен", "service", "api-gateway",
+		"grpc_port", config.Instance().GrpcServer.Port,
+		"http_port", config.Instance().HttpServer.Port,
+	)
 
 	a.publicCloser.Wait()
 

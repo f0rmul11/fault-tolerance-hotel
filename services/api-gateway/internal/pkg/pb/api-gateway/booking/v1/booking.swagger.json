@@ -1,0 +1,278 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "api-gateway/booking/v1/booking.proto",
+    "version": "version not set"
+  },
+  "tags": [
+    {
+      "name": "BookingService"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/v1/bookings": {
+      "post": {
+        "summary": "Атомарно создаёт подтверждённую бронь; повтор ключа возвращает результат операции.",
+        "operationId": "BookingService_CreateBooking",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/api_gateway.booking.v1.CreateBookingResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "description": "Параметры бронирования конкретного номера на непрерывный период.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/api_gateway.booking.v1.CreateBookingRequest"
+            }
+          }
+        ],
+        "tags": [
+          "BookingService"
+        ]
+      }
+    },
+    "/v1/bookings/{bookingId}": {
+      "get": {
+        "summary": "Возвращает бронь по UUID с учётом прав вызывающего пользователя.",
+        "operationId": "BookingService_GetBooking",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/api_gateway.booking.v1.GetBookingResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "bookingId",
+            "description": "UUID брони в Booking.",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "BookingService"
+        ]
+      }
+    },
+    "/v1/rooms/availability": {
+      "post": {
+        "summary": "Возвращает снимок доступности; занятость окончательно проверяется при создании брони.",
+        "operationId": "BookingService_CheckAvailability",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/api_gateway.booking.v1.CheckAvailabilityResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "description": "Отель и период для проверки доступности его номеров.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/api_gateway.booking.v1.CheckAvailabilityRequest"
+            }
+          }
+        ],
+        "tags": [
+          "BookingService"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "api_gateway.booking.v1.BookingView": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "UUID брони в Booking."
+        },
+        "version": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Версия сохранённого состояния сущности."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Время создания брони, RFC3339."
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Время последнего изменения брони, RFC3339."
+        },
+        "guestId": {
+          "type": "string",
+          "description": "UUID гостя, на которого оформлена бронь."
+        },
+        "status": {
+          "type": "string",
+          "description": "CONFIRMED, ACTIVE или CANCELED."
+        },
+        "requestId": {
+          "type": "string",
+          "description": "UUID запроса для трассировки; не заменяет ключ идемпотентности."
+        },
+        "roomId": {
+          "type": "string",
+          "description": "Положительный числовой ID номера в системе, передаётся строкой, например \"1\"."
+        },
+        "startsAt": {
+          "type": "string",
+          "description": "Начало проживания включительно, RFC3339 с часовым поясом, до микросекунд."
+        },
+        "endsAt": {
+          "type": "string",
+          "description": "Конец проживания исключительно, RFC3339 с часовым поясом, до микросекунд."
+        },
+        "roomNumber": {
+          "type": "string",
+          "description": "Снимок обозначения номера внутри отеля на момент создания брони."
+        },
+        "roomType": {
+          "type": "string",
+          "description": "Снимок типа номера при создании брони, например \"Standard\"."
+        }
+      },
+      "description": "Бронь клиента и снимок данных номера на момент её создания."
+    },
+    "api_gateway.booking.v1.CheckAvailabilityRequest": {
+      "type": "object",
+      "properties": {
+        "hotelId": {
+          "type": "string",
+          "description": "UUID отеля в Hotels."
+        },
+        "startsAt": {
+          "type": "string",
+          "description": "Начало проживания включительно, RFC3339 с часовым поясом, до микросекунд."
+        },
+        "endsAt": {
+          "type": "string",
+          "description": "Конец проживания исключительно, RFC3339 с часовым поясом, до микросекунд."
+        }
+      },
+      "description": "Отель и период для проверки доступности его номеров."
+    },
+    "api_gateway.booking.v1.CheckAvailabilityResponse": {
+      "type": "object",
+      "properties": {
+        "roomIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Системные ID свободных номеров — положительные числа в строках."
+        }
+      },
+      "description": "Номера, свободные на момент выполнения запроса."
+    },
+    "api_gateway.booking.v1.CreateBookingRequest": {
+      "type": "object",
+      "properties": {
+        "roomId": {
+          "type": "string",
+          "description": "Положительный числовой ID номера в системе, передаётся строкой, например \"1\"."
+        },
+        "startsAt": {
+          "type": "string",
+          "description": "Начало проживания включительно, RFC3339 с часовым поясом, до микросекунд."
+        },
+        "endsAt": {
+          "type": "string",
+          "description": "Конец проживания исключительно, RFC3339 с часовым поясом, до микросекунд."
+        },
+        "idempotencyKey": {
+          "type": "string",
+          "description": "UUID операции. Повторяйте неизменным с теми же данными при потере ответа."
+        }
+      },
+      "description": "Параметры бронирования конкретного номера на непрерывный период."
+    },
+    "api_gateway.booking.v1.CreateBookingResponse": {
+      "type": "object",
+      "properties": {
+        "booking": {
+          "$ref": "#/definitions/api_gateway.booking.v1.BookingView",
+          "description": "Сведения о брони."
+        }
+      },
+      "description": "Сохранённая бронь либо результат повтора той же операции."
+    },
+    "api_gateway.booking.v1.GetBookingResponse": {
+      "type": "object",
+      "properties": {
+        "booking": {
+          "$ref": "#/definitions/api_gateway.booking.v1.BookingView",
+          "description": "Сведения о брони."
+        }
+      },
+      "description": "Текущее состояние брони."
+    },
+    "google.protobuf.Any": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": {}
+    },
+    "google.rpc.Status": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/google.protobuf.Any"
+          }
+        }
+      }
+    }
+  }
+}

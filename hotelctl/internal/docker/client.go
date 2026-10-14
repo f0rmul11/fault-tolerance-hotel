@@ -13,7 +13,9 @@ import (
 	"github.com/docker/docker/client"
 )
 
-type Engine struct{ client client.APIClient }
+type Engine struct {
+	client client.APIClient
+}
 
 // New respects the active Docker context, including Docker Desktop and OrbStack.
 // All operations use the Engine SDK, never a shell or the docker executable.
@@ -23,11 +25,18 @@ func New(errOut io.Writer) (*Engine, error) {
 	if name == "" && os.Getenv("DOCKER_HOST") == "" {
 		name = cfg.CurrentContext
 	}
-	opts := []client.Opt{client.FromEnv, client.WithAPIVersionNegotiation()}
+	opts := []client.Opt{
+		client.FromEnv,
+		client.WithAPIVersionNegotiation(),
+	}
 	if name != "" && name != "default" {
 		contextStore := store.New(dockerconfig.ContextStoreDir(), store.NewConfig(
-			func() any { return &map[string]any{} },
-			store.EndpointTypeGetter(dockercontext.DockerEndpoint, func() any { return &dockercontext.EndpointMeta{} }),
+			func() any {
+				return &map[string]any{}
+			},
+			store.EndpointTypeGetter(dockercontext.DockerEndpoint, func() any {
+				return &dockercontext.EndpointMeta{}
+			}),
 		))
 		metadata, err := contextStore.GetMetadata(name)
 		if err != nil {
@@ -41,16 +50,23 @@ func New(errOut io.Writer) (*Engine, error) {
 		if !strings.HasPrefix(endpoint.Host, "unix://") && !strings.HasPrefix(endpoint.Host, "npipe://") {
 			return nil, fmt.Errorf("Docker context %s is remote; select a local context", name)
 		}
-		opts = []client.Opt{client.WithHost(endpoint.Host), client.WithAPIVersionNegotiation()}
+		opts = []client.Opt{
+			client.WithHost(endpoint.Host),
+			client.WithAPIVersionNegotiation(),
+		}
 	}
 	cli, err := client.NewClientWithOpts(opts...)
 	if err != nil {
 		return nil, err
 	}
-	return &Engine{client: cli}, nil
+	return &Engine{
+		client: cli,
+	}, nil
 }
 
-func (e *Engine) Close() error { return e.client.Close() }
+func (e *Engine) Close() error {
+	return e.client.Close()
+}
 
 func (e *Engine) Check(ctx context.Context) error {
 	host := e.client.DaemonHost()
