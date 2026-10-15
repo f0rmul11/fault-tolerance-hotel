@@ -12,23 +12,24 @@ cfg := config.NewClient(manager)
 enabled = cfg.GetValue(ctx, config.HotelsListEnabled).Bool()
 ```
 
-Пакет, generator и facade готовы к подключению. Writer доступен через `hotelctl config get/set` — см. [инструкцию CLI](../../../../../hotelctl/README.md#runtime-конфигурация-в-etcd). Отдельный `config-etcd` с PVC разворачивается вместе со стендом; endpoint внутри k3s — `http://config-etcd.hotelflow.svc.cluster.local:2379`. Lifecycle API Gateway, HTTP/gRPC gate и admin endpoint пока не подключены. Флаг `hotels_list_enabled` пока служит примером каталога и сам по себе не меняет обработку запросов.
+Клиент подключён к lifecycle API Gateway и устанавливается до начала serving. Writer доступен через `hotelctl config get/set` — см. [инструкцию CLI](../../../../../hotelctl/README.md#runtime-конфигурация-в-etcd). Отдельный `config-etcd` с PVC разворачивается вместе со стендом; endpoint внутри k3s — `http://config-etcd.hotelflow.svc.cluster.local:2379`. Локальная готовность reader включена в admin `/healthcheck/ready` как `runtime_config`. HTTP/gRPC gate пока не подключён. Флаг `hotels_list_enabled` пока служит примером каталога и сам по себе не меняет обработку запросов.
 
 ## Структура
 
 | Файл | Ответственность |
 |---|---|
 | `client.go` | Контракты, options и локальный status |
+| `config.go` | Общий тип статических настроек `rtconfig.Config` |
 | `value.go` | Неизменяемые типизированные скаляры |
 | `schema.go` | Общая валидация YAML, defaults и remote values |
 | `manager.go` | Lifecycle и атомарная публикация snapshot |
 | `watch.go` | Get → Watch, revisions, freshness и recovery |
 | `observer.go` | Регистрация и последовательная доставка callbacks |
-| `global/` | Явно установленный client для generated facade |
+| `global/` | Явная инициализация общего клиента, системные callbacks и регистрация закрытия |
 | `system/` | Registry платформенных определений и callbacks |
 | `codegen/` | Генератор facade: проверка каталога, Go identifiers и атомарная запись |
 
-`global`, `system` и `codegen` зависят от core `rtconfig`; core не импортирует их. `codegen` объединяет сервисный YAML с явно переданными системными определениями и создаёт facade `internal/config/config.go`, который использует `global`. Короткая точка запуска находится в `internal/config/generate/main.go`; в `cmd` остаётся только приложение. В корневом `config` находятся статическая конфигурация и YAML-каталог сервиса.
+`global`, `system` и `codegen` зависят от core `rtconfig`; `global.Init` собирает core и system и регистрирует закрытие в общем `closer`. Core не импортирует эти подпакеты. `codegen` объединяет сервисный YAML с явно переданными системными определениями и создаёт facade `internal/config/config.go`, который использует `global`. Короткая точка запуска находится в `internal/config/generate/main.go`; в `cmd` остаётся только приложение. В корневом `config` находятся статическая конфигурация и YAML-каталог сервиса.
 
 ## Каталог и wire format
 
@@ -62,15 +63,32 @@ go generate ./internal/config
 
 ## Подключение к lifecycle
 
-Bootstrap приложения выполняет следующие шаги до начала serving:
+Общие настройки встраиваются в статический конфиг сервиса как `RuntimeConfig rtconfig.Config`. Prefix выбирает сам сервис в YAML или `RTCONFIG_PREFIX`, в библиотеке нет имени сервиса или окружения. `ResolveSchemaPath(configPath)` разрешает путь к каталогу рядом со статическим YAML; `Validate()` проверяет настройки.
 
-1. Загружает YAML через `ParseSchema`, вызывает `system.Freeze()` и объединяет `serviceSchema.Definitions()` с `system.Definitions()` через `NewSchema`.
-2. Сверяет `schema.Hash()` с generated `config.SchemaHash`. Для обязательных consumers вызывает `schema.RequireType("hotels_list_enabled", rtconfig.BoolType)`.
-3. Создаёт `rtconfig.New(schema, opts)`. Конструктор локальный: defaults доступны сразу, сеть и goroutines ещё не запущены.
-4. Регистрирует cleanup и вызывает `manager.Start(appContext)`. Это **lifetime context приложения**, а не startup/request context. Offline startup ограничен `StartupTimeout`; manager продолжает recovery в фоне.
-5. Регистрирует нужные `system.Callbacks()` через `WatchVariable`. Adapter передаёт callback значения `old.Value()` и `new.Value()`. Для обязательных начальных эффектов вызывает `WaitForInitial` с отдельным startup budget.
-6. Передаёт manager через DI либо вызывает `global.SetClient(manager)` из `api-gateway/internal/pkg/rtconfig/global` до serving. Global client не следует менять в parallel tests.
-7. После drain запросов вызывает `manager.Close(shutdownContext)` с отдельным ограниченным budget. Ранние ошибки bootstrap также проходят cleanup.
+В API Gateway всё подключено внутри `internal.New(ctx)`: сначала запускается rtconfig, затем создаются основной сервер и обработчики. В `main` достаточно обычного запуска приложения:
+
+```go
+internal.New(ctx).Run(ctx)
+```
+
+Явный `global.Init(ctx, cfg.RuntimeConfig, generated.SchemaHash)` загружает каталог, проверяет hash, запускает manager и системные callbacks, устанавливает общий клиент. При ошибке созданный manager закрывается, прежний общий клиент восстанавливается. Успешный запуск регистрирует закрытие в общем `closer`, который приложение вызывает после drain и при ошибке дальнейшей инициализации. Для закрытия используется отдельный `ShutdownTimeout`.
+
+Внутри `initRuntimeConfig` остаётся только:
+
+```go
+client, err := global.Init(ctx, config.Instance().RuntimeConfig, runtimeconfig.SchemaHash)
+if err != nil {
+    return err
+}
+a.runtimeConfig.Store(client)
+return nil
+```
+
+Возвращается обычный `*rtconfig.Manager`, без дополнительной обёртки. Его `CheckReady()` возвращает ошибку до запуска и после закрытия; валидные defaults или последний snapshot достаточны для готовности. В Gateway указатель публикуется после успешного `Init`, проверка входит в `/healthcheck/ready`. Отдельного HTTP status endpoint нет. Readiness не проверяет свежесть или соединение с etcd.
+
+`global.Init` вызывается один раз при старте приложения. `global.Client()` только возвращает установленный клиент; чтение не запускает сеть. Для независимых клиентов используйте `rtconfig.New`/`Manager.Start`/`Manager.Close` и самостоятельно управляйте их lifecycle.
+
+`config/rtconfig.yaml` включён в Docker-образ. [Параметры запуска](../../../config/rtconfig.md#запуск-клиента).
 
 Минимальные options для локального стенда:
 
@@ -82,7 +100,7 @@ opts := rtconfig.Options{
 }
 ```
 
-`TLS`, `Username`, `Password` передаются статически; endpoint не содержит credentials. Reader получает только read-доступ к своему prefix, writer использует отдельную identity. При включённой авторизации недоступный etcd во время создания client также оставляет defaults и повторяется в фоне.
+Пакет поддерживает статические `TLS`, `Username`, `Password`; endpoint не содержит credentials. Для защищённого etcd reader следует выдать только read-доступ к своему prefix, writer — отдельную identity. Текущая инициализация Gateway подключается к доверенному HTTP etcd стенда без авторизации. При включённой авторизации недоступный etcd во время создания client также оставляет defaults и повторяется в фоне.
 
 | Budget | Default |
 |---|---|
@@ -99,7 +117,7 @@ opts := rtconfig.Options{
 
 `Value(ctx, name)` возвращает immutable значение или `ErrVariableNotFound`. Отмена request context не мешает локальному чтению. `Values(ctx)` копирует map **одного** поколения; два независимых вызова `Value` могут увидеть разные поколения. Сохранённые Value не меняются после следующей публикации.
 
-`String()` возвращает каноническое представление всех типов. Bool/Float64/Duration getters требуют соответствующего типа; signed и unsigned getters допускают только свой класс и проверяют диапазон результата. Getter неподходящего типа возвращает zero и не меняет `Err()`: проверяйте контракт consumer через `RequireType` при bootstrap. `NewNilValue(err)` сохраняет ошибку и предоставляет безопасные zero getters.
+`String()` возвращает каноническое представление всех типов. Bool/Float64/Duration getters требуют соответствующего типа; signed и unsigned getters допускают только свой класс и проверяют диапазон результата. Getter неподходящего типа возвращает zero и не меняет `Err()`: проверяйте контракт consumer через `RequireType` при инициализации. `NewNilValue(err)` сохраняет ошибку и предоставляет безопасные zero getters.
 
 `WatchVariable` и `WatchAllVariables` регистрируются после Start. Context ограничивает регистрацию; после успешного возврата подписка живёт до остановки manager. Первый callback получает old с именем ключа и `ErrNoPreviousValue`, без nil. WatchAll доставляет ключи в стабильном порядке.
 

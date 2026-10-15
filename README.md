@@ -63,7 +63,7 @@ Healthcheck: `http://localhost:<admin>/healthcheck/{live,ready,startup}`.
 
 В k3s разворачивается отдельный `config-etcd` с постоянным PVC. Для доступа с компьютера выполните `make config-etcd` в отдельном терминале, затем используйте `./bin/hotelctl config get/set`. Адрес внутри кластера — `http://config-etcd:2379`, через туннель — `http://127.0.0.1:2379`.
 
-[Развёртывание, проверка и ограничения etcd](deploy/booking-dependencies/README.md#runtime-конфигурация-в-отдельном-etcd). Bootstrap reader в API Gateway пока не подключён: запись флага в etcd ещё не меняет поведение HTTP/gRPC.
+[Развёртывание, проверка и ограничения etcd](deploy/booking-dependencies/README.md#runtime-конфигурация-в-отдельном-etcd). Reader автоматически запускается в API Gateway; его локальная готовность включена в `http://127.0.0.1:8081/healthcheck/ready` (`runtime_config`). Флаг доступен через facade, его проверка в HTTP/gRPC обработчиках пока не добавлена.
 
 ## Kafka UI
 

@@ -15,6 +15,7 @@ import (
 	"api-gateway/config"
 	"api-gateway/internal/pkg/closer"
 	"api-gateway/internal/pkg/healthcheck"
+	"api-gateway/internal/pkg/rtconfig"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/not-for-prod/clay/server"
@@ -24,7 +25,8 @@ import (
 
 // App application
 type App struct {
-	mainServer *server.Server
+	runtimeConfig atomic.Pointer[rtconfig.Manager]
+	mainServer    *server.Server
 
 	adminListener net.Listener
 	adminMux      *chi.Mux
@@ -45,7 +47,8 @@ type App struct {
 	adminCloser *closer.Closer
 }
 
-// New конструктор
+// New создаёт приложение и запускает rtconfig до инициализации обработчиков.
+// Готовность и закрытие клиента подключаются автоматически.
 func New(ctx context.Context) *App {
 	app := &App{
 		grpcConn:     make(map[string]grpc.ClientConnInterface),
@@ -62,6 +65,8 @@ func New(ctx context.Context) *App {
 	app.runAdminServer(ctx)
 
 	if err := app.init(ctx); err != nil {
+		closer.CloseAll()
+		app.adminCloser.CloseAll()
 		log.Fatalf("[APP] Не удалось инициализировать приложение: %s", err.Error())
 	}
 	return app
@@ -112,6 +117,7 @@ func (a *App) Run(_ context.Context) {
 
 	a.publicCloser.Wait()
 
+	// Watch живёт до окончания drain публичного сервера.
 	closer.CloseAll()
 
 	a.adminCloser.CloseAll()
@@ -119,6 +125,7 @@ func (a *App) Run(_ context.Context) {
 
 func (a *App) init(ctx context.Context) error {
 	initFuncs := []func(context.Context) error{
+		a.initRuntimeConfig,
 		a.initMainServer,
 		a.initGrpcConn,
 		a.initControllers,

@@ -168,6 +168,24 @@ func (m *Manager) Close(ctx context.Context) error {
 	}
 }
 
+// CheckReady проверяет lifecycle клиента без обращения к etcd.
+// После Start валидные defaults или последний snapshot достаточны для работы.
+func (m *Manager) CheckReady() error {
+	if m == nil {
+		return ErrNotInitialized
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.closed {
+		return ErrClosed
+	}
+	if !m.started {
+		return ErrNotInitialized
+	}
+	return nil
+}
+
 // Value reads only memory. Request cancellation does not invalidate a ready
 // snapshot, and closing Manager does not invalidate already published values.
 func (m *Manager) Value(_ context.Context, name string) (Value, error) {

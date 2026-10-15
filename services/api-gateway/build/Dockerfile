@@ -10,6 +10,7 @@ FROM scratch AS release
 WORKDIR /app
 COPY --from=builder /api-gateway /api-gateway
 COPY config/config.yaml /app/config/config.yaml
+COPY config/rtconfig.yaml /app/config/rtconfig.yaml
 USER 65532:65532
 EXPOSE 8080 8081 9090
 ENTRYPOINT ["/api-gateway"]

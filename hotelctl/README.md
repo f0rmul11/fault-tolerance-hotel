@@ -141,8 +141,10 @@ CLI не импортирует внутренние пакеты сервисо
 подключается напрямую и сам не создаёт port-forward. После перезапуска Pod туннель нужно открыть заново.
 Внутри кластера адрес — `http://config-etcd.hotelflow.svc.cluster.local:2379`.
 [Устройство и команды etcd](../deploy/booking-dependencies/README.md#runtime-конфигурация-в-отдельном-etcd).
-Bootstrap reader в Gateway пока не подключён: успешный `set` подтверждает запись в хранилище,
-а не применение флага Pod.
+Reader в API Gateway запускается автоматически. Успешный `set` подтверждает запись в хранилище;
+обновление reader асинхронное. Его локальная готовность включена в admin `/healthcheck/ready`
+(`runtime_config=success`). Readiness не подтверждает применение конкретной revision или доступность etcd.
+Проверка флага в HTTP/gRPC обработчиках пока не добавлена.
 `get` показывает значение из etcd; если ключ отсутствует — YAML default с `source=default revision=0`.
 Он не опрашивает локальный snapshot сервиса и не показывает его last-known-good состояние.
 

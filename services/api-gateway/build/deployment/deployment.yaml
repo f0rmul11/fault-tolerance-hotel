@@ -42,6 +42,10 @@ spec:
             - name: admin
               containerPort: 8081
           env:
+            - name: RTCONFIG_ENDPOINTS
+              value: "http://config-etcd.hotelflow.svc.cluster.local:2379"
+            - name: RTCONFIG_PREFIX
+              value: "/hotelflow/dev/services/api-gateway/rtconfig/v1/values/"
             - name: HTTP_PORT
               value: "8080"
             - name: GRPC_PORT

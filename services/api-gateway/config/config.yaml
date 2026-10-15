@@ -16,3 +16,11 @@ service:
   hotels: "hotels:9090"
   check-in: "check-in:9090"
   booking: booking:9090
+
+# Для локального запуска через make config-etcd. В k3s endpoint задан в Deployment.
+runtime_config:
+  endpoints: ["http://127.0.0.1:2379"]
+  prefix: /hotelflow/dev/services/api-gateway/rtconfig/v1/values/
+  schema_path: rtconfig.yaml
+  startup_timeout: 5s
+  shutdown_timeout: 3s

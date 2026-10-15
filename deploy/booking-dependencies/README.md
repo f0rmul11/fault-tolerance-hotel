@@ -49,4 +49,4 @@ make config-etcd
 
 Startup/readiness используют `/readyz`, liveness — `/livez`. Backend quota — 128 MiB, история revisions автоматически compact-ится с retention 1 час; отставший watch должен выполнить полный resync. Compaction не заменяет defrag и резервные копии. Параметры: [официальная документация etcd](https://etcd.io/docs/v3.6/op-guide/configuration/), [семантика probes](https://etcd.io/docs/v3.6/op-guide/monitoring/).
 
-Пакет reader и facade в API Gateway реализованы, но bootstrap reader и применение флага в HTTP/gRPC пока не подключены. Успешный `hotelctl config set` подтверждает запись в etcd, а не изменение поведения приложения.
+Reader запускается в API Gateway автоматически; Deployment задаёт внутренний endpoint etcd и префикс сервиса. `GET http://127.0.0.1:8081/healthcheck/ready` содержит проверку `runtime_config` — готовность локального клиента, без проверки доступности etcd или конкретной revision. При недоступном etcd доступны defaults или последнее валидное состояние в памяти. Проверка флага в HTTP/gRPC обработчиках пока не добавлена: успешный `hotelctl config set` подтверждает запись в etcd, reader применяет её асинхронно.

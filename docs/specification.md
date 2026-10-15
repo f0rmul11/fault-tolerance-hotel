@@ -46,7 +46,12 @@ Kafka общая, адрес внутри кластера — `kafka:9092`. О�
 Прикладная runtime-конфигурация хранится в отдельном `config-etcd:2379` с собственным PVC
 `config-etcd-data`. Это один member, HTTP без авторизации для доверенного локального стенда;
 доступ с компьютера — через loopback port-forward (`make config-etcd`). `up/deploy` запускает
-etcd, `reset` сохраняет overrides. Пакет reader готов, его bootstrap в API Gateway ещё не подключён.
+etcd, `reset` сохраняет overrides. Reader автоматически запускается в API Gateway: YAML и
+системный registry сверяются с generated schema hash, затем запускаются snapshot/watch.
+Без etcd доступны defaults или последнее валидное состояние в памяти. Manager закрывается
+после drain; локальная готовность включена в admin `/healthcheck/ready` (`runtime_config`).
+Readiness не требует доступного etcd при валидных defaults/snapshot. Проверка флага
+в HTTP/gRPC обработчиках пока не добавлена.
 
 ## Идентификаторы, время и основные данные
 
