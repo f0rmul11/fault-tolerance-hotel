@@ -26,8 +26,9 @@ enabled = cfg.GetValue(ctx, config.HotelsListEnabled).Bool()
 | `observer.go` | Регистрация и последовательная доставка callbacks |
 | `global/` | Явно установленный client для generated facade |
 | `system/` | Registry платформенных определений и callbacks |
+| `codegen/` | Генератор facade: проверка каталога, Go identifiers и атомарная запись |
 
-`global` и `system` зависят от core `rtconfig`; core не импортирует их. `cmd/rtconfig-gen` объединяет сервисный YAML с `system` и создаёт facade `internal/config/config.go`, который использует `global`. В корневом `config` находятся статическая конфигурация и YAML-каталог сервиса.
+`global`, `system` и `codegen` зависят от core `rtconfig`; core не импортирует их. `codegen` объединяет сервисный YAML с явно переданными системными определениями и создаёт facade `internal/config/config.go`, который использует `global`. Короткая точка запуска находится в `internal/config/generate/main.go`; в `cmd` остаётся только приложение. В корневом `config` находятся статическая конфигурация и YAML-каталог сервиса.
 
 ## Каталог и wire format
 
@@ -54,6 +55,8 @@ realtimeConfig:
 ```sh
 go generate ./internal/config
 ```
+
+Точка запуска передаёт в `codegen.New(codegen.Options{...})` пути `SchemaPath`, `OutputPath` и `SystemDefinitions: system.Definitions()`, затем вызывает `Generate()`. [Пример использования API](../../../config/rtconfig.md#api-генератора).
 
 Генератор объединяет YAML и `system.Definitions()`, сортирует ключи, проверяет коллизии Go identifiers и выпускает `SchemaHash`. Hash включает имя, тип, default, writable и enum; описательный текст в него не входит. Generated-файл вручную не редактируется.
 

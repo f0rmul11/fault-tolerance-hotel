@@ -1,10 +1,9 @@
-package main
+package codegen
 
 import (
 	"bytes"
 	"go/parser"
 	"go/token"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -24,11 +23,11 @@ func TestGenerateDeterministicAndCompatible(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	first, err := generate(schema)
+	first, err := render(schema)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := generate(schema)
+	second, err := render(schema)
 	if err != nil || !bytes.Equal(first, second) {
 		t.Fatalf("generation not reproducible: %v", err)
 	}
@@ -85,7 +84,7 @@ func TestGenerateRejectsGoNameCollision(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, err := generate(schema); err == nil {
+			if _, err := render(schema); err == nil {
 				t.Fatal("Go name collision accepted")
 			}
 		})
@@ -125,6 +124,10 @@ func TestInvalidInputPreservesGeneratedFile(t *testing.T) {
 			yaml: "realtimeConfig:\n  debug: {type: bool, value: false, writable: true}\n  debug: {type: bool, value: true, writable: true}\n",
 		},
 		{
+			name: "go_identifier_collision",
+			yaml: "realtimeConfig:\n  client: {type: bool, value: false, writable: true}\n",
+		},
+		{
 			name: "wrong_default",
 			yaml: "realtimeConfig:\n  debug: {type: bool, value: yes, writable: true}\n",
 		},
@@ -141,7 +144,14 @@ func TestInvalidInputPreservesGeneratedFile(t *testing.T) {
 			if err := os.WriteFile(outputPath, []byte("existing artifact"), 0o600); err != nil {
 				t.Fatal(err)
 			}
-			if err := run([]string{"-schema", schemaPath, "-out", outputPath}, io.Discard); err == nil {
+			generator, err := New(Options{
+				SchemaPath: schemaPath,
+				OutputPath: outputPath,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := generator.Generate(); err == nil {
 				t.Fatal("invalid schema accepted")
 			}
 			output, err := os.ReadFile(outputPath)
@@ -162,11 +172,118 @@ func TestGenerateKeepsUsageAsComment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	generated, err := generate(schema)
+	generated, err := render(schema)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(string(generated), "// package other") {
 		t.Fatalf("multiline usage escaped comment: %s", generated)
+	}
+}
+
+func TestNewRejectsInvalidOptions(t *testing.T) {
+	tests := []struct {
+		name string
+		opts Options
+	}{
+		{
+			name: "missing_schema",
+			opts: Options{OutputPath: "config.go"},
+		},
+		{
+			name: "missing_output",
+			opts: Options{SchemaPath: "values.yaml"},
+		},
+		{
+			name: "same_path",
+			opts: Options{
+				SchemaPath: "values.yaml",
+				OutputPath: filepath.Join("unused", "..", "values.yaml"),
+			},
+		},
+		{
+			name: "invalid_system_definition",
+			opts: Options{
+				SchemaPath: "values.yaml",
+				OutputPath: "config.go",
+				SystemDefinitions: []rtconfig.Definition{
+					{
+						Name:    "debug",
+						Type:    rtconfig.BoolType,
+						Default: "invalid bool",
+					},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if _, err := New(tt.opts); err == nil {
+				t.Fatal("invalid options accepted")
+			}
+		})
+	}
+}
+
+func TestGeneratorResolvesPathsAndCopiesSystemDefinitions(t *testing.T) {
+	directory := t.TempDir()
+	t.Chdir(directory)
+	definitions := []rtconfig.Definition{
+		{
+			Name:    "log_level",
+			Type:    rtconfig.StringType,
+			Default: "info",
+			Enum:    []string{"info", "debug"},
+		},
+	}
+	data := []byte("realtimeConfig:\n  enabled: {type: bool, value: false, writable: true}\n")
+	schema, err := mergedSchema(data, definitions)
+	if err != nil {
+		t.Fatal(err)
+	}
+	generator, err := New(Options{
+		SchemaPath:        "values.yaml",
+		OutputPath:        "generated/config.go",
+		SystemDefinitions: definitions,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries, err := os.ReadDir(directory)
+	if err != nil || len(entries) != 0 {
+		t.Fatalf("constructor created files: %v, %v", entries, err)
+	}
+	// Конструктор сохраняет собственный каталог, включая вложенные enum slices.
+	definitions[0].Name = "changed_name"
+	definitions[0].Enum[0] = "changed_value"
+	if err := os.WriteFile("values.yaml", data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	// Смена cwd после New не должна перенаправить ввод или вывод.
+	t.Chdir(t.TempDir())
+	if err := generator.Generate(); err != nil {
+		t.Fatal(err)
+	}
+	outputPath := filepath.Join(directory, "generated", "config.go")
+	first, err := os.ReadFile(outputPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, fragment := range []string{
+		`LogLevel = configKey("log_level")`,
+		`Enabled = configKey("enabled")`,
+		schema.Hash(),
+	} {
+		if !strings.Contains(strings.Join(strings.Fields(string(first)), " "), fragment) {
+			t.Errorf("missing merged contract %q", fragment)
+		}
+	}
+	if err := generator.Generate(); err != nil {
+		t.Fatal(err)
+	}
+	second, err := os.ReadFile(outputPath)
+	if err != nil || !bytes.Equal(first, second) {
+		t.Fatalf("generation not reproducible: %v", err)
 	}
 }
