@@ -85,7 +85,7 @@ make reset
 ```
 
 Команда предназначена для работающего локального стенда с текущей схемой и конфигурацией.
-Она удаляет все учебные записи четырёх БД, включая HTTP-ключи, inbox/outbox/processed_events;
+Она удаляет все учебные записи четырёх БД, включая HTTP-ключи, inbox/outbox;
 возвращает 3 отеля, 11 номеров и 2 рейтинга; пересоздаёт booking.events.v1/checkin.events.v1
 (1 partition, replication factor 1) и удаляет consumer groups из конфигураций Booking,
 Check-in и Notification вместе с offsets. Остальные топики/группы не затрагиваются.

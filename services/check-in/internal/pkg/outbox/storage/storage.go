@@ -24,14 +24,25 @@ func NewStorage(pool *pgxpool.Pool) *Storage {
 
 // SaveMessages сохраняет сообщения для дальнейшей отправки в kafka
 func (s Storage) SaveMessages(ctx context.Context, messages message.Messages) error {
-	sql := `insert into outbox (entity_id, topic,key,body,headers,metadata,created_at)
-				select unnest($1::text[]) 	as entity_id,
-					   unnest($2::text[])  		as topic,
-					   unnest($3::bytea[])  	as key,
-					   unnest($4::bytea[])  	as body,
-					   unnest($5::jsonb[])  	as headers,
-					   unnest($6::jsonb[]) 		as metadata,
-					   unnest($7::timestamp[]) as created_at;`
+	sql := `
+		insert into outbox (
+			entity_id,
+			topic,
+			key,
+			body,
+			headers,
+			metadata,
+			created_at
+		)
+		select
+			unnest($1::text[]) as entity_id,
+			unnest($2::text[]) as topic,
+			unnest($3::bytea[]) as key,
+			unnest($4::bytea[]) as body,
+			unnest($5::jsonb[]) as headers,
+			unnest($6::jsonb[]) as metadata,
+			unnest($7::timestamp[]) as created_at;
+	`
 
 	_, err := s.wrapper.Pool(ctx).Exec(ctx, sql,
 		messages.EntitiesIDs(),
@@ -47,15 +58,21 @@ func (s Storage) SaveMessages(ctx context.Context, messages message.Messages) er
 
 // MarkAsProcessed помечает батч сообщений как обработанный
 func (s Storage) MarkAsProcessed(ctx context.Context, messages message.Messages) error {
-	sql := `update outbox
-			set processed_at = tmp.processed_at,
-				errors_count = tmp.errors_count,
-				error_desc   = tmp.error_desc
-			from (select unnest($1::bigint[])    as id,
-						 unnest($2::timestamp[]) as processed_at,
-						 unnest($3::integer[])   as errors_count,
-						 unnest($4::text[])      as error_desc) as tmp
-			where outbox.id = tmp.id;`
+	sql := `
+		update outbox
+		set
+			processed_at = tmp.processed_at,
+			errors_count = tmp.errors_count,
+			error_desc = tmp.error_desc
+		from (
+			select
+				unnest($1::bigint[]) as id,
+				unnest($2::timestamp[]) as processed_at,
+				unnest($3::integer[]) as errors_count,
+				unnest($4::text[]) as error_desc
+		) as tmp
+		where outbox.id = tmp.id;
+	`
 
 	_, err := s.wrapper.Pool(ctx).Exec(ctx, sql,
 		pq.Array(messages.IDs()),
@@ -68,13 +85,18 @@ func (s Storage) MarkAsProcessed(ctx context.Context, messages message.Messages)
 
 // GetPendingMessages возвращает батч необработанных сообщений в разрезе топика
 func (s Storage) GetPendingMessages(ctx context.Context, keysLimit, messagesLimit int) (batch message.Messages, _ error) {
-	lockSql := `with target_rows(entity_id) as (
-                select entity_id from outbox where processed_at is null
-                order by id + 0
-                limit $1
-            )
-			select entity_id from target_rows
-			where pg_try_advisory_xact_lock(hashtext(entity_id));`
+	lockSql := `
+		with target_rows(entity_id) as (
+			select entity_id
+			from outbox
+			where processed_at is null
+			order by id + 0
+			limit $1
+		)
+		select entity_id
+		from target_rows
+		where pg_try_advisory_xact_lock(hashtext(entity_id));
+	`
 
 	var lockedKeys []string
 	// блокируем ключи
@@ -83,11 +105,14 @@ func (s Storage) GetPendingMessages(ctx context.Context, keysLimit, messagesLimi
 		return nil, err
 	}
 
-	sql := `select * from outbox where
-            outbox.entity_id = any ($1)
-            and outbox.processed_at is null
-			order by id
-			limit $2;`
+	sql := `
+		select *
+		from outbox
+		where outbox.entity_id = any ($1)
+			and outbox.processed_at is null
+		order by id
+		limit $2;
+	`
 
 	var messages []*Message
 

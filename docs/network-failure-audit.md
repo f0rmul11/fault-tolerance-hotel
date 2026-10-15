@@ -29,8 +29,8 @@
 | Consumer сохранил inbox, offset commit потерян | Повтор поглощается unique (correlation_id, topic) в inbox |
 | HTTP активации/отмены Check-in | Ключ (actor_id, key), состояние CheckIn и outbox сохраняются одной транзакцией. Повтор возвращает текущее состояние того же CheckIn |
 | Kafka недоступна после принятия действия | CheckIn остаётся ARRIVING/CANCELING до ответа; сохранённая команда ожидает в outbox. Локального таймера отмены нет |
-| Booking применяет команду Check-in | processed_events, CAS-переход Booking и reply outbox сохраняются одной транзакцией. Техническая ошибка откатывает их вместе |
-| Business commit Booking успешен, inbox processed_at не сохранён | Повтор команды распознаётся по processed_events.correlation_id и не создаёт второй переход или reply |
+| Booking применяет команду Check-in | CAS-переход Booking и reply outbox сохраняются одной транзакцией. Техническая ошибка откатывает их вместе |
+| Business commit Booking успешен, inbox processed_at не сохранён | Inbox повторяет use case. Домен не повторяет изменение статуса/версии; reply может создаться снова. Check-in игнорирует ответ для уже завершённого действия |
 | Бизнес-отказ Booking | booking.checkin-rejected.v1 возвращает CheckIn в предыдущее состояние с русским пояснением |
 | Ответ повторился или пришёл поздно | Домен CheckIn проверяет ожидаемую версию действия; старый ответ не изменяет новое состояние |
 | Notification записал лог, offset commit потерян | Лог может повториться: inbox и дедупликация намеренно отсутствуют |

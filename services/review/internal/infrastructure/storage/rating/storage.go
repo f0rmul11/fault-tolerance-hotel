@@ -20,12 +20,19 @@ func New(db wrapper.Database) *Storage {
 }
 
 func (s *Storage) Get(ctx context.Context, ids []uuid.UUID) ([]*entity.Rating, error) {
+	const query = `
+		select *
+		from public.ratings
+		where hotel_id = any($1::uuid[])
+		order by hotel_id
+	`
+
 	if len(ids) == 0 {
 		return nil, nil
 	}
 	var rows []dao.Rating
 	if err := pgxscan.Select(ctx, s.db.Pool(ctx), &rows,
-		`select * from public.ratings where hotel_id = any($1::uuid[]) order by hotel_id`, ids,
+		query, ids,
 	); err != nil {
 		return nil, err
 	}

@@ -196,9 +196,11 @@ Reply получает собственный correlation_id, causation_id ук�
 Consumer groups: `booking-checkin-events`, `check-in-booking-events`, `notification-booking-events`.
 Новые группы читают oldest. Delivery — at-least-once, без обещания exactly-once.
 Booking/Check-in сначала сохраняют inbox с уникальным `(correlation_id, topic)`, затем подтверждают offset.
-Booking сохраняет processed_events, CAS-переход и reply outbox одной транзакцией:
-повтор после business commit не повторяет переход/ответ. Check-in защищает применение ответа
-собственной версией; повтор создания не перезаписывает CheckIn.
+Booking сохраняет CAS-переход и reply outbox одной транзакцией. Inbox может повторить use case
+после business commit; идемпотентные доменные методы не повторяют изменение статуса/версии.
+Отдельного маркера обработанных событий нет. Ответное событие может создаться повторно
+с новым correlation_id и прежним causation_id; Check-in защищает его применение собственной
+версией действия. Повтор создания не перезаписывает CheckIn.
 
 Бизнес-транзакции не вызывают внешние системы. Для отдельного outbox relay разрешено
 держать транзакцию БД во время отправки в Kafka, как в выбранном образце.
@@ -208,7 +210,7 @@ Booking сохраняет processed_events, CAS-переход и reply outbox 
 
 | БД / владелец | Таблицы public |
 | --- | --- |
-| Booking | bookings, inbox, outbox, processed_events, goose_db_version |
+| Booking | bookings, inbox, outbox, goose_db_version |
 | Check-in | checkins, requests, inbox, outbox, goose_db_version |
 | Hotels | hotels, rooms, goose_db_version |
 | Review | ratings, goose_db_version |

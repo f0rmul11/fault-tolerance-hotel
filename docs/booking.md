@@ -33,7 +33,7 @@ Room lock, поиск конфликтующих броней в Go и прот�
 
 `CheckAvailability` получает hotel_id и период, загружает номера из Hotels, фильтрует условия длительности и исключает занятое время запросом в свою БД. Это снимок доступности: окончательное решение принимает EXCLUDE при записи.
 
-CONFIRMED и ACTIVE занимают номер. Отмена в CANCELED освобождает период благодаря предикату EXCLUDE. Переход, маркер обработанного correlation-id и ответное событие сохраняются одной транзакцией. [Сценарий Check-in](check-in.md).
+CONFIRMED и ACTIVE занимают номер. Отмена в CANCELED освобождает период благодаря предикату EXCLUDE. Переход и ответное событие сохраняются одной транзакцией. Inbox может повторить обработку; доменные методы не повторяют смену статуса и версии, повторный reply допустим. [Сценарий Check-in](check-in.md).
 
 ## Идемпотентность
 
@@ -74,7 +74,7 @@ curl -sS http://localhost:8080/v1/bookings \
 
 ## Схема и генерация
 
-Booking в собственной БД: `public.bookings`, `public.processed_events`, `public.outbox` и `public.inbox`. Hotels в своей БД: `public.hotels` и `public.rooms`. DAO встраивает xo-модель и восстанавливает Booking через With/Option.
+Booking в собственной БД: `public.bookings`, `public.outbox` и `public.inbox`. Hotels в своей БД: `public.hotels` и `public.rooms`. DAO встраивает xo-модель и восстанавливает Booking через With/Option.
 
 ```sh
 make booking-tools

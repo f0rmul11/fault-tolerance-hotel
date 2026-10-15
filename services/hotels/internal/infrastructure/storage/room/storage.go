@@ -23,7 +23,11 @@ func New(db wrapper.Database) *Storage {
 }
 
 func (s *Storage) Get(ctx context.Context, id int64) (*entity.Room, error) {
-	const query = `select * from public.rooms where id = $1`
+	const query = `
+		select *
+		from public.rooms
+		where id = $1
+	`
 	var row dao.Room
 	if err := pgxscan.Get(ctx, s.db.Pool(ctx), &row, query, id); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -37,9 +41,16 @@ func (s *Storage) Get(ctx context.Context, id int64) (*entity.Room, error) {
 }
 
 func (s *Storage) List(ctx context.Context, hotelID uuid.UUID) ([]*entity.Room, error) {
+	const query = `
+		select *
+		from public.rooms
+		where hotel_id = $1
+		order by number, id
+	`
+
 	var rows []dao.Room
 	if err := pgxscan.Select(ctx, s.db.Pool(ctx), &rows,
-		`select * from public.rooms where hotel_id = $1 order by number, id`, hotelID,
+		query, hotelID,
 	); err != nil {
 		return nil, err
 	}

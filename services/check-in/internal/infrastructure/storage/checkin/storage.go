@@ -24,16 +24,52 @@ func New(db wrapper.Database) *Storage {
 }
 
 func (s *Storage) Create(ctx context.Context, c *entity.CheckIn) error {
-	_, err := s.db.Pool(ctx).Exec(ctx, `insert into public.checkins
-    (id,booking_id,room_id,guest_id,starts_at,ends_at,status,previous_status,version,failure,room_number,room_type)
-    values ($1,$2,$3,$4,$5,$6,$7,'',$8,'',$9,$10) on conflict (booking_id) do nothing`,
-		c.ID(), c.BookingID(), c.RoomID(), c.GuestID(), c.Period().Start(), c.Period().End(), string(c.Status()), c.Version(), c.RoomNumber(), c.RoomType())
+	const query = `
+		insert into public.checkins (
+			id,
+			booking_id,
+			room_id,
+			guest_id,
+			starts_at,
+			ends_at,
+			status,
+			previous_status,
+			version,
+			failure,
+			room_number,
+			room_type
+		)
+		values (
+			$1, $2, $3, $4, $5, $6,
+			$7, '', $8, '', $9, $10
+		)
+		on conflict (booking_id) do nothing
+	`
+
+	_, err := s.db.Pool(ctx).Exec(ctx, query,
+		c.ID(),
+		c.BookingID(),
+		c.RoomID(),
+		c.GuestID(),
+		c.Period().Start(),
+		c.Period().End(),
+		string(c.Status()),
+		c.Version(),
+		c.RoomNumber(),
+		c.RoomType(),
+	)
 	return err
 }
 
 func (s *Storage) Get(ctx context.Context, bookingID uuid.UUID) (*entity.CheckIn, error) {
+	const query = `
+		select *
+		from public.checkins
+		where booking_id = $1
+	`
+
 	var row dao.CheckIn
-	if err := pgxscan.Get(ctx, s.db.Pool(ctx), &row, `select * from public.checkins where booking_id=$1`, bookingID); err != nil {
+	if err := pgxscan.Get(ctx, s.db.Pool(ctx), &row, query, bookingID); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, app.NewNotFoundErr("Заселение не найдено", err)
 		}
@@ -43,9 +79,17 @@ func (s *Storage) Get(ctx context.Context, bookingID uuid.UUID) (*entity.CheckIn
 }
 
 func (s *Storage) ListArrivals(ctx context.Context, p vo.Period) ([]*entity.CheckIn, error) {
+	const query = `
+		select *
+		from public.checkins
+		where status in ('EXPECTED', 'ARRIVING')
+			and starts_at >= $1
+			and starts_at < $2
+		order by starts_at, id
+	`
+
 	var rows []dao.CheckIn
-	if err := pgxscan.Select(ctx, s.db.Pool(ctx), &rows, `select * from public.checkins
-    where status in ('EXPECTED','ARRIVING') and starts_at >= $1 and starts_at < $2 order by starts_at,id`, p.Start(), p.End()); err != nil {
+	if err := pgxscan.Select(ctx, s.db.Pool(ctx), &rows, query, p.Start(), p.End()); err != nil {
 		return nil, err
 	}
 	result := make([]*entity.CheckIn, 0, len(rows))
@@ -61,8 +105,24 @@ func (s *Storage) ListArrivals(ctx context.Context, p vo.Period) ([]*entity.Chec
 
 // ClaimRequest reserves an HTTP idempotency key in the same transaction as the state and outbox.
 func (s *Storage) ClaimRequest(ctx context.Context, r checkindto.Request) (bool, error) {
-	tag, err := s.db.Pool(ctx).Exec(ctx, `insert into public.requests (actor_id,key,booking_id,action)
-    values ($1,$2,$3,$4) on conflict (actor_id,key) do nothing`, r.ActorID, r.Key, r.BookingID, string(r.Action))
+	const insertQuery = `
+		insert into public.requests (
+			actor_id,
+			key,
+			booking_id,
+			action
+		)
+		values ($1, $2, $3, $4)
+		on conflict (actor_id, key) do nothing
+	`
+	const selectQuery = `
+		select *
+		from public.requests
+		where actor_id = $1
+			and key = $2
+	`
+
+	tag, err := s.db.Pool(ctx).Exec(ctx, insertQuery, r.ActorID, r.Key, r.BookingID, string(r.Action))
 	if err != nil {
 		return false, err
 	}
@@ -74,7 +134,7 @@ func (s *Storage) ClaimRequest(ctx context.Context, r checkindto.Request) (bool,
 		ctx,
 		s.db.Pool(ctx),
 		&row,
-		`select * from public.requests where actor_id=$1 and key=$2`,
+		selectQuery,
 		r.ActorID,
 		r.Key,
 	); err != nil {
@@ -87,6 +147,41 @@ func (s *Storage) ClaimRequest(ctx context.Context, r checkindto.Request) (bool,
 }
 
 func (s *Storage) Save(ctx context.Context, objects ...*entity.CheckIn) error {
+	const query = `
+		update public.checkins c
+		set
+			status = v.status,
+			previous_status = v.previous_status,
+			version = v.version,
+			actor_id = v.actor_id,
+			request_id = v.request_id,
+			requested_at = v.requested_at,
+			failure = v.failure
+		from unnest(
+			$1::uuid[],
+			$2::text[],
+			$3::text[],
+			$4::bigint[],
+			$5::bigint[],
+			$6::uuid[],
+			$7::uuid[],
+			$8::timestamptz[],
+			$9::text[]
+		) as v(
+			id,
+			status,
+			previous_status,
+			version,
+			old_version,
+			actor_id,
+			request_id,
+			requested_at,
+			failure
+		)
+		where c.id = v.id
+			and c.version = v.old_version
+	`
+
 	if len(objects) == 0 {
 		return nil
 	}
@@ -110,13 +205,17 @@ func (s *Storage) Save(ctx context.Context, objects ...*entity.CheckIn) error {
 		requestedAt = append(requestedAt, c.RequestedAt())
 		failures = append(failures, c.Failure())
 	}
-	tag, err := s.db.Pool(ctx).Exec(ctx, `update public.checkins c
-    set status=v.status,previous_status=v.previous_status,version=v.version,
-        actor_id=v.actor_id,request_id=v.request_id,requested_at=v.requested_at,failure=v.failure
-    from unnest($1::uuid[],$2::text[],$3::text[],$4::bigint[],$5::bigint[],
-        $6::uuid[],$7::uuid[],$8::timestamptz[],$9::text[])
-        as v(id,status,previous_status,version,old_version,actor_id,request_id,requested_at,failure)
-    where c.id=v.id and c.version=v.old_version`, ids, statuses, previous, versions, oldVersions, actors, requests, requestedAt, failures)
+	tag, err := s.db.Pool(ctx).Exec(ctx, query,
+		ids,
+		statuses,
+		previous,
+		versions,
+		oldVersions,
+		actors,
+		requests,
+		requestedAt,
+		failures,
+	)
 	if err != nil {
 		return err
 	}

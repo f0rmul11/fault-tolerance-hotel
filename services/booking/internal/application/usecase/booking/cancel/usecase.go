@@ -14,7 +14,6 @@ import (
 )
 
 type Storage interface {
-	AcceptEvent(context.Context, uuid.UUID) (bool, error)
 	Get(context.Context, uuid.UUID) (*entity.Booking, error)
 	Save(context.Context, ...*entity.Booking) error
 }
@@ -37,10 +36,6 @@ func (s *UseCase) Execute(ctx context.Context, input Input) error {
 		return err
 	}
 	return transaction.Exec(ctx, func(txCtx context.Context) error {
-		fresh, err := s.storage.AcceptEvent(txCtx, request.CorrelationID)
-		if err != nil || !fresh {
-			return err
-		}
 		booking, err := s.storage.Get(txCtx, request.BookingID)
 		if err != nil {
 			return err

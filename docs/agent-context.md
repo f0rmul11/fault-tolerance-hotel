@@ -21,6 +21,8 @@
 - Топики booking.events.v1 и checkin.events.v1. correlation_id UUID — ключ события,
   request_id — трассировка, idempotency_key — ключ HTTP; это разные идентификаторы.
   Kafka handlers вызывают use case. Booking и Check-in используют inbox/outbox.
+  Повторная обработка допустима: доменные переходы идемпотентны, отдельного маркера событий нет.
+  Reply может повториться; Check-in проверяет версию действия и не откатывает новое состояние.
 - Notification читает confirmed/activated/canceled и пишет push-заглушки в stdout.
   У него нет inbox/БД/дедупликации, из RPC только Echo. Повторные логи допустимы.
 - У Booking, Check-in, Hotels, Review отдельные PostgreSQL; все таблицы в public.
