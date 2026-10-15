@@ -1,0 +1,130 @@
+# Runtime configuration
+
+`rtconfig` хранит проверенную конфигурацию в immutable snapshot. `Value` читает atomic pointer и map без mutex, парсинга, логов и сетевых вызовов. Один manager владеет etcd client, одной watch-подпиской и последовательным dispatcher callbacks.
+
+```go
+import config "api-gateway/internal/config"
+
+enabled := config.GetValue(ctx, config.HotelsListEnabled).Bool()
+
+// Независимый клиент для DI и параллельных тестов.
+cfg := config.NewClient(manager)
+enabled = cfg.GetValue(ctx, config.HotelsListEnabled).Bool()
+```
+
+Пакет, generator и facade готовы к подключению. Writer доступен через `hotelctl config get/set` — см. [инструкцию CLI](../../../../../hotelctl/README.md#runtime-конфигурация-в-etcd). Lifecycle API Gateway, HTTP/gRPC gate, admin endpoint и deployment etcd пока не подключены. Флаг `hotels_list_enabled` пока служит примером каталога и сам по себе не меняет обработку запросов.
+
+## Структура
+
+| Файл | Ответственность |
+|---|---|
+| `client.go` | Контракты, options и локальный status |
+| `value.go` | Неизменяемые типизированные скаляры |
+| `schema.go` | Общая валидация YAML, defaults и remote values |
+| `manager.go` | Lifecycle и атомарная публикация snapshot |
+| `watch.go` | Get → Watch, revisions, freshness и recovery |
+| `observer.go` | Регистрация и последовательная доставка callbacks |
+| `global/` | Явно установленный client для generated facade |
+| `system/` | Registry платформенных определений и callbacks |
+
+`global` и `system` зависят от core `rtconfig`; core не импортирует их. `cmd/rtconfig-gen` объединяет сервисный YAML с `system` и создаёт facade `internal/config/config.go`, который использует `global`. В корневом `config` находятся статическая конфигурация и YAML-каталог сервиса.
+
+## Каталог и wire format
+
+Канонический сервисный каталог — `config/rtconfig.yaml`:
+
+```yaml
+realtimeConfig:
+  hotels_list_enabled:
+    usage: Разрешает получение списка отелей через API Gateway
+    group: features
+    value: "false"
+    type: bool
+    writable: true
+```
+
+Поддерживаются `bool`, `string`, `int`, `int64`, `uint`, `uint64`, `float64`, `duration`. `writable` в YAML обязателен. `view.enum` задаётся только для string. Неизвестные поля, дубликаты, YAML aliases, неверный default или enum отвергаются. `NewSchema` и `ParseSchema` возвращают готовый immutable каталог; zero-value `Schema` не используется.
+
+В etcd хранится **JSON-скаляр** по ключу `<Prefix><name>`: `true`, `42`, `"text"`, `"250ms"`. Строка `"false"` допустима как YAML default для bool, но remote bool должен быть JSON `false`. Целые разбираются без преобразования через float64; NaN/Inf и overflow отвергаются.
+
+Отсутствующий ключ означает default. Delete возвращает default. Remote override для `writable: false` отвергается даже при совпадении с default. Неизвестные ключи не входят в effective snapshot, но учитываются в ограничениях размера. Невалидный кандидат отклоняется целиком: последнее валидное состояние остаётся доступным. Сырые изменения сохраняются до исправления, поэтому исправление одного ключа не теряет остальные значения той же транзакции.
+
+После изменения каталога из корня Go-модуля:
+
+```sh
+go generate ./internal/config
+```
+
+Генератор объединяет YAML и `system.Definitions()`, сортирует ключи, проверяет коллизии Go identifiers и выпускает `SchemaHash`. Hash включает имя, тип, default, writable и enum; описательный текст в него не входит. Generated-файл вручную не редактируется.
+
+## Подключение к lifecycle
+
+Bootstrap приложения выполняет следующие шаги до начала serving:
+
+1. Загружает YAML через `ParseSchema`, вызывает `system.Freeze()` и объединяет `serviceSchema.Definitions()` с `system.Definitions()` через `NewSchema`.
+2. Сверяет `schema.Hash()` с generated `config.SchemaHash`. Для обязательных consumers вызывает `schema.RequireType("hotels_list_enabled", rtconfig.BoolType)`.
+3. Создаёт `rtconfig.New(schema, opts)`. Конструктор локальный: defaults доступны сразу, сеть и goroutines ещё не запущены.
+4. Регистрирует cleanup и вызывает `manager.Start(appContext)`. Это **lifetime context приложения**, а не startup/request context. Offline startup ограничен `StartupTimeout`; manager продолжает recovery в фоне.
+5. Регистрирует нужные `system.Callbacks()` через `WatchVariable`. Adapter передаёт callback значения `old.Value()` и `new.Value()`. Для обязательных начальных эффектов вызывает `WaitForInitial` с отдельным startup budget.
+6. Передаёт manager через DI либо вызывает `global.SetClient(manager)` из `api-gateway/internal/pkg/rtconfig/global` до serving. Global client не следует менять в parallel tests.
+7. После drain запросов вызывает `manager.Close(shutdownContext)` с отдельным ограниченным budget. Ранние ошибки bootstrap также проходят cleanup.
+
+Минимальные options для локального стенда:
+
+```go
+opts := rtconfig.Options{
+    Endpoints: []string{"http://127.0.0.1:2379"},
+    Prefix:    "/hotelflow/dev/services/api-gateway/rtconfig/v1/values/",
+    ProjectID: "api-gateway/dev",
+}
+```
+
+`TLS`, `Username`, `Password` передаются статически; endpoint не содержит credentials. Reader получает только read-доступ к своему prefix, writer использует отдельную identity. При включённой авторизации недоступный etcd во время создания client также оставляет defaults и повторяется в фоне.
+
+| Budget | Default |
+|---|---|
+| `StartupTimeout` — полное начальное ожидание | 5 s |
+| `RequestTimeout` — открытие/auth и отдельный Get | 3 s |
+| `WatchTimeout` — регистрация подписки | 5 s |
+| `ProbeInterval` / `ProbeTimeout` | 30 s / 5 s |
+| `StaleAfter` | 90 s |
+| `RetryMin` / `RetryMax` с jitter | 250 ms / 30 s |
+
+Нулевые durations выбирают defaults, отрицательные отвергаются. Истечение startup budget не отменяет manager. `Start` одноразовый; `Close` идемпотентный. После Close опубликованные values доступны для чтения, новых обновлений нет. До `SetClient` facade возвращает error Value с `ErrNotInitialized`, без скрытой инициализации сети.
+
+## Чтение и observers
+
+`Value(ctx, name)` возвращает immutable значение или `ErrVariableNotFound`. Отмена request context не мешает локальному чтению. `Values(ctx)` копирует map **одного** поколения; два независимых вызова `Value` могут увидеть разные поколения. Сохранённые Value не меняются после следующей публикации.
+
+`String()` возвращает каноническое представление всех типов. Bool/Float64/Duration getters требуют соответствующего типа; signed и unsigned getters допускают только свой класс и проверяют диапазон результата. Getter неподходящего типа возвращает zero и не меняет `Err()`: проверяйте контракт consumer через `RequireType` при bootstrap. `NewNilValue(err)` сохраняет ошибку и предоставляет безопасные zero getters.
+
+`WatchVariable` и `WatchAllVariables` регистрируются после Start. Context ограничивает регистрацию; после успешного возврата подписка живёт до остановки manager. Первый callback получает old с именем ключа и `ErrNoPreviousValue`, без nil. WatchAll доставляет ключи в стабильном порядке.
+
+Публикация и регистрация сериализованы; callbacks выполняются вне lock. Initial snapshot сохраняется, последующие обновления coalesce до последнего pending snapshot. Old — последнее доставленное этому observer состояние; no-op не уведомляет. Это доставка состояния, а не журнал каждого изменения. Callback обязан быть коротким и идемпотентным; он не должен синхронно вызывать `Close` или ждать `WaitForInitial` из dispatcher.
+
+`WaitForInitial` ждёт первые уведомления подписок, существовавших в момент вызова. Это барьер initial generation, без гарантии совпадения внешних эффектов с самым новым snapshot. Panic изолируется и попадает в status; зависший callback блокирует dispatcher, но не публикацию и чтения. Close отменяет сетевую работу и ждёт до своего budget, возвращая ошибку при зависшем callback. После отмены оставшиеся callbacks текущего WatchAll batch не запускаются.
+
+## Протокол и диагностика
+
+Linearizable prefix Get даёт полный raw snapshot и revision R. Watch начинается с R+1; изменения одной revision применяются вместе. Cursor вычисляется по `ModRevision` событий; watch headers не пропускают исторические события. Invalid candidate продвигает observed revision, но не applied revision.
+
+После compaction, закрытия watch-канала, ошибки watch-цикла, смены cluster ID, rollback revision или превышения лимитов начинается новый полный Get. Обычный сетевой разрыв официальный etcd client может восстановить прозрачно, продолжив Watch с сохранённой revision. Старые raw keys не переносятся в новую epoch. Периодический quorum read плюс watch progress проверяет, что watch достиг подтверждённой revision; обычная тишина в каталоге не считается неисправностью. Reconnect использует bounded exponential backoff с jitter.
+
+`Ready` и `Version.IsReady()` означают доступность **локального** snapshot, включая defaults. `Status` различает source, transport connectivity, freshness, invalid candidate, observed/applied revisions и поколения observers. `Stale` диагностический: недоступность etcd не стирает последнее валидное значение. В status не включаются значения, credentials или произвольные тексты удалённых ошибок.
+
+Лимиты: 256 keys, 128 bytes в имени, 1 KiB на remote JSON value, 256 KiB на raw keys + values, 64 observers, 1 MiB на получаемое etcd сообщение. Кандидат сверх лимита отклоняется целиком. Каталог рассчитан на контролируемую частоту административных изменений; внутренние очереди официального etcd SDK не дают гарантии жёсткого memory bound при бесконечном потоке записей.
+
+## Проверки
+
+Из корня Go-модуля:
+
+```sh
+go generate ./internal/config
+go test -race ./...
+go vet ./...
+go build ./...
+go test ./internal/pkg/rtconfig -run '^$' -bench BenchmarkManagerValueParallel -benchmem
+ETCD_BIN=/absolute/path/to/etcd go test -race -tags=integration ./internal/pkg/rtconfig -count=1
+```
+
+Integration suite запускает свой standalone etcd на временных loopback ports и останавливает его при cleanup. Проверены настоящие watch/update/delete, atomic transactions, invalid snapshot/correction, restart, offline delete + compaction + resync, cold offline recovery и authentication/RBAC. Проверки выполнены с etcd 3.6.15; сценарии не доказывают работу production HA-кластера или TLS внутри deployment image.

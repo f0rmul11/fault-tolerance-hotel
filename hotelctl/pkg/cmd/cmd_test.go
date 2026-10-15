@@ -140,6 +140,9 @@ func TestHelpAndVersionNeedNoProjectOrDocker(t *testing.T) {
 	for _, args := range [][]string{
 		{"--help"},
 		{"--version"},
+		{"config", "--help"},
+		{"config", "set", "--help"},
+		{"config", "get", "--help"},
 		{
 			"build",
 			"--help",

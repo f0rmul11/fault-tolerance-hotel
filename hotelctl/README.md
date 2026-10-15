@@ -1,7 +1,7 @@
 # hotelctl
 
 Go CLI для управления стендом. Конфигурация: `../hotel.yaml`.
-Нужны Go 1.26.1+ и запущенный Docker с Linux-контейнерами.
+Для сборки нужны Go 1.26.1+. Команды стенда требуют запущенный Docker с Linux-контейнерами; `config get/set` подключаются напрямую к etcd и работают без Docker.
 
 Из корня проекта:
 
@@ -17,6 +17,8 @@ make build                       # собрать ./bin/hotelctl
 | `up [SERVICE...]` | Запустить k3s, собрать, развернуть и проверить стенд |
 | `build [SERVICE...]` | Собрать образы; без имён — все сервисы |
 | `deploy [SERVICE...]` | Развернуть ранее собранные образы |
+| `config get SERVICE VARIABLE` | Прочитать override из etcd и его revision |
+| `config set SERVICE VARIABLE VALUE` | Изменить runtime-переменную сервиса в etcd |
 | `status [-o json]` | Состояние сервисов и их локальные порты |
 | `logs SERVICE [-f] [--tail 100]` | Логи новейшего Pod; `-f` — следить до Ctrl+C |
 | `doctor` | Проверить конфигурацию, Docker, порты и k3s |
@@ -30,7 +32,7 @@ make build                       # собрать ./bin/hotelctl
 | `COMMAND --help` | Справка по команде |
 
 Общие флаги: `--project DIR`, `--config FILE`; версия — `--version`.
-Таймаут: `up --timeout 15m`, остальные команды — `--timeout 5m` (кроме `kubectl`).
+Таймаут: `up --timeout 15m`, `config get/set --timeout 5s`, остальные команды — `--timeout 5m` (кроме `kubectl`).
 Перед `kubectl` указываются `--project` и `--config`; `exec -t` не поддерживается.
 `logs -f` работает до Ctrl+C независимо от `--timeout`.
 
@@ -108,3 +110,85 @@ Reset Job выполняет очистку и seed каждой БД в одн�
 Reset не применяет изменённые inplace-миграции к уже существующей старой схеме.
 Для полного пересоздания такого учебного стенда используются отдельные `destroy` и `up`.
 После reset можно запустить `make smoke-business`; эта проверка снова оставит отменённую бронь и события.
+
+## Runtime-конфигурация в etcd
+
+```bash
+./bin/hotelctl config get api-gateway hotels_list_enabled
+./bin/hotelctl config set api-gateway hotels_list_enabled true
+./bin/hotelctl config set api-gateway hotels_list_enabled false
+```
+
+CLI выбирает сервис из `hotel.yaml`, читает `<service.context>/config/rtconfig.yaml`
+и проверяет имя, тип, `writable` и string enum выбранной переменной до подключения к etcd.
+Сейчас сервисный каталог есть у API Gateway; для другого сервиса нужно сначала добавить его каталог.
+Ключи из Go registry `rtconfig/system` этой командой не редактируются.
+CLI не импортирует внутренние пакеты сервисов: границей служат YAML-каталог и JSON-скаляры в etcd.
+При чтении сервис независимо проверяет весь snapshot, поэтому CLI не заменяет reader validation.
+
+Адрес по умолчанию — `http://127.0.0.1:2379`, окружение — `dev`.
+Ключ строится как `/<stand.name>/<env>/services/<service>/rtconfig/v1/values/<variable>`;
+стандартное имя стенда — `hotelflow`. `--prefix` явно заменяет весь префикс выбранного сервиса.
+
+```bash
+./bin/hotelctl config set api-gateway hotels_list_enabled true \
+  --endpoints=http://127.0.0.1:12379 --env=dev --timeout=5s
+```
+
+Etcd должен быть доступен с компьютера, где запущен CLI. Команда не разворачивает etcd
+и не создаёт port-forward. Deployment отдельного config etcd и bootstrap reader в Gateway
+пока не подключены: успешный `set` подтверждает запись в хранилище, а не применение флага Pod.
+`get` показывает значение из etcd; если ключ отсутствует — YAML default с `source=default revision=0`.
+Он не опрашивает локальный snapshot сервиса и не показывает его last-known-good состояние.
+
+Значение передаётся обычным CLI-аргументом; JSON-кодирование выполняется автоматически:
+
+| Тип | Пример аргумента | Значение в etcd |
+|---|---|---|
+| `bool` | `false` | `false` |
+| `string` | `'maintenance mode'` | `"maintenance mode"` |
+| `duration` | `250ms` | `"250ms"` |
+| `int` / `int64` | `42` | `42` |
+| `uint` / `uint64` | `18446744073709551615` для uint64 | точное JSON-число |
+| `float64` | `1.5` | `1.5` |
+
+Для отрицательного числа используйте завершитель флагов: `config set SERVICE VARIABLE -- -1`.
+Переполнение, NaN/Inf, неверный bool, enum, readonly и JSON value больше 1 KiB отвергаются.
+Для string не нужно вручную добавлять JSON-кавычки: они стали бы частью самой строки.
+Изменение значения не переписывает YAML и не требует генерации кода.
+
+Каждый `set` читает текущий ModRevision и выполняет compare-and-swap.
+При конкурентном изменении команда завершается конфликтом и не повторяет запись автоматически.
+Для защиты ранее прочитанного значения передайте revision из `get` явно:
+
+```bash
+./bin/hotelctl config set api-gateway hotels_list_enabled false --expect-revision=42
+# Создать override только если ключ ещё отсутствует:
+./bin/hotelctl config set api-gateway hotels_list_enabled true --expect-revision=0
+```
+
+При потере ответа команда возвращает ошибку без сообщения об успехе. Сначала выполните `get`
+и проверьте хранилище перед повтором. Повторный `get` показывает текущее состояние, но не доказывает,
+какой именно writer его установил. Вызов `hotelctl reset` runtime overrides не очищает.
+
+Для защищённого etcd используются отдельные operator credentials с read/write на service prefix:
+
+```bash
+# HOTELCTL_ETCD_PASSWORD задаётся в окружении вне аргументов команды.
+./bin/hotelctl config set api-gateway hotels_list_enabled false \
+  --endpoints=https://config-etcd.example:2379 \
+  --user=config-writer --cacert=/path/to/ca.pem
+```
+
+`--password-env NAME` выбирает другую переменную окружения. Для mTLS добавьте
+`--cert=/path/to/client.pem --key=/path/to/client-key.pem`. TLS-проверка сертификата остаётся включённой.
+Пароль не принимается внутри URL endpoint или отдельным значением аргумента.
+
+Unit-проверки входят в `go test -race ./...`. Отдельный suite запускает свой временный etcd
+на случайных loopback ports и проверяет команды, JSON, CAS, изоляцию сервисов/окружений,
+offline timeout и authentication/RBAC:
+
+```bash
+cd hotelctl
+ETCD_BIN=/absolute/path/to/etcd go test -race -tags=integration ./pkg/cmd/config -count=1
+```
