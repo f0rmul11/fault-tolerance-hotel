@@ -25,6 +25,9 @@
   Reply может повториться; Check-in проверяет версию действия и не откатывает новое состояние.
 - Notification читает confirmed/activated/canceled и пишет push-заглушки в stdout.
   У него нет inbox/БД/дедупликации, из RPC только Echo. Повторные логи допустимы.
+- Прикладной `config-etcd` разворачивается отдельно в k3s с PVC `config-etcd-data`.
+  `make config-etcd` открывает локальный туннель для `hotelctl config get/set`; `reset` сохраняет overrides.
+  Reader `rtconfig` в API Gateway ещё не подключён к lifecycle и обработчикам.
 - У Booking, Check-in, Hotels, Review отдельные PostgreSQL; все таблицы в public.
   Нет чужих SQL-чтений. Gateway и Notification не используют БД.
 - Hotel/Booking/CheckIn/guest/actor/request/event — UUID v4. Room ID — bigint, в API/событиях

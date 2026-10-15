@@ -12,7 +12,7 @@ cfg := config.NewClient(manager)
 enabled = cfg.GetValue(ctx, config.HotelsListEnabled).Bool()
 ```
 
-Пакет, generator и facade готовы к подключению. Writer доступен через `hotelctl config get/set` — см. [инструкцию CLI](../../../../../hotelctl/README.md#runtime-конфигурация-в-etcd). Lifecycle API Gateway, HTTP/gRPC gate, admin endpoint и deployment etcd пока не подключены. Флаг `hotels_list_enabled` пока служит примером каталога и сам по себе не меняет обработку запросов.
+Пакет, generator и facade готовы к подключению. Writer доступен через `hotelctl config get/set` — см. [инструкцию CLI](../../../../../hotelctl/README.md#runtime-конфигурация-в-etcd). Отдельный `config-etcd` с PVC разворачивается вместе со стендом; endpoint внутри k3s — `http://config-etcd.hotelflow.svc.cluster.local:2379`. Lifecycle API Gateway, HTTP/gRPC gate и admin endpoint пока не подключены. Флаг `hotels_list_enabled` пока служит примером каталога и сам по себе не меняет обработку запросов.
 
 ## Структура
 

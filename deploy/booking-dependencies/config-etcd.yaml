@@ -1,0 +1,111 @@
+# Отдельное хранилище runtime-конфигурации учебного стенда.
+# Один member с собственным PVC; реплики этого Deployment увеличивать нельзя.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: config-etcd-data
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: config-etcd
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: config-etcd
+  ports:
+    - name: client
+      port: 2379
+      targetPort: client
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: config-etcd
+spec:
+  replicas: 1
+  # Старый процесс должен закрыть data-dir до запуска нового.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: config-etcd
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: config-etcd
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: etcd
+          image: gcr.io/etcd-development/etcd:v3.6.15
+          command: [/usr/local/bin/etcd]
+          args:
+            - --name=config-etcd
+            - --data-dir=/var/lib/etcd/data
+            - --listen-client-urls=http://0.0.0.0:2379
+            - --advertise-client-urls=http://config-etcd.hotelflow.svc.cluster.local:2379
+            # У единственного member нет внешних peers; адрес стабилен при смене Pod.
+            - --listen-peer-urls=http://127.0.0.1:2380
+            - --initial-advertise-peer-urls=http://127.0.0.1:2380
+            - --initial-cluster=config-etcd=http://127.0.0.1:2380
+            - --initial-cluster-token=hotelflow-runtime-config
+            - --initial-cluster-state=new
+            - --auto-compaction-mode=periodic
+            - --auto-compaction-retention=1h
+            - --quota-backend-bytes=134217728
+          ports:
+            - name: client
+              containerPort: 2379
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/etcd
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          startupProbe:
+            httpGet:
+              path: /readyz
+              port: client
+            periodSeconds: 2
+            timeoutSeconds: 2
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: client
+            periodSeconds: 5
+            timeoutSeconds: 2
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: client
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: config-etcd-data

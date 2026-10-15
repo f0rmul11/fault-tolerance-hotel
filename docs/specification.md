@@ -43,6 +43,10 @@ Check-in не содержит сущность Booking и не меняет ч�
 `booking-postgres`, `check-in-postgres`, `hotels-postgres`, `review-postgres`.
 Все прикладные и технические таблицы расположены в `public` собственной БД.
 Kafka общая, адрес внутри кластера — `kafka:9092`. Один узел k3s не обеспечивает HA.
+Прикладная runtime-конфигурация хранится в отдельном `config-etcd:2379` с собственным PVC
+`config-etcd-data`. Это один member, HTTP без авторизации для доверенного локального стенда;
+доступ с компьютера — через loopback port-forward (`make config-etcd`). `up/deploy` запускает
+etcd, `reset` сохраняет overrides. Пакет reader готов, его bootstrap в API Gateway ещё не подключён.
 
 ## Идентификаторы, время и основные данные
 

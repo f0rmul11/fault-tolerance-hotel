@@ -135,7 +135,7 @@ func (m *Manager) deploy(
 		if err != nil {
 			return err
 		}
-		fmt.Fprintln(m.Streams.Out, "Запуск отдельных PostgreSQL и общей Kafka")
+		fmt.Fprintln(m.Streams.Out, "Запуск PostgreSQL, Kafka и отдельного config-etcd")
 		if err = client.Apply(ctx, resources.Infrastructure, m.Streams.Out); err != nil {
 			return err
 		}
@@ -145,6 +145,7 @@ func (m *Manager) deploy(
 			"hotels-postgres",
 			"review-postgres",
 			"booking-kafka",
+			"config-etcd",
 		} {
 			if err = client.WaitDeployment(ctx, config.Service{
 				Name:       name,

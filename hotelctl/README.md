@@ -135,9 +135,14 @@ CLI не импортирует внутренние пакеты сервисо
   --endpoints=http://127.0.0.1:12379 --env=dev --timeout=5s
 ```
 
-Etcd должен быть доступен с компьютера, где запущен CLI. Команда не разворачивает etcd
-и не создаёт port-forward. Deployment отдельного config etcd и bootstrap reader в Gateway
-пока не подключены: успешный `set` подтверждает запись в хранилище, а не применение флага Pod.
+Отдельный `config-etcd` с постоянным PVC разворачивается через `hotelctl up/deploy`.
+Для существующего стенда выполните `make config-etcd-deploy`, затем `make config-etcd`
+в отдельном терминале: это открывает туннель на `127.0.0.1:2379`. CLI `config get/set`
+подключается напрямую и сам не создаёт port-forward. После перезапуска Pod туннель нужно открыть заново.
+Внутри кластера адрес — `http://config-etcd.hotelflow.svc.cluster.local:2379`.
+[Устройство и команды etcd](../deploy/booking-dependencies/README.md#runtime-конфигурация-в-отдельном-etcd).
+Bootstrap reader в Gateway пока не подключён: успешный `set` подтверждает запись в хранилище,
+а не применение флага Pod.
 `get` показывает значение из etcd; если ключ отсутствует — YAML default с `source=default revision=0`.
 Он не опрашивает локальный snapshot сервиса и не показывает его last-known-good состояние.
 

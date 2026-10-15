@@ -1,6 +1,6 @@
-# Зависимости бронирования
+# Зависимости стенда
 
-`hotelctl up` и `hotelctl deploy` для Booking, Check-in, Hotels, Review, Notification или gateway применяют этот Kustomize-набор, ждут PostgreSQL/Kafka, затем выполняют миграции и seed до rollout сервисов. При первом запуске контейнерные образы скачиваются из registry.
+`hotelctl up` и `hotelctl deploy` для Booking, Check-in, Hotels, Review, Notification или gateway применяют этот Kustomize-набор, ждут PostgreSQL/Kafka/config-etcd, затем выполняют миграции и seed до rollout сервисов. При первом запуске контейнерные образы скачиваются из registry.
 
 - PostgreSQL `16.10-alpine`: четыре отдельных Deployment/Service — `booking-postgres`, `check-in-postgres`, `hotels-postgres`, `review-postgres`. Каждый использует собственный PVC `<сервис>-db-data`, Secret `<сервис>-database` и единственную прикладную БД. `POSTGRES_USER`/`POSTGRES_DB` создают владельца при первом запуске. Миграции, seed и приложение получают только его DSN. Все таблицы — в `public`, без создания схем сервиса.
 - Notification и API Gateway не получают PostgreSQL DSN. Notification использует общий брокер напрямую без inbox.
@@ -21,3 +21,32 @@
 `akhq.yaml` входит в общий Kustomize-набор. Deployment использует `tchiotludo/akhq:dev`, конфигурация `AKHQ_CONFIGURATION` задаёт соединение `hotelflow` → `kafka:9092`. Данные брокера остаются в существующем Kafka; AKHQ не требует собственной БД или PVC.
 
 Для отдельного развёртывания UI: `make kafka-ui-deploy`. Для доступа с компьютера: `make kafka-ui`, затем http://localhost:8090. Туннель работает до Ctrl+C/завершения процесса; после остановки или пересоздания Pod его можно запустить той же командой. Публичные порты k3s менять не нужно. Broker bootstrap задаётся по [схеме AKHQ](https://akhq.io/docs/configuration/brokers.html).
+
+## Runtime-конфигурация в отдельном etcd
+
+`config-etcd.yaml` задаёт отдельный etcd `3.6.15`: Deployment `config-etcd` с одной репликой и стратегией `Recreate`, Service `config-etcd` и PVC `config-etcd-data` на 1 GiB. Он хранит только прикладную runtime-конфигурацию и не использует данные control plane Kubernetes. Стабильный адрес для сервисов — `http://config-etcd.hotelflow.svc.cluster.local:2379` (в namespace `hotelflow` достаточно `http://config-etcd:2379`).
+
+Это одноузловая учебная установка без HA. При перезапуске Pod хранилище временно недоступно, значения сохраняются на PVC. Увеличивать `replicas` этого Deployment нельзя: дополнительные члены etcd требуют отдельных томов и настройки membership. `stop` сохраняет том k3s, `reset` не очищает runtime overrides, `destroy` удаляет весь стенд вместе с данными.
+
+Для локального доверенного стенда используются HTTP и доступ без логина. Клиентский порт опубликован только через ClusterIP; peer-порт слушает loopback внутри Pod. Доступ с компьютера — через `kubectl port-forward`, привязанный к `127.0.0.1`. Это не конфигурация для общего или публичного кластера.
+
+Запуск из корня проекта:
+
+```bash
+# После hotelctl up etcd уже развёрнут. Добавить его в существующий стенд отдельно:
+make config-etcd-deploy
+make config-etcd-health
+
+# В отдельном терминале; держать открытым во время работы с hotelctl config:
+make config-etcd
+
+# В другом терминале:
+./bin/hotelctl config get api-gateway hotels_list_enabled
+./bin/hotelctl config set api-gateway hotels_list_enabled true
+```
+
+`HOTEL_KUBECONFIG` по умолчанию равен `.local/hotelctl/kubeconfig`. Если порт 2379 занят: `make config-etcd HOTEL_ETCD_PORT=12379`, затем передавайте CLI `--endpoints=http://127.0.0.1:12379`. После пересоздания Pod или остановки k3s туннель нужно запустить заново. `Ctrl+C` закрывает только туннель.
+
+Startup/readiness используют `/readyz`, liveness — `/livez`. Backend quota — 128 MiB, история revisions автоматически compact-ится с retention 1 час; отставший watch должен выполнить полный resync. Compaction не заменяет defrag и резервные копии. Параметры: [официальная документация etcd](https://etcd.io/docs/v3.6/op-guide/configuration/), [семантика probes](https://etcd.io/docs/v3.6/op-guide/monitoring/).
+
+Пакет reader и facade в API Gateway реализованы, но bootstrap reader и применение флага в HTTP/gRPC пока не подключены. Успешный `hotelctl config set` подтверждает запись в etcd, а не изменение поведения приложения.

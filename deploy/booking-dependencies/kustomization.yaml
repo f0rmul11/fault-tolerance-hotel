@@ -10,3 +10,4 @@ resources:
   - review-postgres.yaml
   - kafka.yaml
   - akhq.yaml
+  - config-etcd.yaml

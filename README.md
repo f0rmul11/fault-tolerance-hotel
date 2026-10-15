@@ -59,6 +59,12 @@ Healthcheck: `http://localhost:<admin>/healthcheck/{live,ready,startup}`.
 
 Каталог отелей и номеров, пользовательские рейтинги отелей: [Hotels / Review](docs/hotels-review.md).
 
+## Runtime-конфигурация
+
+В k3s разворачивается отдельный `config-etcd` с постоянным PVC. Для доступа с компьютера выполните `make config-etcd` в отдельном терминале, затем используйте `./bin/hotelctl config get/set`. Адрес внутри кластера — `http://config-etcd:2379`, через туннель — `http://127.0.0.1:2379`.
+
+[Развёртывание, проверка и ограничения etcd](deploy/booking-dependencies/README.md#runtime-конфигурация-в-отдельном-etcd). Bootstrap reader в API Gateway пока не подключён: запись флага в etcd ещё не меняет поведение HTTP/gRPC.
+
 ## Kafka UI
 
 AKHQ: [http://localhost:8090](http://localhost:8090). После запуска стенда выполните `make kafka-ui` и оставьте терминал открытым. Команда применяет манифест AKHQ, ждёт готовности и открывает локальный port-forward. Нужен `kubectl`; kubeconfig берётся из `.local/hotelctl/kubeconfig` (можно переопределить `HOTEL_KUBECONFIG`). `Ctrl+C` закрывает только туннель, AKHQ остаётся в кластере.
