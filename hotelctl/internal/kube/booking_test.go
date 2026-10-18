@@ -319,3 +319,36 @@ func TestSeparatePostgresInstancesAndNotificationWithoutDatabase(t *testing.T) {
 		}
 	}
 }
+
+func TestDependencyNodePortsMatchLocalPublication(t *testing.T) {
+	root, err := filepath.Abs("../../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resources, err := RenderBookingDependencies(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, dependency := range config.Dependencies() {
+		if dependency.Port.Host == 0 {
+			continue
+		}
+		found := false
+		for _, object := range resources.Infrastructure {
+			if object.GetKind() != "Service" || object.GetName() != dependency.Name {
+				continue
+			}
+			found = true
+			var service corev1.Service
+			if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &service); err != nil {
+				t.Fatal(err)
+			}
+			if service.Spec.Type != corev1.ServiceTypeNodePort || len(service.Spec.Ports) != 1 || int(service.Spec.Ports[0].NodePort) != dependency.Port.Node || !dependency.Port.LocalOnly {
+				t.Fatalf("%s cannot be reached through its declared local port: %+v", dependency.Name, service.Spec)
+			}
+		}
+		if !found {
+			t.Fatalf("missing service for %s", dependency.Name)
+		}
+	}
+}

@@ -12,7 +12,7 @@
 
 При ошибке посмотрите `hotelctl kubectl -n hotelflow logs job/ИМЯ -c booking` (либо `hotels`, `review`, `check-in`, `hotels-seed`, `review-seed`). После исправления причины можно явно удалить только неуспешный Job и повторить `up`; CLI не удаляет данные и не повторяет неуспешную миграцию автоматически.
 
-Данные PostgreSQL/Kafka находятся в PVC внутри постоянного тома k3s. `stop` сохраняет их, `destroy` удаляет весь стенд. Учётные данные синтетические; внешних портов для PostgreSQL и Kafka этот набор не открывает.
+Данные PostgreSQL/Kafka находятся в PVC внутри постоянного тома k3s. `stop` сохраняет их, `destroy` удаляет весь стенд. Учётные данные синтетические; PostgreSQL имеют NodePort и локальные порты 15432–15435 через контейнер k3s. Kafka напрямую наружу не публикуется.
 
 Прежний общий `postgres` и `postgres-init` исключены из манифестов. Новые PVC `<сервис>-db-data` не используют старый общий `booking-postgres-data`. Изменение исходников не удаляет существующие Kubernetes-объекты/тома: обычный apply не выполняет prune. Старый учебный стенд можно пересоздать явно; автоматического удаления данных или переноса старых схем нет.
 
@@ -20,7 +20,10 @@
 
 `akhq.yaml` входит в общий Kustomize-набор. Deployment использует `tchiotludo/akhq:dev`, конфигурация `AKHQ_CONFIGURATION` задаёт соединение `hotelflow` → `kafka:9092`. Данные брокера остаются в существующем Kafka; AKHQ не требует собственной БД или PVC.
 
-Для отдельного развёртывания UI: `make kafka-ui-deploy`. Для доступа с компьютера: `make kafka-ui`, затем http://localhost:8090. Туннель работает до Ctrl+C/завершения процесса; после остановки или пересоздания Pod его можно запустить той же командой. Публичные порты k3s менять не нужно. Broker bootstrap задаётся по [схеме AKHQ](https://akhq.io/docs/configuration/brokers.html).
+После `hotelctl up` UI постоянно доступен на http://localhost:8090; туннель не нужен.
+Service AKHQ использует NodePort 30089, Docker публикует его на loopback:8090.
+`make kafka-ui-deploy` отдельно применяет манифест, `make kafka-ui` дополнительно печатает URL.
+Для старого контейнера сначала выполните `hotelctl up`, чтобы обновить публикацию портов.
 
 ## Runtime-конфигурация в отдельном etcd
 
@@ -28,7 +31,7 @@
 
 Это одноузловая учебная установка без HA. При перезапуске Pod хранилище временно недоступно, значения сохраняются на PVC. Увеличивать `replicas` этого Deployment нельзя: дополнительные члены etcd требуют отдельных томов и настройки membership. `stop` сохраняет том k3s, `reset` не очищает runtime overrides, `destroy` удаляет весь стенд вместе с данными.
 
-Для локального доверенного стенда используются HTTP и доступ без логина. Клиентский порт опубликован только через ClusterIP; peer-порт слушает loopback внутри Pod. Доступ с компьютера — через `kubectl port-forward`, привязанный к `127.0.0.1`. Это не конфигурация для общего или публичного кластера.
+Для локального доверенного стенда используются HTTP и доступ без логина. Клиентский Service использует NodePort 32379, Docker публикует его на `127.0.0.1:2379`; peer-порт слушает loopback внутри Pod. Это не конфигурация для общего или публичного кластера.
 
 Запуск из корня проекта:
 
@@ -37,16 +40,28 @@
 make config-etcd-deploy
 make config-etcd-health
 
-# В отдельном терминале; держать открытым во время работы с hotelctl config:
-make config-etcd
-
-# В другом терминале:
+# После hotelctl up доступ уже открыт; отдельный терминал не нужен:
 ./bin/hotelctl config get api-gateway hotels_list_enabled
 ./bin/hotelctl config set api-gateway hotels_list_enabled true
 ```
 
-`HOTEL_KUBECONFIG` по умолчанию равен `.local/hotelctl/kubeconfig`. Если порт 2379 занят: `make config-etcd HOTEL_ETCD_PORT=12379`, затем передавайте CLI `--endpoints=http://127.0.0.1:12379`. После пересоздания Pod или остановки k3s туннель нужно запустить заново. `Ctrl+C` закрывает только туннель.
+`HOTEL_KUBECONFIG` по умолчанию равен `.local/hotelctl/kubeconfig` и нужен только Makefile-командам,
+которые вызывают kubectl. Локальный клиентский порт etcd — 2379. Он сохраняется при пересоздании Pod;
+после перезапуска компонента переподключается сам клиент. `hotelctl access` показывает все адреса.
 
 Startup/readiness используют `/readyz`, liveness — `/livez`. Backend quota — 128 MiB, история revisions автоматически compact-ится с retention 1 час; отставший watch должен выполнить полный resync. Compaction не заменяет defrag и резервные копии. Параметры: [официальная документация etcd](https://etcd.io/docs/v3.6/op-guide/configuration/), [семантика probes](https://etcd.io/docs/v3.6/op-guide/monitoring/).
 
 Reader запускается в API Gateway автоматически; Deployment задаёт внутренний endpoint etcd и префикс сервиса. `GET http://127.0.0.1:8081/healthcheck/ready` содержит проверку `runtime_config` — готовность локального клиента, без проверки доступности etcd или конкретной revision. При недоступном etcd доступны defaults или последнее валидное состояние в памяти. Проверка флага в HTTP/gRPC обработчиках пока не добавлена: успешный `hotelctl config set` подтверждает запись в etcd, reader применяет её асинхронно.
+
+### Обновление старого стенда
+
+Если первый `up` сообщает конфликт `.spec.type` у `Service/akhq` с
+`kubectl-client-side-apply`, старый UI создавался через прежний Make target.
+Однократно переключите тип существующего Service, затем повторите `up`:
+
+```bash
+./bin/hotelctl kubectl -n hotelflow patch service akhq --type=merge --field-manager=hotelctl -p '{"spec":{"type":"NodePort"}}'
+./bin/hotelctl up
+```
+
+PVC и данные при этом не удаляются. На свежем стенде этот шаг не нужен.

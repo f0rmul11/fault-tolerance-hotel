@@ -73,6 +73,7 @@ func (m *Manager) Up(ctx context.Context, services []config.Service) (err error)
 		return err
 	}
 	m.addresses()
+	fmt.Fprintln(m.Streams.Out, "Kafka UI: http://localhost:8090\nБД и etcd опубликованы локально: hotelctl access")
 	return nil
 }
 
@@ -146,6 +147,7 @@ func (m *Manager) deploy(
 			"review-postgres",
 			"booking-kafka",
 			"config-etcd",
+			"akhq",
 		} {
 			if err = client.WaitDeployment(ctx, config.Service{
 				Name:       name,

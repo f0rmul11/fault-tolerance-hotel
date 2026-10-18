@@ -35,7 +35,7 @@ func (m *Manager) Status(ctx context.Context, format string) error {
 		if result.Runtime.Running {
 			client, e := kube.New(m.Config.Kubeconfig())
 			if e == nil {
-				result.Services, e = client.Services(ctx, m.Config.Services)
+				result.Services, e = client.Services(ctx, m.Config.Components())
 			}
 			if e != nil {
 				result.Error = e.Error()
@@ -63,20 +63,27 @@ func (m *Manager) Status(ctx context.Context, format string) error {
 	}
 	fmt.Fprintf(m.Streams.Out, "k3s node: %s (running)\n", result.Runtime.Name)
 	w := tabwriter.NewWriter(m.Streams.Out, 0, 4, 2, ' ', 0)
-	fmt.Fprintln(w, "SERVICE\tREADY\tgRPC\tADMIN\tIMAGE")
+	fmt.Fprintln(w, "COMPONENT\tREADY\tgRPC\tADMIN\tIMAGE")
 	for _, s := range result.Services {
 		grpcPort, adminPort := s.GRPCPort, s.AdminPort
 		if s.Name == "api-gateway" {
 			grpcPort, adminPort = m.Config.Runtime.Ports.GRPC, m.Config.Runtime.Ports.Admin
 		}
+		grpcAddress, adminAddress := "—", "—"
+		if grpcPort != 0 {
+			grpcAddress = fmt.Sprintf("127.0.0.1:%d", grpcPort)
+		}
+		if adminPort != 0 {
+			adminAddress = fmt.Sprintf("127.0.0.1:%d", adminPort)
+		}
 		fmt.Fprintf(
 			w,
-			"%s\t%d/%d\t127.0.0.1:%d\t127.0.0.1:%d\t%s\n",
+			"%s\t%d/%d\t%s\t%s\t%s\n",
 			s.Name,
 			s.Ready,
 			s.Desired,
-			grpcPort,
-			adminPort,
+			grpcAddress,
+			adminAddress,
 			s.Image,
 		)
 	}

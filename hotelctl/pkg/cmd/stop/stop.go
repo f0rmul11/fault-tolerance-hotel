@@ -3,6 +3,8 @@ package stop
 import (
 	"context"
 
+	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/internal/config"
+
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/internal/iostreams"
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/pkg/cmd/util"
 	"github.com/spf13/cobra"
@@ -10,6 +12,7 @@ import (
 
 type StopOptions struct {
 	util.Options
+	Components []config.Service
 }
 
 func NewStopOptions(streams iostreams.IOStreams) *StopOptions {
@@ -21,11 +24,11 @@ func NewStopOptions(streams iostreams.IOStreams) *StopOptions {
 func NewCmdStop(f util.Factory, streams iostreams.IOStreams) *cobra.Command {
 	o := NewStopOptions(streams)
 	command := &cobra.Command{
-		Use:   "stop",
-		Short: "Stop k3s and preserve the data volume",
-		Args:  cobra.NoArgs,
+		Use:   "stop [COMPONENT...]",
+		Short: "Остановить компоненты; без имён — весь k3s с сохранением данных",
+		Args:  cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := o.Complete(f); err != nil {
+			if err := o.Complete(f, args); err != nil {
 				return err
 			}
 			if err := o.Validate(); err != nil {
@@ -38,8 +41,13 @@ func NewCmdStop(f util.Factory, streams iostreams.IOStreams) *cobra.Command {
 	return command
 }
 
-func (o *StopOptions) Complete(f util.Factory) error {
-	return o.Options.Complete(f)
+func (o *StopOptions) Complete(f util.Factory, args []string) error {
+	if err := o.Options.Complete(f); err != nil {
+		return err
+	}
+	var err error
+	o.Components, err = o.Config.SelectComponents(args)
+	return err
 }
 
 func (o *StopOptions) Validate() error {
@@ -54,5 +62,8 @@ func (o *StopOptions) Run(ctx context.Context) error {
 	defer runner.Close()
 	ctx, cancel := o.Context(ctx)
 	defer cancel()
+	if len(o.Components) > 0 {
+		return runner.Control(ctx, "stop", o.Components)
+	}
 	return runner.Stop(ctx)
 }

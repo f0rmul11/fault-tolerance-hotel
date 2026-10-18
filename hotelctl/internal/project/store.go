@@ -31,13 +31,14 @@ type ResetState struct {
 }
 
 type State struct {
-	Reset    *ResetState          `json:"reset,omitempty"`
-	Version  int                  `json:"version"`
-	Owner    string               `json:"owner"`
-	Name     string               `json:"name"`
-	Runtime  config.Runtime       `json:"runtime"`
-	Images   map[string]string    `json:"images"`
-	Bindings []config.PortBinding `json:"bindings,omitempty"`
+	StoppedComponents map[string]int32     `json:"stoppedComponents,omitempty"`
+	Reset             *ResetState          `json:"reset,omitempty"`
+	Version           int                  `json:"version"`
+	Owner             string               `json:"owner"`
+	Name              string               `json:"name"`
+	Runtime           config.Runtime       `json:"runtime"`
+	Images            map[string]string    `json:"images"`
+	Bindings          []config.PortBinding `json:"bindings,omitempty"`
 }
 
 type Store struct {

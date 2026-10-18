@@ -26,7 +26,7 @@
 - Notification читает confirmed/activated/canceled и пишет push-заглушки в stdout.
   У него нет inbox/БД/дедупликации, из RPC только Echo. Повторные логи допустимы.
 - Прикладной `config-etcd` разворачивается отдельно в k3s с PVC `config-etcd-data`.
-  `make config-etcd` открывает локальный туннель для `hotelctl config get/set`; `reset` сохраняет overrides.
+  `hotelctl up` публикует etcd на loopback:2379 для `hotelctl config get/set`; `reset` сохраняет overrides.
   Reader `rtconfig` автоматически запускается в API Gateway до serving и закрывается после drain.
   Локальная готовность клиента входит в `/healthcheck/ready` как `runtime_config`;
   недоступный etcd не делает валидный локальный snapshot неготовым. HTTP/gRPC gate пока не добавлен.

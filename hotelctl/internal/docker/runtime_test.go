@@ -185,3 +185,23 @@ func TestServicePortUpdatePreservesVolumeAndOwner(t *testing.T) {
 		})
 	}
 }
+
+func TestDependencyPortsStayOnLoopback(t *testing.T) {
+	state := &project.State{
+		Runtime: config.Runtime{
+			BindAddress: "0.0.0.0",
+		},
+	}
+	for _, dependency := range config.Dependencies() {
+		if dependency.Port.Host != 0 {
+			state.Bindings = append(state.Bindings, dependency.Port)
+		}
+	}
+	for port, mappings := range publishedPorts(state) {
+		for _, mapping := range mappings {
+			if mapping.HostIP != "127.0.0.1" {
+				t.Fatalf("dependency %s exposed on %s", port, mapping.HostIP)
+			}
+		}
+	}
+}

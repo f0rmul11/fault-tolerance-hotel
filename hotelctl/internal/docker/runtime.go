@@ -295,7 +295,7 @@ func publishedPorts(s *project.State) nat.PortMap {
 	for _, mapping := range s.PortBindings() {
 		p := nat.Port(strconv.Itoa(mapping.Node) + "/tcp")
 		bind := s.Runtime.BindAddress
-		if mapping.Node == 6443 {
+		if mapping.Node == 6443 || mapping.LocalOnly {
 			bind = "127.0.0.1"
 		}
 		ports[p] = []nat.PortBinding{{

@@ -15,11 +15,12 @@ kind: Service
 metadata:
   name: config-etcd
 spec:
-  type: ClusterIP
+  type: NodePort
   selector:
     app.kubernetes.io/name: config-etcd
   ports:
     - name: client
+      nodePort: 32379
       port: 2379
       targetPort: client
 ---

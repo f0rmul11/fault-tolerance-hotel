@@ -37,6 +37,7 @@ type Interface interface {
 	Smoke(context.Context) error
 	BusinessSmoke(context.Context) error
 	Logs(context.Context, config.Service, bool, int64) error
+	Control(context.Context, string, []config.Service) error
 	Stop(context.Context) error
 	Destroy(context.Context) error
 	Reset(context.Context) error

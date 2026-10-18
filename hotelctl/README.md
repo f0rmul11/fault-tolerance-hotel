@@ -19,13 +19,18 @@ make build                       # собрать ./bin/hotelctl
 | `deploy [SERVICE...]` | Развернуть ранее собранные образы |
 | `config get SERVICE VARIABLE` | Прочитать override из etcd и его revision |
 | `config set SERVICE VARIABLE VALUE` | Изменить runtime-переменную сервиса в etcd |
-| `status [-o json]` | Состояние сервисов и их локальные порты |
-| `logs SERVICE [-f] [--tail 100]` | Логи новейшего Pod; `-f` — следить до Ctrl+C |
+| `status [-o json]` | Состояние приложений и инфраструктуры |
+| `components` | Имена всех компонентов для управления |
+| `access` | Локальные адреса API, Kafka UI, etcd и PostgreSQL |
+| `hosts [--install / --remove]` | Показать/установить/удалить блок имён БД в hosts; запись требует sudo |
+| `start COMPONENT...` | Запустить компоненты без сборки и миграций |
+| `restart COMPONENT...` | Остановить и запустить компоненты с исходным числом реплик |
+| `logs COMPONENT [-f] [--tail 100]` | Логи новейшего Pod приложения или зависимости |
 | `doctor` | Проверить конфигурацию, Docker, порты и k3s |
 | `smoke` | Проверить gRPC Echo всех сервисов, admin и HTTP gateway |
 | `smoke --business` | Дополнительно создать, активировать и отменить тестовую бронь; проверить Kafka-обмен и stdout Notification |
 | `reset --yes` | Согласованно очистить учебные БД/Kafka и восстановить seed |
-| `stop` | Остановить стенд, сохранив данные |
+| `stop [COMPONENT...]` | С именами — остановить выбранные компоненты; без имён — весь k3s. Данные сохраняются |
 | `destroy` | Удалить стенд **вместе с данными** |
 | `kubectl ARGS...` | Выполнить kubectl внутри k3s |
 | `completion SHELL` | Автодополнение: bash, zsh, fish, powershell |
@@ -136,11 +141,9 @@ CLI не импортирует внутренние пакеты сервисо
 ```
 
 Отдельный `config-etcd` с постоянным PVC разворачивается через `hotelctl up/deploy`.
-Для существующего стенда выполните `make config-etcd-deploy`, затем `make config-etcd`
-в отдельном терминале: это открывает туннель на `127.0.0.1:2379`. CLI `config get/set`
-подключается напрямую и сам не создаёт port-forward. После перезапуска Pod туннель нужно открыть заново.
+Порт `127.0.0.1:2379` постоянно публикуется при `up`; туннель и отдельный терминал не нужны.
 Внутри кластера адрес — `http://config-etcd.hotelflow.svc.cluster.local:2379`.
-[Устройство и команды etcd](../deploy/booking-dependencies/README.md#runtime-конфигурация-в-отдельном-etcd).
+[Адреса и управление компонентами](../docs/demo-control.md).
 Reader в API Gateway запускается автоматически. Успешный `set` подтверждает запись в хранилище;
 обновление reader асинхронное. Его локальная готовность включена в admin `/healthcheck/ready`
 (`runtime_config=success`). Readiness не подтверждает применение конкретной revision или доступность etcd.
@@ -199,3 +202,24 @@ offline timeout и authentication/RBAC:
 cd hotelctl
 ETCD_BIN=/absolute/path/to/etcd go test -race -tags=integration ./pkg/cmd/config -count=1
 ```
+
+## Остановка отдельных компонентов
+
+`hotelctl stop kafka booking-postgres` задаёт Deployment replicas=0 и ждёт удаления Pod.
+Он не удаляет PVC, БД или Kafka topics. `start` возвращает сохранённое количество реплик,
+по умолчанию 1, и ждёт готовности. Повторный stop не затирает сохранённое число нулём.
+`restart` делает stop/start, поэтому создаёт реальный перерыв; для уже остановленного компонента
+нужно использовать start. Сборки, миграций и сброса данных эти команды не выполняют.
+При ошибке или Ctrl+C восстановление выполняется через start; число реплик сохраняется до изменений.
+Несколько имён проверяются до первого изменения; сетевой сбой может оставить частичный результат,
+который виден через status. Команды блокируются при незавершённом reset.
+
+Компоненты: шесть приложений из hotel.yaml, четыре `*-postgres`, `kafka`, `akhq`, `config-etcd`.
+Имя `kafka` соответствует Deployment `booking-kafka`. Кластерные системные Pod сюда не входят.
+`logs` также принимает имена зависимостей. Список доступен без Docker: `hotelctl components`.
+
+`stop` без аргументов останавливает весь контейнер k3s, как и раньше; возобновление — `up`.
+`up/deploy` снова применяют манифесты и могут вернуть остановленные компоненты: в ходе
+эксперимента используйте именно stop/start, а не deploy.
+
+Справка для эфира, пароли учебных БД и готовые SQL: [demo-control.md](../docs/demo-control.md).

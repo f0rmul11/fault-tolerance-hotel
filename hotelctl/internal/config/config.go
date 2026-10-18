@@ -30,8 +30,9 @@ type Runtime struct {
 
 // PortBinding publishes a Kubernetes NodePort on the student's computer.
 type PortBinding struct {
-	Host int `json:"host"`
-	Node int `json:"node"`
+	Host      int  `json:"host"`
+	Node      int  `json:"node"`
+	LocalOnly bool `json:"localOnly,omitempty"`
 }
 
 type Service struct {
@@ -137,6 +138,17 @@ func (c Config) Validate() error {
 		30081: true,
 	}
 	names := map[string]bool{}
+	for _, dependency := range Dependencies() {
+		names[dependency.Name] = true
+		if dependency.Port.Host == 0 {
+			continue
+		}
+		if used[dependency.Port.Host] {
+			return fmt.Errorf("порт %d занят локальным доступом к %s", dependency.Port.Host, dependency.Name)
+		}
+		used[dependency.Port.Host] = true
+		nodes[dependency.Port.Node] = true
+	}
 	for _, s := range c.Services {
 		if !namePattern.MatchString(s.Name) || names[s.Name] {
 			return fmt.Errorf("invalid or duplicate service %q", s.Name)
@@ -244,6 +256,11 @@ func (r Runtime) PortBindings() []PortBinding {
 
 func (c Config) PortBindings() []PortBinding {
 	result := c.Runtime.PortBindings()
+	for _, dependency := range Dependencies() {
+		if dependency.Port.Host != 0 {
+			result = append(result, dependency.Port)
+		}
+	}
 	for _, service := range c.Services {
 		for _, binding := range []PortBinding{
 			service.GRPC,

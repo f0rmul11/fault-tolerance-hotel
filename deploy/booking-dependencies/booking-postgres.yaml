@@ -13,10 +13,12 @@ kind: Service
 metadata:
   name: booking-postgres
 spec:
+  type: NodePort
   selector:
     app.kubernetes.io/name: booking-postgres
   ports:
     - name: postgres
+      nodePort: 30432
       port: 5432
       targetPort: postgres
 ---

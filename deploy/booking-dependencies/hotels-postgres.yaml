@@ -13,10 +13,12 @@ kind: Service
 metadata:
   name: hotels-postgres
 spec:
+  type: NodePort
   selector:
     app.kubernetes.io/name: hotels-postgres
   ports:
     - name: postgres
+      nodePort: 30434
       port: 5432
       targetPort: postgres
 ---

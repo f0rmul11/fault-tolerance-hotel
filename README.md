@@ -61,15 +61,37 @@ Healthcheck: `http://localhost:<admin>/healthcheck/{live,ready,startup}`.
 
 ## Runtime-конфигурация
 
-В k3s разворачивается отдельный `config-etcd` с постоянным PVC. Для доступа с компьютера выполните `make config-etcd` в отдельном терминале, затем используйте `./bin/hotelctl config get/set`. Адрес внутри кластера — `http://config-etcd:2379`, через туннель — `http://127.0.0.1:2379`.
+В k3s разворачивается отдельный `config-etcd` с постоянным PVC. После `hotelctl up`
+локальный адрес `http://127.0.0.1:2379` доступен без туннеля; внутри кластера — `http://config-etcd:2379`.
+Команды конфигурации: `./bin/hotelctl config get/set`. Reader запускается в API Gateway;
+проверка флага в HTTP/gRPC обработчиках пока не добавлена.
 
-[Развёртывание, проверка и ограничения etcd](deploy/booking-dependencies/README.md#runtime-конфигурация-в-отдельном-etcd). Reader автоматически запускается в API Gateway; его локальная готовность включена в `http://127.0.0.1:8081/healthcheck/ready` (`runtime_config`). Флаг доступен через facade, его проверка в HTTP/gRPC обработчиках пока не добавлена.
+## Доступ для демонстрации и управление компонентами
+
+```bash
+./bin/hotelctl components                 # все имена приложений и зависимостей
+./bin/hotelctl stop kafka                 # остановить брокер; сохранить данные
+./bin/hotelctl start kafka                # вернуть исходное число реплик
+./bin/hotelctl restart booking            # остановка и запуск без пересборки
+./bin/hotelctl logs booking-postgres -f    # логи также доступны для зависимостей
+./bin/hotelctl access                     # адреса API, UI и PostgreSQL
+sudo ./bin/hotelctl hosts --install       # один раз: локальные имена БД
+```
+
+`stop` без имён по-прежнему останавливает весь k3s. `status` показывает все 13 компонентов.
+PostgreSQL опубликованы постоянно на loopback: `booking-postgres:15432`,
+`check-in-postgres:15433`, `hotels-postgres:15434`, `review-postgres:15435`.
+После установки hosts имена разрешаются в `127.0.0.1`; до установки можно использовать IP.
+`hotelctl up` обновляет публикацию портов существующего контейнера, сохраняя том k3s.
 
 ## Kafka UI
 
-AKHQ: [http://localhost:8090](http://localhost:8090). После запуска стенда выполните `make kafka-ui` и оставьте терминал открытым. Команда применяет манифест AKHQ, ждёт готовности и открывает локальный port-forward. Нужен `kubectl`; kubeconfig берётся из `.local/hotelctl/kubeconfig` (можно переопределить `HOTEL_KUBECONFIG`). `Ctrl+C` закрывает только туннель, AKHQ остаётся в кластере.
+AKHQ: [http://localhost:8090](http://localhost:8090), доступен сразу после `hotelctl up`.
+Отдельный `port-forward` не нужен. Выберите `hotelflow` → топик → Data → Oldest.
+Видны payload, key, headers, partition и offset. Kafka внутри кластера: `kafka:9092`;
+наружу опубликован UI, а не брокер с внутренним advertised address.
 
-Выберите соединение `hotelflow`, затем топик → Data. Для уже отправленных событий выберите чтение с начала (Oldest). Доступны payload, key, headers, partition и offset. Подключение внутри k3s — `kafka:9092`; образ — `tchiotludo/akhq:dev`.
+[Шпаргалка открытого урока: команды, БД и сценарии outbox/inbox](docs/demo-control.md).
 
 Полный сценарий бронирования, заселения, отмены и уведомлений: `make smoke-business`.
 [Что проверяет команда и какие данные оставляет](hotelctl/README.md#проверка-бизнес-сценария).

@@ -63,22 +63,21 @@ migrate-review:
 	@test -n "$$POSTGRES_DSN" || (echo 'Set POSTGRES_DSN for review' >&2; exit 1)
 	goose -dir services/review/tools/migrations postgres "$$POSTGRES_DSN" up
 
-# AKHQ is deployed beside Kafka; the local tunnel avoids restarting the k3s node.
+# AKHQ and etcd have permanent loopback ports after hotelctl up.
 HOTEL_KUBECONFIG ?= .local/hotelctl/kubeconfig
 .PHONY: kafka-ui kafka-ui-deploy
 kafka-ui-deploy:
 	kubectl --kubeconfig "$(HOTEL_KUBECONFIG)" -n hotelflow apply -f deploy/booking-dependencies/akhq.yaml
 	kubectl --kubeconfig "$(HOTEL_KUBECONFIG)" -n hotelflow rollout status deployment/akhq --timeout=180s
 kafka-ui: kafka-ui-deploy
-	kubectl --kubeconfig "$(HOTEL_KUBECONFIG)" -n hotelflow port-forward --address 127.0.0.1 service/akhq 8090:8080
+	@echo "Kafka UI: http://localhost:8090 (постоянный порт после hotelctl up)"
 
 # Runtime config etcd is independent of the Kubernetes control-plane storage.
-HOTEL_ETCD_PORT ?= 2379
 .PHONY: config-etcd config-etcd-deploy config-etcd-health
 config-etcd-deploy:
 	kubectl --kubeconfig "$(HOTEL_KUBECONFIG)" -n hotelflow apply --server-side --field-manager=hotelctl -f deploy/booking-dependencies/config-etcd.yaml
 	kubectl --kubeconfig "$(HOTEL_KUBECONFIG)" -n hotelflow rollout status deployment/config-etcd --timeout=180s
 config-etcd: config-etcd-deploy
-	kubectl --kubeconfig "$(HOTEL_KUBECONFIG)" -n hotelflow port-forward --address 127.0.0.1 service/config-etcd $(HOTEL_ETCD_PORT):2379
+	@echo "etcd: http://127.0.0.1:2379 (постоянный порт после hotelctl up)"
 config-etcd-health:
 	kubectl --kubeconfig "$(HOTEL_KUBECONFIG)" -n hotelflow exec deployment/config-etcd -- /usr/local/bin/etcdctl --endpoints=http://config-etcd:2379 endpoint health

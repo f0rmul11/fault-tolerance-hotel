@@ -27,8 +27,8 @@ func NewLogsOptions(streams iostreams.IOStreams) *LogsOptions {
 func NewCmdLogs(f util.Factory, streams iostreams.IOStreams) *cobra.Command {
 	o := NewLogsOptions(streams)
 	command := &cobra.Command{
-		Use:     "logs SERVICE",
-		Short:   "Show logs of the newest service pod",
+		Use:     "logs COMPONENT",
+		Short:   "Показать логи приложения или зависимости",
 		Args:    cobra.ExactArgs(1),
 		Example: "  hotelctl logs api-gateway -f --tail 50",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -51,7 +51,7 @@ func (o *LogsOptions) Complete(f util.Factory, args []string) error {
 	if err := o.Options.Complete(f); err != nil {
 		return err
 	}
-	services, err := o.Config.Select(args)
+	services, err := o.Config.SelectComponents(args)
 	if err != nil {
 		return err
 	}

@@ -16,13 +16,16 @@ import (
 )
 
 type fakeFactory struct {
-	c        config.Config
-	calls    int
-	built    []config.Service
-	block    bool
-	smoke    bool
-	business bool
-	reset    bool
+	c          config.Config
+	calls      int
+	built      []config.Service
+	block      bool
+	smoke      bool
+	business   bool
+	action     string
+	components []config.Service
+	wholeStop  bool
+	reset      bool
 }
 
 func (f *fakeFactory) Config() (config.Config, error) {
@@ -69,6 +72,7 @@ func commandConfig(t *testing.T) config.Config {
 
 func TestInvalidInputDoesNotCreateRuntime(t *testing.T) {
 	for _, args := range [][]string{
+		{"start"}, {"restart"}, {"start", "missing"}, {"start", "kafka", "kafka"},
 		{
 			"up",
 			"--agents",
@@ -241,5 +245,67 @@ func TestResetWithExplicitFlag(t *testing.T) {
 	}
 	if !f.reset {
 		t.Fatal("сброс не вызван")
+	}
+}
+
+func (s *fakeStand) Control(_ context.Context, action string, components []config.Service) error {
+	s.f.action = action
+	s.f.components = components
+	return nil
+}
+
+func (s *fakeStand) Stop(context.Context) error {
+	s.f.wholeStop = true
+	return nil
+}
+
+func TestComponentCommandsDispatchWithoutChangingWholeStand(t *testing.T) {
+	for _, action := range []string{"stop", "start", "restart"} {
+		t.Run(action, func(t *testing.T) {
+			f := &fakeFactory{
+				c: commandConfig(t),
+			}
+			command := NewHotelctlCommand(f, iostreams.IOStreams{
+				Out:    io.Discard,
+				ErrOut: io.Discard,
+			}, "test")
+			command.SetArgs([]string{action, "kafka", "booking"})
+			if err := command.Execute(); err != nil {
+				t.Fatal(err)
+			}
+			if f.action != action || len(f.components) != 2 || f.components[0].Deployment != "booking-kafka" || f.wholeStop {
+				t.Fatalf("incorrect dispatch: %+v", f)
+			}
+		})
+	}
+	f := &fakeFactory{
+		c: commandConfig(t),
+	}
+	command := NewHotelctlCommand(f, iostreams.IOStreams{
+		Out:    io.Discard,
+		ErrOut: io.Discard,
+	}, "test")
+	command.SetArgs([]string{"stop"})
+	if err := command.Execute(); err != nil || !f.wholeStop {
+		t.Fatalf("whole-stand stop changed: %v", err)
+	}
+}
+
+func TestLocalAccessCommandsNeedNoDocker(t *testing.T) {
+	for _, name := range []string{"components", "access", "hosts"} {
+		t.Run(name, func(t *testing.T) {
+			f := &fakeFactory{
+				c: commandConfig(t),
+			}
+			var out bytes.Buffer
+			command := NewHotelctlCommand(f, iostreams.IOStreams{
+				Out:    &out,
+				ErrOut: io.Discard,
+			}, "test")
+			command.SetArgs([]string{name})
+			if err := command.Execute(); err != nil || f.calls != 0 || out.Len() == 0 {
+				t.Fatalf("command failed or opened Docker: %v / %d", err, f.calls)
+			}
+		})
 	}
 }

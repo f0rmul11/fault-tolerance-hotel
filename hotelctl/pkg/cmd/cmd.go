@@ -2,7 +2,9 @@ package cmd
 
 import (
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/internal/iostreams"
+	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/pkg/cmd/access"
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/pkg/cmd/build"
+	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/pkg/cmd/component"
 	configcmd "github.com/f0rmul11/fault-tolerance-hotel/hotelctl/pkg/cmd/config"
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/pkg/cmd/deploy"
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/pkg/cmd/destroy"
@@ -43,6 +45,11 @@ func NewHotelctlCommand(f util.Factory, streams iostreams.IOStreams, version str
 	command.AddCommand(configcmd.NewCmdConfig(f, streams))
 	command.AddCommand(deploy.NewCmdDeploy(f, streams))
 	command.AddCommand(stop.NewCmdStop(f, streams))
+	command.AddCommand(component.NewCmdControl(f, streams, "start"))
+	command.AddCommand(component.NewCmdControl(f, streams, "restart"))
+	command.AddCommand(component.NewCmdComponents(f, streams))
+	command.AddCommand(access.NewCmdAccess(f, streams))
+	command.AddCommand(access.NewCmdHosts(f, streams))
 	command.AddCommand(destroy.NewCmdDestroy(f, streams))
 	command.AddCommand(smoke.NewCmdSmoke(f, streams))
 	command.AddCommand(reset.NewCmdReset(f, streams))

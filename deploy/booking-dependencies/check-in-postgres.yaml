@@ -13,10 +13,12 @@ kind: Service
 metadata:
   name: check-in-postgres
 spec:
+  type: NodePort
   selector:
     app.kubernetes.io/name: check-in-postgres
   ports:
     - name: postgres
+      nodePort: 30433
       port: 5432
       targetPort: postgres
 ---
