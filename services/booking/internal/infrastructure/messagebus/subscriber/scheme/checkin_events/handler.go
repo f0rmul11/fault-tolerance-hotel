@@ -39,7 +39,7 @@ func (h *MessageHandler) Handle(ctx context.Context, _ sarama.ConsumerGroupSessi
 		return fmt.Errorf("correlation-id в заголовке и событии не совпадают")
 	}
 	msg := message.NewMessage(
-		base.EntityID,
+		base.BookingID,
 		correlationID,
 		kafkaMessage.Topic,
 		kafkaMessage.Key,

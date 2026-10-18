@@ -197,7 +197,7 @@ auth выполняется после него и проверяет роли. 
 Других рабочих топиков нет; `__consumer_offsets` — внутренний топик Kafka.
 Envelope и payload определены в `services/<producer>/internal/events`;
 подробности — [check-in.md](check-in.md) и [identifiers.md](identifiers.md).
-Kafka key/aggregate_id — UUID брони. correlation_id — отдельный UUID события,
+Kafka key/booking_id — UUID брони. correlation_id — отдельный UUID события,
 одинаковый в envelope и `x-correlation-id`; повтор relay сохраняет его.
 Reply получает собственный correlation_id, causation_id указывает на команду.
 Снимок создания включает room_id строкой, room_number, room_type и границы периода.

@@ -24,9 +24,9 @@ func (h *Handler) HandleEvent(ctx context.Context, body []byte) error {
 	return h.usecase.Execute(
 		ctx,
 		confirm_arrival.Input{
-			CheckInID:      uuid.FromStringOrNil(e.CheckInID),
+			CheckInID:      uuid.FromStringOrNil(e.Payload.CheckInID),
 			BookingID:      uuid.FromStringOrNil(e.BookingID),
-			CheckInVersion: e.CheckInVersion,
+			CheckInVersion: e.Payload.CheckInVersion,
 		},
 	)
 }

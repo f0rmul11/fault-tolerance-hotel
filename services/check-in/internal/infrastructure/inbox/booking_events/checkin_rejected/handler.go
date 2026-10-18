@@ -24,10 +24,10 @@ func (h *Handler) HandleEvent(ctx context.Context, body []byte) error {
 	return h.usecase.Execute(
 		ctx,
 		reject.Input{
-			CheckInID:      uuid.FromStringOrNil(e.CheckInID),
+			CheckInID:      uuid.FromStringOrNil(e.Payload.CheckInID),
 			BookingID:      uuid.FromStringOrNil(e.BookingID),
-			CheckInVersion: e.CheckInVersion,
-			Message:        e.Message,
+			CheckInVersion: e.Payload.CheckInVersion,
+			Message:        e.Payload.Message,
 		},
 	)
 }

@@ -23,18 +23,15 @@ func New(c *entity.CheckIn) pipe.Func[event.Events] {
 			return nil, err
 		}
 		baseEvent := events.Base[ArrivalRequestedEvent]{
-			CorrelationID:    correlationID.String(),
-			EventType:        Type,
-			EntityID:         c.BookingID().String(),
-			AggregateVersion: c.Version(),
-			OccurredAt:       c.RequestedAt().Format(time.RFC3339Nano),
-			RequestID:        c.RequestID().String(),
+			CorrelationID: correlationID.String(),
+			EventType:     Type,
+			BookingID:     c.BookingID().String(),
+			OccurredAt:    c.RequestedAt().Format(time.RFC3339Nano),
+			RequestID:     c.RequestID().String(),
 			Payload: ArrivalRequestedEvent{
 				CheckInID:      c.ID().String(),
-				BookingID:      c.BookingID().String(),
 				CheckInVersion: c.Version(),
 				ActorID:        c.ActorID().String(),
-				RequestID:      c.RequestID().String(),
 				RequestedAt:    c.RequestedAt(),
 			},
 		}

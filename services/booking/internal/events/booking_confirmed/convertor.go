@@ -33,14 +33,13 @@ func New(b *entity.Booking) pipe.Func[event.Events] {
 		}
 
 		baseEvent := events.Base[BookingConfirmedEvent]{
-			CorrelationID:    correlationID.String(),
-			EventType:        Type,
-			EntityID:         b.ID().String(),
-			AggregateVersion: b.Version(),
-			OccurredAt:       b.UpdatedAt().Format(time.RFC3339Nano),
-			RequestID:        b.RequestID().String(),
+			CorrelationID:  correlationID.String(),
+			EventType:      Type,
+			BookingID:      b.ID().String(),
+			BookingVersion: b.Version(),
+			OccurredAt:     b.UpdatedAt().Format(time.RFC3339Nano),
+			RequestID:      b.RequestID().String(),
 			Payload: BookingConfirmedEvent{
-				ID:         b.ID().String(),
 				RoomID:     strconv.FormatInt(b.RoomID(), 10),
 				RoomNumber: b.RoomNumber(),
 				RoomType:   b.RoomType(),
@@ -48,7 +47,6 @@ func New(b *entity.Booking) pipe.Func[event.Events] {
 				EndsAt:     b.Period().End().Format(time.RFC3339Nano),
 				CreatedAt:  b.CreatedAt().Format(time.RFC3339Nano),
 				GuestID:    b.GuestID().String(),
-				Version:    b.Version(),
 				Status:     string(b.Status()),
 			},
 		}

@@ -13,7 +13,7 @@ func New(booking *entity.Booking) pipe.Func[event.Events] {
     return func(ctx context.Context, batch event.Events) (event.Events, error) {
         baseEvent := events.Base[BookingConfirmedEvent]{
             EventType: "booking.confirmed.v1",
-            EntityID:  booking.ID().String(),
+            BookingID: booking.ID().String(),
             Payload: BookingConfirmedEvent{
                 ID:     booking.ID().String(),
                 Status: string(booking.Status()),
@@ -52,7 +52,7 @@ func New(booking *entity.Booking) pipe.Func[event.Events] {
 }
 ```
 
-Это форма построения, а не полный wire-контракт. Реализация заполняет **все** поля текущего AsyncAPI: `correlation_id`, `event_type`, `aggregate_id`, `aggregate_version`, `occurred_at`, `request_id`, `payload`. Go-поле EntityID сериализуется как aggregate_id для HotelFlow. Один correlation-id создаётся при формировании события и хранится в body и x-correlation-id; повторная доставка сохранённой строки сохраняет этот ID. Он является ключом идемпотентности события. Request ID наследуется от запроса. Имена топиков задаются константами config; значения полей не заменяются названиями из order-service.
+Это форма построения, а не полный wire-контракт. Реализация заполняет **все** поля текущего AsyncAPI: `correlation_id`, `event_type`, `booking_id`, `booking_version` (для событий Booking), `occurred_at`, `request_id`, `payload`. Go-поле BookingID сериализуется как booking_id. В payload нет дублей booking_id/request_id; checkin_id и checkin_version явно относятся к CheckIn. Скопированные технические event/outbox сохраняют поле EntityID; это внутреннее API, не имя JSON-поля. Один correlation-id создаётся при формировании события и хранится в body и x-correlation-id; повторная доставка сохранённой строки сохраняет этот ID. Он является ключом идемпотентности события. Request ID наследуется от запроса. Имена топиков задаются константами config; значения полей не заменяются названиями из order-service.
 
 ## Сбор и сохранение
 

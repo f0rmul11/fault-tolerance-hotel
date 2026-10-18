@@ -10,7 +10,7 @@ import (
 
 type BaseEvent struct {
 	EventType string          `json:"event_type"`
-	EntityID  string          `json:"aggregate_id"`
+	BookingID string          `json:"booking_id"`
 	Payload   json.RawMessage `json:"payload"`
 }
 

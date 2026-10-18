@@ -36,17 +36,16 @@ func TestConfirmedEventPreservesRoomIdentityAndSnapshot(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			storage := &storageFake{}
 			handler := NewHandler(register.New(storage))
-			body, err := json.Marshal(struct {
-				Payload BookingConfirmed `json:"payload"`
-			}{Payload: BookingConfirmed{
-				ID:         bookingID.String(),
-				GuestID:    guestID.String(),
-				RoomID:     tt.roomID,
-				RoomNumber: "101",
-				RoomType:   "Family",
-				StartsAt:   "2026-10-14T12:00:00Z",
-				EndsAt:     "2026-10-15T12:00:00Z",
-			}})
+			body, err := json.Marshal(Envelope{
+				BookingID: bookingID.String(),
+				Payload: BookingConfirmed{
+					GuestID:    guestID.String(),
+					RoomID:     tt.roomID,
+					RoomNumber: "101",
+					RoomType:   "Family",
+					StartsAt:   "2026-10-14T12:00:00Z",
+					EndsAt:     "2026-10-15T12:00:00Z",
+				}})
 			if err != nil {
 				t.Fatal(err)
 			}

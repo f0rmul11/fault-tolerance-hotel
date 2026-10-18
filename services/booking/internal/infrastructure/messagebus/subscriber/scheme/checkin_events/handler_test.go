@@ -10,7 +10,7 @@ import (
 func TestEventRequiresCorrelationID(t *testing.T) {
 	const id = "de3dab97-8166-4908-97ab-ce3e20f7df75"
 	for _, tc := range []struct{ name, body, header string }{
-		{"offset is not a key", `{"aggregate_id":"booking"}`, ""},
+		{"offset is not a key", `{"booking_id":"booking"}`, ""},
 		{"event_id is not a key", `{"event_id":"` + id + `"}`, ""},
 		{"invalid UUID", `{"correlation_id":"bad"}`, "bad"},
 		{"header disagrees with body", `{"correlation_id":"39a654bc-aed7-472d-8cc3-535b826f4ef0"}`, id},

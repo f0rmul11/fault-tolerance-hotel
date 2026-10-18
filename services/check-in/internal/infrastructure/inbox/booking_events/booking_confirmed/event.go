@@ -3,7 +3,6 @@ package booking_confirmed
 import "encoding/json"
 
 type BookingConfirmed struct {
-	ID         string `json:"id"`
 	RoomID     string `json:"room_id"`
 	RoomNumber string `json:"room_number"`
 	RoomType   string `json:"room_type"`
@@ -12,10 +11,13 @@ type BookingConfirmed struct {
 	EndsAt     string `json:"ends_at"`
 }
 
-func deserialize(body []byte) (BookingConfirmed, error) {
-	var envelope struct {
-		Payload BookingConfirmed `json:"payload"`
-	}
+type Envelope struct {
+	BookingID string           `json:"booking_id"`
+	Payload   BookingConfirmed `json:"payload"`
+}
+
+func deserialize(body []byte) (Envelope, error) {
+	var envelope Envelope
 	err := json.Unmarshal(body, &envelope)
-	return envelope.Payload, err
+	return envelope, err
 }

@@ -311,7 +311,8 @@
         "properties": {
           "correlation_id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "UUID события; ключ идемпотентности inbox, совпадает с x-correlation-id."
           },
           "event_type": {
             "type": "string",
@@ -319,13 +320,15 @@
               "booking.confirmed.v1"
             ]
           },
-          "aggregate_id": {
+          "booking_id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "UUID брони, к которой относится событие; совпадает с ключом Kafka."
           },
-          "aggregate_version": {
+          "booking_version": {
             "type": "integer",
-            "minimum": 1
+            "minimum": 1,
+            "description": "Версия брони в Booking."
           },
           "occurred_at": {
             "type": "string",
@@ -333,15 +336,12 @@
           },
           "request_id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "UUID исходного запроса для трассировки."
           },
           "payload": {
             "type": "object",
             "properties": {
-              "id": {
-                "type": "string",
-                "format": "uuid"
-              },
               "room_id": {
                 "type": "string",
                 "pattern": "^[1-9][0-9]*$",
@@ -364,10 +364,6 @@
                 "type": "string",
                 "format": "date-time"
               },
-              "version": {
-                "type": "integer",
-                "minimum": 1
-              },
               "status": {
                 "type": "string",
                 "enum": [
@@ -386,13 +382,11 @@
               }
             },
             "required": [
-              "id",
               "room_id",
               "guest_id",
               "starts_at",
               "ends_at",
               "created_at",
-              "version",
               "status",
               "room_number",
               "room_type"
@@ -402,8 +396,8 @@
         "required": [
           "correlation_id",
           "event_type",
-          "aggregate_id",
-          "aggregate_version",
+          "booking_id",
+          "booking_version",
           "occurred_at",
           "request_id",
           "payload"
@@ -414,7 +408,8 @@
         "properties": {
           "correlation_id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "UUID события; ключ идемпотентности inbox, совпадает с x-correlation-id."
           },
           "event_type": {
             "type": "string",
@@ -422,13 +417,10 @@
               "checkin.arrival-requested.v1"
             ]
           },
-          "aggregate_id": {
+          "booking_id": {
             "type": "string",
-            "format": "uuid"
-          },
-          "aggregate_version": {
-            "type": "integer",
-            "minimum": 1
+            "format": "uuid",
+            "description": "UUID брони, к которой относится событие; совпадает с ключом Kafka."
           },
           "occurred_at": {
             "type": "string",
@@ -436,30 +428,25 @@
           },
           "request_id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "UUID исходного запроса для трассировки."
           },
           "payload": {
             "type": "object",
             "properties": {
               "checkin_id": {
                 "type": "string",
-                "format": "uuid"
-              },
-              "booking_id": {
-                "type": "string",
-                "format": "uuid"
+                "format": "uuid",
+                "description": "UUID заселения в Check-in."
               },
               "actor_id": {
                 "type": "string",
                 "format": "uuid"
               },
-              "request_id": {
-                "type": "string",
-                "format": "uuid"
-              },
               "checkin_version": {
                 "type": "integer",
-                "minimum": 1
+                "minimum": 1,
+                "description": "Версия действия Check-in, к которой относится запрос или ответ."
               },
               "requested_at": {
                 "type": "string",
@@ -468,9 +455,7 @@
             },
             "required": [
               "checkin_id",
-              "booking_id",
               "actor_id",
-              "request_id",
               "checkin_version",
               "requested_at"
             ]
@@ -479,8 +464,7 @@
         "required": [
           "correlation_id",
           "event_type",
-          "aggregate_id",
-          "aggregate_version",
+          "booking_id",
           "occurred_at",
           "request_id",
           "payload"
@@ -491,7 +475,8 @@
         "properties": {
           "correlation_id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "UUID события; ключ идемпотентности inbox, совпадает с x-correlation-id."
           },
           "event_type": {
             "type": "string",
@@ -499,13 +484,10 @@
               "checkin.cancellation-requested.v1"
             ]
           },
-          "aggregate_id": {
+          "booking_id": {
             "type": "string",
-            "format": "uuid"
-          },
-          "aggregate_version": {
-            "type": "integer",
-            "minimum": 1
+            "format": "uuid",
+            "description": "UUID брони, к которой относится событие; совпадает с ключом Kafka."
           },
           "occurred_at": {
             "type": "string",
@@ -513,30 +495,25 @@
           },
           "request_id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "UUID исходного запроса для трассировки."
           },
           "payload": {
             "type": "object",
             "properties": {
               "checkin_id": {
                 "type": "string",
-                "format": "uuid"
-              },
-              "booking_id": {
-                "type": "string",
-                "format": "uuid"
+                "format": "uuid",
+                "description": "UUID заселения в Check-in."
               },
               "actor_id": {
                 "type": "string",
                 "format": "uuid"
               },
-              "request_id": {
-                "type": "string",
-                "format": "uuid"
-              },
               "checkin_version": {
                 "type": "integer",
-                "minimum": 1
+                "minimum": 1,
+                "description": "Версия действия Check-in, к которой относится запрос или ответ."
               },
               "requested_at": {
                 "type": "string",
@@ -545,9 +522,7 @@
             },
             "required": [
               "checkin_id",
-              "booking_id",
               "actor_id",
-              "request_id",
               "checkin_version",
               "requested_at"
             ]
@@ -556,8 +531,7 @@
         "required": [
           "correlation_id",
           "event_type",
-          "aggregate_id",
-          "aggregate_version",
+          "booking_id",
           "occurred_at",
           "request_id",
           "payload"
@@ -568,7 +542,8 @@
         "properties": {
           "correlation_id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "UUID события; ключ идемпотентности inbox, совпадает с x-correlation-id."
           },
           "event_type": {
             "type": "string",
@@ -576,13 +551,15 @@
               "booking.activated.v1"
             ]
           },
-          "aggregate_id": {
+          "booking_id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "UUID брони, к которой относится событие; совпадает с ключом Kafka."
           },
-          "aggregate_version": {
+          "booking_version": {
             "type": "integer",
-            "minimum": 1
+            "minimum": 1,
+            "description": "Версия брони в Booking."
           },
           "occurred_at": {
             "type": "string",
@@ -590,31 +567,30 @@
           },
           "request_id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "UUID исходного запроса для трассировки."
           },
           "payload": {
             "type": "object",
             "properties": {
               "checkin_id": {
                 "type": "string",
-                "format": "uuid"
-              },
-              "booking_id": {
-                "type": "string",
-                "format": "uuid"
+                "format": "uuid",
+                "description": "UUID заселения в Check-in."
               },
               "causation_id": {
                 "type": "string",
-                "format": "uuid"
+                "format": "uuid",
+                "description": "correlation_id команды Check-in, на которую отвечает Booking."
               },
               "checkin_version": {
                 "type": "integer",
-                "minimum": 1
+                "minimum": 1,
+                "description": "Версия действия Check-in, к которой относится запрос или ответ."
               }
             },
             "required": [
               "checkin_id",
-              "booking_id",
               "causation_id",
               "checkin_version"
             ]
@@ -623,8 +599,8 @@
         "required": [
           "correlation_id",
           "event_type",
-          "aggregate_id",
-          "aggregate_version",
+          "booking_id",
+          "booking_version",
           "occurred_at",
           "request_id",
           "payload"
@@ -635,7 +611,8 @@
         "properties": {
           "correlation_id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "UUID события; ключ идемпотентности inbox, совпадает с x-correlation-id."
           },
           "event_type": {
             "type": "string",
@@ -643,13 +620,15 @@
               "booking.canceled.v1"
             ]
           },
-          "aggregate_id": {
+          "booking_id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "UUID брони, к которой относится событие; совпадает с ключом Kafka."
           },
-          "aggregate_version": {
+          "booking_version": {
             "type": "integer",
-            "minimum": 1
+            "minimum": 1,
+            "description": "Версия брони в Booking."
           },
           "occurred_at": {
             "type": "string",
@@ -657,31 +636,30 @@
           },
           "request_id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "UUID исходного запроса для трассировки."
           },
           "payload": {
             "type": "object",
             "properties": {
               "checkin_id": {
                 "type": "string",
-                "format": "uuid"
-              },
-              "booking_id": {
-                "type": "string",
-                "format": "uuid"
+                "format": "uuid",
+                "description": "UUID заселения в Check-in."
               },
               "causation_id": {
                 "type": "string",
-                "format": "uuid"
+                "format": "uuid",
+                "description": "correlation_id команды Check-in, на которую отвечает Booking."
               },
               "checkin_version": {
                 "type": "integer",
-                "minimum": 1
+                "minimum": 1,
+                "description": "Версия действия Check-in, к которой относится запрос или ответ."
               }
             },
             "required": [
               "checkin_id",
-              "booking_id",
               "causation_id",
               "checkin_version"
             ]
@@ -690,8 +668,8 @@
         "required": [
           "correlation_id",
           "event_type",
-          "aggregate_id",
-          "aggregate_version",
+          "booking_id",
+          "booking_version",
           "occurred_at",
           "request_id",
           "payload"
@@ -702,7 +680,8 @@
         "properties": {
           "correlation_id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "UUID события; ключ идемпотентности inbox, совпадает с x-correlation-id."
           },
           "event_type": {
             "type": "string",
@@ -710,13 +689,15 @@
               "booking.checkin-rejected.v1"
             ]
           },
-          "aggregate_id": {
+          "booking_id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "UUID брони, к которой относится событие; совпадает с ключом Kafka."
           },
-          "aggregate_version": {
+          "booking_version": {
             "type": "integer",
-            "minimum": 1
+            "minimum": 1,
+            "description": "Версия брони в Booking."
           },
           "occurred_at": {
             "type": "string",
@@ -724,26 +705,26 @@
           },
           "request_id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "UUID исходного запроса для трассировки."
           },
           "payload": {
             "type": "object",
             "properties": {
               "checkin_id": {
                 "type": "string",
-                "format": "uuid"
-              },
-              "booking_id": {
-                "type": "string",
-                "format": "uuid"
+                "format": "uuid",
+                "description": "UUID заселения в Check-in."
               },
               "causation_id": {
                 "type": "string",
-                "format": "uuid"
+                "format": "uuid",
+                "description": "correlation_id команды Check-in, на которую отвечает Booking."
               },
               "checkin_version": {
                 "type": "integer",
-                "minimum": 1
+                "minimum": 1,
+                "description": "Версия действия Check-in, к которой относится запрос или ответ."
               },
               "message": {
                 "type": "string"
@@ -751,7 +732,6 @@
             },
             "required": [
               "checkin_id",
-              "booking_id",
               "causation_id",
               "checkin_version",
               "message"
@@ -761,8 +741,8 @@
         "required": [
           "correlation_id",
           "event_type",
-          "aggregate_id",
-          "aggregate_version",
+          "booking_id",
+          "booking_version",
           "occurred_at",
           "request_id",
           "payload"

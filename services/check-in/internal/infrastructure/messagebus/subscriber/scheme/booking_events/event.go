@@ -4,5 +4,5 @@ const correlationIDHeader = "x-correlation-id"
 
 type BaseEvent struct {
 	CorrelationID string `json:"correlation_id"`
-	EntityID      string `json:"aggregate_id"`
+	BookingID     string `json:"booking_id"`
 }

@@ -109,7 +109,7 @@ func TestRepeatedCheckInCommands(t *testing.T) {
 				if err := json.Unmarshal(message.Body, &reply); err != nil {
 					t.Fatal(err)
 				}
-				if reply.EventType != tc.replyType || reply.AggregateVersion != storage.booking.Version() || reply.Payload.CausationID != request.CorrelationID.String() || reply.Payload.CheckInVersion != request.CheckInVersion {
+				if reply.BookingID != storage.booking.ID().String() || reply.EventType != tc.replyType || reply.BookingVersion != storage.booking.Version() || reply.Payload.CausationID != request.CorrelationID.String() || reply.Payload.CheckInVersion != request.CheckInVersion {
 					t.Fatalf("incorrect reply: %+v", reply)
 				}
 				if uuid.FromStringOrNil(reply.CorrelationID) == uuid.Nil || ids[reply.CorrelationID] {

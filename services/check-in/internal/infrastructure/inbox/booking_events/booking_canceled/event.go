@@ -4,14 +4,16 @@ import "encoding/json"
 
 type Reply struct {
 	CheckInID      string `json:"checkin_id"`
-	BookingID      string `json:"booking_id"`
 	CheckInVersion int    `json:"checkin_version"`
 }
 
-func deserialize(body []byte) (Reply, error) {
-	var envelope struct {
-		Payload Reply `json:"payload"`
-	}
+type Envelope struct {
+	BookingID string `json:"booking_id"`
+	Payload   Reply  `json:"payload"`
+}
+
+func deserialize(body []byte) (Envelope, error) {
+	var envelope Envelope
 	err := json.Unmarshal(body, &envelope)
-	return envelope.Payload, err
+	return envelope, err
 }

@@ -23,23 +23,23 @@ func (h *Handler) HandleEvent(ctx context.Context, body []byte) error {
 	if err != nil {
 		return err
 	}
-	roomID, err := strconv.ParseInt(e.RoomID, 10, 64)
+	roomID, err := strconv.ParseInt(e.Payload.RoomID, 10, 64)
 	if err != nil {
 		return err
 	}
 
-	period, err := vo.ParsePeriod(e.StartsAt, e.EndsAt)
+	period, err := vo.ParsePeriod(e.Payload.StartsAt, e.Payload.EndsAt)
 	if err != nil {
 		return err
 	}
 	return h.usecase.Execute(
 		ctx,
 		register.Input{
-			BookingID:  uuid.FromStringOrNil(e.ID),
+			BookingID:  uuid.FromStringOrNil(e.BookingID),
 			RoomID:     roomID,
-			RoomNumber: e.RoomNumber,
-			RoomType:   e.RoomType,
-			GuestID:    uuid.FromStringOrNil(e.GuestID),
+			RoomNumber: e.Payload.RoomNumber,
+			RoomType:   e.Payload.RoomType,
+			GuestID:    uuid.FromStringOrNil(e.Payload.GuestID),
 			Period:     period,
 		},
 	)

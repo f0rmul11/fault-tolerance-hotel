@@ -40,7 +40,7 @@ func (h *MessageHandler) Handle(ctx context.Context, _ sarama.ConsumerGroupSessi
 	if correlationID != base.CorrelationID {
 		return fmt.Errorf("correlation-id в заголовке и событии не совпадают")
 	}
-	if uuid.FromStringOrNil(base.EntityID) == uuid.Nil {
+	if uuid.FromStringOrNil(base.BookingID) == uuid.Nil {
 		return fmt.Errorf("в событии отсутствует идентификатор брони")
 	}
 

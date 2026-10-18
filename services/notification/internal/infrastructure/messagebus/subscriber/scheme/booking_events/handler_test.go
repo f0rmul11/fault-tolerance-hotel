@@ -149,7 +149,7 @@ func newMessage(t *testing.T, eventType string) *sarama.ConsumerMessage {
 	correlationID := uuid.Must(uuid.NewV4()).String()
 	body, err := json.Marshal(map[string]any{
 		"event_type":     eventType,
-		"aggregate_id":   bookingID,
+		"booking_id":     bookingID,
 		"correlation_id": correlationID,
 		"payload": map[string]any{
 			"room_id":     "1",

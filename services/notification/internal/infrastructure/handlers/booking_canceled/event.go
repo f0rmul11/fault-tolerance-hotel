@@ -6,7 +6,7 @@ import (
 
 type Event struct {
 	CorrelationID string `json:"correlation_id"`
-	BookingID     string `json:"aggregate_id"`
+	BookingID     string `json:"booking_id"`
 }
 
 func deserialize(body []byte) (Event, error) {

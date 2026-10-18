@@ -26,10 +26,10 @@ func (h *Handler) HandleEvent(ctx context.Context, body []byte) error {
 	return h.usecase.Execute(ctx, cancel.Input{Request: checkindto.Request{
 		CorrelationID:  uuid.FromStringOrNil(envelope.CorrelationID),
 		CheckInID:      uuid.FromStringOrNil(e.CheckInID),
-		BookingID:      uuid.FromStringOrNil(e.BookingID),
+		BookingID:      uuid.FromStringOrNil(envelope.BookingID),
 		CheckInVersion: e.CheckInVersion,
 		ActorID:        uuid.FromStringOrNil(e.ActorID),
-		RequestID:      uuid.FromStringOrNil(e.RequestID),
+		RequestID:      uuid.FromStringOrNil(envelope.RequestID),
 		RequestedAt:    e.RequestedAt,
 	}})
 }

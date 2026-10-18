@@ -24,15 +24,14 @@ func New(b *entity.Booking, request checkindto.Request, message string) pipe.Fun
 			return nil, err
 		}
 		baseEvent := events.Base[CheckinRejectedEvent]{
-			CorrelationID:    correlationID.String(),
-			EventType:        Type,
-			EntityID:         b.ID().String(),
-			AggregateVersion: b.Version(),
-			OccurredAt:       request.RequestedAt.Format(time.RFC3339Nano),
-			RequestID:        request.RequestID.String(),
+			CorrelationID:  correlationID.String(),
+			EventType:      Type,
+			BookingID:      b.ID().String(),
+			BookingVersion: b.Version(),
+			OccurredAt:     request.RequestedAt.Format(time.RFC3339Nano),
+			RequestID:      request.RequestID.String(),
 			Payload: CheckinRejectedEvent{
 				CheckInID:      request.CheckInID.String(),
-				BookingID:      b.ID().String(),
 				CheckInVersion: request.CheckInVersion,
 				CausationID:    request.CorrelationID.String(),
 				Message:        message,

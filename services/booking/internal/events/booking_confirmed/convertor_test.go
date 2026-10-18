@@ -31,6 +31,23 @@ func TestEventCarriesRoomAndPeriod(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	var wire struct {
+		BookingID      string                     `json:"booking_id"`
+		BookingVersion int                        `json:"booking_version"`
+		Payload        map[string]json.RawMessage `json:"payload"`
+	}
+	if err := json.Unmarshal(batch[0].Body, &wire); err != nil {
+		t.Fatal(err)
+	}
+	if wire.BookingID != id.String() || wire.BookingVersion != b.Version() {
+		t.Fatal("wire contract lost booking identity or version")
+	}
+	for _, key := range []string{"id", "booking_id", "version", "booking_version", "request_id"} {
+		if _, exists := wire.Payload[key]; exists {
+			t.Fatalf("payload duplicates envelope field %s", key)
+		}
+	}
+
 	var envelope events.Base[BookingConfirmedEvent]
 	if err := json.Unmarshal(batch[0].Body, &envelope); err != nil {
 		t.Fatal(err)
@@ -39,8 +56,8 @@ func TestEventCarriesRoomAndPeriod(t *testing.T) {
 	if envelope.EventType != Type || envelope.RequestID != requestID.String() {
 		t.Fatal("event lost type or request identity")
 	}
-	if envelope.EntityID != id.String() || string(batch[0].Key) != id.String() {
-		t.Fatal("Kafka aggregate ID and key must identify the booking UUID")
+	if envelope.BookingID != id.String() || string(batch[0].Key) != id.String() {
+		t.Fatal("Kafka booking ID and key must identify the booking UUID")
 	}
 	if envelope.Payload.RoomID != "1" || envelope.Payload.RoomNumber != "101" || envelope.Payload.RoomType != "Standard" {
 		t.Fatal("event lost room identity")

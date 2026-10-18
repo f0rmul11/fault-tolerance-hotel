@@ -7,7 +7,7 @@ import (
 
 type Event struct {
 	CorrelationID string `json:"correlation_id"`
-	BookingID     string `json:"aggregate_id"`
+	BookingID     string `json:"booking_id"`
 	Payload       struct {
 		RoomNumber string    `json:"room_number"`
 		RoomType   string    `json:"room_type"`
