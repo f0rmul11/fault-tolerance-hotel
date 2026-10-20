@@ -2,4 +2,4 @@
 
 Создаёт и читает клиентские брони, проверяет доступность номеров. Hotels предоставляет каталог и условия; Booking атомарно сохраняет CONFIRMED, период, ключ идемпотентности и outbox.
 
-[Сценарий и команды](../../docs/booking.md). Локальный контракт — `api/booking/booking/v1/booking.proto`.
+Локальный контракт — `api/booking/booking/v1/booking.proto`.

@@ -2,8 +2,6 @@
 
 Учебный гостиничный стенд: один k3s-узел, API Gateway и пять сервисов. Booking атомарно сохраняет подтверждённую бронь конкретного номера, период бронирования, ключ идемпотентности и outbox. Hotels хранит каталог и ограничения длительности (seed: минимум 12 часов). Пересечения исключаются ограничением PostgreSQL EXCLUDE USING gist. Во всех сервисах сохранены gRPC Echo и probes.
 
-[Действующая спецификация](docs/specification.md)
-
 ## Запуск
 
 Нужны Go 1.26.1+ и запущенный Docker с Linux-контейнерами.
@@ -49,15 +47,15 @@ Healthcheck: `http://localhost:<admin>/healthcheck/{live,ready,startup}`.
 
 Порты доступны без `port-forward`; admin остаётся доступным при неготовности Pod.
 
-[Сервисы и gRPC](docs/services.md) · [Все команды CLI](hotelctl/README.md) · [Архитектура](docs/cli-architecture.md) · [Проверки](docs/verification.md)
+[Все команды CLI](hotelctl/README.md)
 
 ## Бронирование
 
-Атомарное бронирование, идемпотентность, outbox, команды и примеры запросов: [docs/booking.md](docs/booking.md).
+Атомарное бронирование, идемпотентность и outbox: [Booking](services/booking/README.md).
 
-Заселение/отмена и Kafka request/reply: [Check-in](docs/check-in.md). Проверка реализации: [отчёт](docs/check-in-verification.md).
+Заселение/отмена и Kafka request/reply: [Check-in](services/check-in/README.md).
 
-Каталог отелей и номеров, пользовательские рейтинги отелей: [Hotels / Review](docs/hotels-review.md).
+Каталог отелей и номеров: [Hotels](services/hotels/README.md). Пользовательские рейтинги отелей: [Review](services/review/README.md).
 
 ## Runtime-конфигурация
 
@@ -90,8 +88,6 @@ AKHQ: [http://localhost:8090](http://localhost:8090), доступен сраз�
 Отдельный `port-forward` не нужен. Выберите `hotelflow` → топик → Data → Oldest.
 Видны payload, key, headers, partition и offset. Kafka внутри кластера: `kafka:9092`;
 наружу опубликован UI, а не брокер с внутренним advertised address.
-
-[Шпаргалка открытого урока: команды, БД и сценарии outbox/inbox](docs/demo-control.md).
 
 Полный сценарий бронирования, заселения, отмены и уведомлений: `make smoke-business`.
 [Что проверяет команда и какие данные оставляет](hotelctl/README.md#проверка-бизнес-сценария).

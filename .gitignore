@@ -3,7 +3,7 @@
 **/bin/
 **/coverage.out
 
-# Local development instructions
+# Local development instructions and documentation
 /.agents/
 /AGENTS.md
-/docs/agent-context.md
+/docs/

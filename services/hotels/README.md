@@ -4,4 +4,4 @@
 
 ListHotels/GetHotel обогащаются одним batch запросом Review; комнаты и min/max бронирования читаются без Review. Суммы звёзд и число оценок принадлежат Review, рейтинг устанавливается через Hotel.SetRating для ответа и не сохраняется в БД Hotels. Use case возвращает саму сущность; общий DTO — только Rating.
 
-`make generate` выполняет Buf lint/build и генерацию собственных контрактов и внешнего клиента Review. `make test` запускает race-тесты. Миграции/seed: tools/migrations и tools/seed. Подробности: [каталог](../../docs/hotels-review.md).
+`make generate` выполняет Buf lint/build и генерацию собственных контрактов и внешнего клиента Review. `make test` запускает race-тесты. Миграции/seed: tools/migrations и tools/seed.

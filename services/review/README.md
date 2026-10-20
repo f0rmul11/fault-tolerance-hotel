@@ -4,4 +4,4 @@
 
 GetHotelRatings принимает список UUID без произвольного ограничения в 100 и делает один SQL по всей коллекции. Пропущенный ID или review_count=0 означает отсутствие оценки. Целые total_stars/review_count в БД сохраняют исходные суммы; дробный рейтинг 0–5 вычисляется при чтении. Нулевая оценка с положительным числом отзывов является настоящим рейтингом.
 
-Own PostgreSQL `review`. Нет запросов в Hotels, Kafka, outbox или проверки существования отеля по сети. `make generate` — Buf; `make test` — race-тесты. Подробности: [каталог](../../docs/hotels-review.md).
+Own PostgreSQL `review`. Нет запросов в Hotels, Kafka, outbox или проверки существования отеля по сети. `make generate` — Buf; `make test` — race-тесты.

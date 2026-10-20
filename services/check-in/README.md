@@ -1,6 +1,6 @@
 # Check-in
 
-Собственная сущность CheckIn и сценарии ресепшн: ListArrivals, ActivateBooking, CancelBooking. Обмен с Booking через Kafka, inbox/outbox; собственная БД checkin. [Протокол, API и запуск](../../docs/check-in.md).
+Собственная сущность CheckIn и сценарии ресепшн: ListArrivals, ActivateBooking, CancelBooking. Обмен с Booking через Kafka, inbox/outbox; собственная БД checkin.
 
 - gRPC в кластере: `check-in.hotelflow.svc.cluster.local:9090`.
 - Контракт: `api/check-in/checkin/v1/checkin.proto`.
