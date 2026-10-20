@@ -3,6 +3,7 @@ syntax = "proto3";
 package api_gateway.booking.v1;
 
 import "google/api/annotations.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
 
 option go_package = "api-gateway/internal/pkg/pb/api-gateway/booking/v1;bookingV1";
 
@@ -14,11 +15,45 @@ service BookingService {
       post: "/v1/bookings"
       body: "*"
     };
+
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      parameters: {
+        headers: {
+          name: "X-Demo-Role"
+          description: "Роль пользователя: GUEST."
+          type: STRING
+          required: true
+        }
+        headers: {
+          name: "X-Demo-Actor"
+          description: "UUID гостя, на которого оформляется бронь."
+          type: STRING
+          required: true
+        }
+      }
+    };
   }
 
   // Возвращает бронь по UUID с учётом прав вызывающего пользователя.
   rpc GetBooking(GetBookingRequest) returns (GetBookingResponse) {
     option (google.api.http) = {get: "/v1/bookings/{booking_id}"};
+
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      parameters: {
+        headers: {
+          name: "X-Demo-Role"
+          description: "Роль пользователя: GUEST, RECEPTION или OPERATOR."
+          type: STRING
+          required: true
+        }
+        headers: {
+          name: "X-Demo-Actor"
+          description: "UUID вызывающего пользователя. Обязателен для GUEST; для RECEPTION и OPERATOR необязателен."
+          type: STRING
+          required: false
+        }
+      }
+    };
   }
 
   // Возвращает снимок доступности; занятость окончательно проверяется при создании брони.
@@ -26,6 +61,23 @@ service BookingService {
     option (google.api.http) = {
       post: "/v1/rooms/availability"
       body: "*"
+    };
+
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      parameters: {
+        headers: {
+          name: "X-Demo-Role"
+          description: "Роль пользователя: GUEST, RECEPTION или OPERATOR."
+          type: STRING
+          required: true
+        }
+        headers: {
+          name: "X-Demo-Actor"
+          description: "UUID вызывающего пользователя. Обязателен для GUEST; для RECEPTION и OPERATOR необязателен."
+          type: STRING
+          required: false
+        }
+      }
     };
   }
 }

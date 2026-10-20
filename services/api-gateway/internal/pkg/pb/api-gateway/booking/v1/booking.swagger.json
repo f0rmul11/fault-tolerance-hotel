@@ -43,6 +43,20 @@
             "schema": {
               "$ref": "#/definitions/api_gateway.booking.v1.CreateBookingRequest"
             }
+          },
+          {
+            "name": "X-Demo-Role",
+            "description": "Роль пользователя: GUEST.",
+            "in": "header",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "X-Demo-Actor",
+            "description": "UUID гостя, на которого оформляется бронь.",
+            "in": "header",
+            "required": true,
+            "type": "string"
           }
         ],
         "tags": [
@@ -74,6 +88,20 @@
             "description": "UUID брони в Booking.",
             "in": "path",
             "required": true,
+            "type": "string"
+          },
+          {
+            "name": "X-Demo-Role",
+            "description": "Роль пользователя: GUEST, RECEPTION или OPERATOR.",
+            "in": "header",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "X-Demo-Actor",
+            "description": "UUID вызывающего пользователя. Обязателен для GUEST; для RECEPTION и OPERATOR необязателен.",
+            "in": "header",
+            "required": false,
             "type": "string"
           }
         ],
@@ -109,6 +137,20 @@
             "schema": {
               "$ref": "#/definitions/api_gateway.booking.v1.CheckAvailabilityRequest"
             }
+          },
+          {
+            "name": "X-Demo-Role",
+            "description": "Роль пользователя: GUEST, RECEPTION или OPERATOR.",
+            "in": "header",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "X-Demo-Actor",
+            "description": "UUID вызывающего пользователя. Обязателен для GUEST; для RECEPTION и OPERATOR необязателен.",
+            "in": "header",
+            "required": false,
+            "type": "string"
           }
         ],
         "tags": [

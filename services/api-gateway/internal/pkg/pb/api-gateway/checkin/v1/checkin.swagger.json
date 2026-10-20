@@ -48,6 +48,20 @@
             "in": "query",
             "required": false,
             "type": "string"
+          },
+          {
+            "name": "X-Demo-Role",
+            "description": "Роль пользователя: RECEPTION или OPERATOR.",
+            "in": "header",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "X-Demo-Actor",
+            "description": "UUID оператора, выполняющего запрос.",
+            "in": "header",
+            "required": true,
+            "type": "string"
           }
         ],
         "tags": [
@@ -88,6 +102,20 @@
             "schema": {
               "$ref": "#/definitions/api_gateway.checkin.v1.CheckinService.ActivateBookingBody"
             }
+          },
+          {
+            "name": "X-Demo-Role",
+            "description": "Роль пользователя: RECEPTION или OPERATOR.",
+            "in": "header",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "X-Demo-Actor",
+            "description": "UUID оператора, выполняющего запрос.",
+            "in": "header",
+            "required": true,
+            "type": "string"
           }
         ],
         "tags": [
@@ -128,6 +156,20 @@
             "schema": {
               "$ref": "#/definitions/api_gateway.checkin.v1.CheckinService.CancelBookingBody"
             }
+          },
+          {
+            "name": "X-Demo-Role",
+            "description": "Роль пользователя: RECEPTION или OPERATOR.",
+            "in": "header",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "X-Demo-Actor",
+            "description": "UUID оператора, выполняющего запрос.",
+            "in": "header",
+            "required": true,
+            "type": "string"
           }
         ],
         "tags": [

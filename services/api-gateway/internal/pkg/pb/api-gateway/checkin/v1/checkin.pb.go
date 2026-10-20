@@ -7,6 +7,7 @@
 package checkinV1
 
 import (
+	_ "github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2/options"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -466,7 +467,7 @@ var File_api_gateway_checkin_v1_checkin_proto protoreflect.FileDescriptor
 
 const file_api_gateway_checkin_v1_checkin_proto_rawDesc = "" +
 	"\n" +
-	"$api-gateway/checkin/v1/checkin.proto\x12\x16api_gateway.checkin.v1\x1a\x1cgoogle/api/annotations.proto\"K\n" +
+	"$api-gateway/checkin/v1/checkin.proto\x12\x16api_gateway.checkin.v1\x1a\x1cgoogle/api/annotations.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"K\n" +
 	"\x13ListArrivalsRequest\x12\x1b\n" +
 	"\tstarts_at\x18\x01 \x01(\tR\bstartsAt\x12\x17\n" +
 	"\aends_at\x18\x02 \x01(\tR\x06endsAt\"`\n" +
@@ -498,11 +499,23 @@ const file_api_gateway_checkin_v1_checkin_proto_rawDesc = "" +
 	"\x17ActivateBookingResponse\x12=\n" +
 	"\acheckin\x18\x01 \x01(\v2#.api_gateway.checkin.v1.CheckInViewR\acheckin\"V\n" +
 	"\x15CancelBookingResponse\x12=\n" +
-	"\acheckin\x18\x01 \x01(\v2#.api_gateway.checkin.v1.CheckInViewR\acheckin2\xed\x03\n" +
-	"\x0eCheckinService\x12\x88\x01\n" +
-	"\fListArrivals\x12+.api_gateway.checkin.v1.ListArrivalsRequest\x1a,.api_gateway.checkin.v1.ListArrivalsResponse\"\x1d\x82\xd3\xe4\x93\x02\x17\x12\x15/v1/check-in/bookings\x12\xaa\x01\n" +
-	"\x0fActivateBooking\x12..api_gateway.checkin.v1.ActivateBookingRequest\x1a/.api_gateway.checkin.v1.ActivateBookingResponse\"6\x82\xd3\xe4\x93\x020:\x01*\"+/v1/check-in/bookings/{booking_id}/activate\x12\xa2\x01\n" +
-	"\rCancelBooking\x12,.api_gateway.checkin.v1.CancelBookingRequest\x1a-.api_gateway.checkin.v1.CancelBookingResponse\"4\x82\xd3\xe4\x93\x02.:\x01*\")/v1/check-in/bookings/{booking_id}/cancelB>Z<api-gateway/internal/pkg/pb/api-gateway/checkin/v1;checkinV1b\x06proto3"
+	"\acheckin\x18\x01 \x01(\v2#.api_gateway.checkin.v1.CheckInViewR\acheckin2\xfa\a\n" +
+	"\x0eCheckinService\x12\xb7\x02\n" +
+	"\fListArrivals\x12+.api_gateway.checkin.v1.ListArrivalsRequest\x1a,.api_gateway.checkin.v1.ListArrivalsResponse\"\xcb\x01\x92A\xaa\x01r\xa7\x01\n" +
+	"P\n" +
+	"\vX-Demo-Role\x12=Роль пользователя: RECEPTION или OPERATOR.\x18\x01(\x01\n" +
+	"S\n" +
+	"\fX-Demo-Actor\x12?UUID оператора, выполняющего запрос.\x18\x01(\x01\x82\xd3\xe4\x93\x02\x17\x12\x15/v1/check-in/bookings\x12\xd9\x02\n" +
+	"\x0fActivateBooking\x12..api_gateway.checkin.v1.ActivateBookingRequest\x1a/.api_gateway.checkin.v1.ActivateBookingResponse\"\xe4\x01\x92A\xaa\x01r\xa7\x01\n" +
+	"P\n" +
+	"\vX-Demo-Role\x12=Роль пользователя: RECEPTION или OPERATOR.\x18\x01(\x01\n" +
+	"S\n" +
+	"\fX-Demo-Actor\x12?UUID оператора, выполняющего запрос.\x18\x01(\x01\x82\xd3\xe4\x93\x020:\x01*\"+/v1/check-in/bookings/{booking_id}/activate\x12\xd1\x02\n" +
+	"\rCancelBooking\x12,.api_gateway.checkin.v1.CancelBookingRequest\x1a-.api_gateway.checkin.v1.CancelBookingResponse\"\xe2\x01\x92A\xaa\x01r\xa7\x01\n" +
+	"P\n" +
+	"\vX-Demo-Role\x12=Роль пользователя: RECEPTION или OPERATOR.\x18\x01(\x01\n" +
+	"S\n" +
+	"\fX-Demo-Actor\x12?UUID оператора, выполняющего запрос.\x18\x01(\x01\x82\xd3\xe4\x93\x02.:\x01*\")/v1/check-in/bookings/{booking_id}/cancelB>Z<api-gateway/internal/pkg/pb/api-gateway/checkin/v1;checkinV1b\x06proto3"
 
 var (
 	file_api_gateway_checkin_v1_checkin_proto_rawDescOnce sync.Once

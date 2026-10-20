@@ -7,6 +7,7 @@
 package bookingV1
 
 import (
+	_ "github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2/options"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -492,7 +493,7 @@ var File_api_gateway_booking_v1_booking_proto protoreflect.FileDescriptor
 
 const file_api_gateway_booking_v1_booking_proto_rawDesc = "" +
 	"\n" +
-	"$api-gateway/booking/v1/booking.proto\x12\x16api_gateway.booking.v1\x1a\x1cgoogle/api/annotations.proto\"\x8e\x01\n" +
+	"$api-gateway/booking/v1/booking.proto\x12\x16api_gateway.booking.v1\x1a\x1cgoogle/api/annotations.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\x8e\x01\n" +
 	"\x14CreateBookingRequest\x12\x17\n" +
 	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x12\x1b\n" +
 	"\tstarts_at\x18\x02 \x01(\tR\bstartsAt\x12\x17\n" +
@@ -528,12 +529,24 @@ const file_api_gateway_booking_v1_booking_proto_rawDesc = "" +
 	"\tstarts_at\x18\x02 \x01(\tR\bstartsAt\x12\x17\n" +
 	"\aends_at\x18\x03 \x01(\tR\x06endsAt\"6\n" +
 	"\x19CheckAvailabilityResponse\x12\x19\n" +
-	"\broom_ids\x18\x01 \x03(\tR\aroomIds2\xbf\x03\n" +
-	"\x0eBookingService\x12\x85\x01\n" +
-	"\rCreateBooking\x12,.api_gateway.booking.v1.CreateBookingRequest\x1a-.api_gateway.booking.v1.CreateBookingResponse\"\x17\x82\xd3\xe4\x93\x02\x11:\x01*\"\f/v1/bookings\x12\x86\x01\n" +
+	"\broom_ids\x18\x01 \x03(\tR\aroomIds2\xf0\b\n" +
+	"\x0eBookingService\x12\xaa\x02\n" +
+	"\rCreateBooking\x12,.api_gateway.booking.v1.CreateBookingRequest\x1a-.api_gateway.booking.v1.CreateBookingResponse\"\xbb\x01\x92A\xa0\x01r\x9d\x01\n" +
+	"<\n" +
+	"\vX-Demo-Role\x12)Роль пользователя: GUEST.\x18\x01(\x01\n" +
+	"]\n" +
+	"\fX-Demo-Actor\x12IUUID гостя, на которого оформляется бронь.\x18\x01(\x01\x82\xd3\xe4\x93\x02\x11:\x01*\"\f/v1/bookings\x12\x8c\x03\n" +
 	"\n" +
-	"GetBooking\x12).api_gateway.booking.v1.GetBookingRequest\x1a*.api_gateway.booking.v1.GetBookingResponse\"!\x82\xd3\xe4\x93\x02\x1b\x12\x19/v1/bookings/{booking_id}\x12\x9b\x01\n" +
-	"\x11CheckAvailability\x120.api_gateway.booking.v1.CheckAvailabilityRequest\x1a1.api_gateway.booking.v1.CheckAvailabilityResponse\"!\x82\xd3\xe4\x93\x02\x1b:\x01*\"\x16/v1/rooms/availabilityB>Z<api-gateway/internal/pkg/pb/api-gateway/booking/v1;bookingV1b\x06proto3"
+	"GetBooking\x12).api_gateway.booking.v1.GetBookingRequest\x1a*.api_gateway.booking.v1.GetBookingResponse\"\xa6\x02\x92A\x81\x02r\xfe\x01\n" +
+	"W\n" +
+	"\vX-Demo-Role\x12DРоль пользователя: GUEST, RECEPTION или OPERATOR.\x18\x01(\x01\n" +
+	"\xa2\x01\n" +
+	"\fX-Demo-Actor\x12\x8f\x01UUID вызывающего пользователя. Обязателен для GUEST; для RECEPTION и OPERATOR необязателен.\x18\x01\x82\xd3\xe4\x93\x02\x1b\x12\x19/v1/bookings/{booking_id}\x12\xa1\x03\n" +
+	"\x11CheckAvailability\x120.api_gateway.booking.v1.CheckAvailabilityRequest\x1a1.api_gateway.booking.v1.CheckAvailabilityResponse\"\xa6\x02\x92A\x81\x02r\xfe\x01\n" +
+	"W\n" +
+	"\vX-Demo-Role\x12DРоль пользователя: GUEST, RECEPTION или OPERATOR.\x18\x01(\x01\n" +
+	"\xa2\x01\n" +
+	"\fX-Demo-Actor\x12\x8f\x01UUID вызывающего пользователя. Обязателен для GUEST; для RECEPTION и OPERATOR необязателен.\x18\x01\x82\xd3\xe4\x93\x02\x1b:\x01*\"\x16/v1/rooms/availabilityB>Z<api-gateway/internal/pkg/pb/api-gateway/booking/v1;bookingV1b\x06proto3"
 
 var (
 	file_api_gateway_booking_v1_booking_proto_rawDescOnce sync.Once

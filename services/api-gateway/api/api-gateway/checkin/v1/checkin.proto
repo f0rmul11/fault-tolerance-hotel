@@ -3,6 +3,7 @@ syntax = "proto3";
 package api_gateway.checkin.v1;
 
 import "google/api/annotations.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
 
 option go_package = "api-gateway/internal/pkg/pb/api-gateway/checkin/v1;checkinV1";
 
@@ -11,6 +12,23 @@ service CheckinService {
   // Возвращает EXPECTED/ARRIVING с началом проживания в заданном диапазоне.
   rpc ListArrivals(ListArrivalsRequest) returns (ListArrivalsResponse) {
     option (google.api.http) = {get: "/v1/check-in/bookings"};
+
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      parameters: {
+        headers: {
+          name: "X-Demo-Role"
+          description: "Роль пользователя: RECEPTION или OPERATOR."
+          type: STRING
+          required: true
+        }
+        headers: {
+          name: "X-Demo-Actor"
+          description: "UUID оператора, выполняющего запрос."
+          type: STRING
+          required: true
+        }
+      }
+    };
   }
 
   // Запрашивает активацию брони. Итог подтверждается ответным событием Booking.
@@ -19,6 +37,23 @@ service CheckinService {
       post: "/v1/check-in/bookings/{booking_id}/activate"
       body: "*"
     };
+
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      parameters: {
+        headers: {
+          name: "X-Demo-Role"
+          description: "Роль пользователя: RECEPTION или OPERATOR."
+          type: STRING
+          required: true
+        }
+        headers: {
+          name: "X-Demo-Actor"
+          description: "UUID оператора, выполняющего запрос."
+          type: STRING
+          required: true
+        }
+      }
+    };
   }
 
   // Запрашивает отмену брони. Итог подтверждается ответным событием Booking.
@@ -26,6 +61,23 @@ service CheckinService {
     option (google.api.http) = {
       post: "/v1/check-in/bookings/{booking_id}/cancel"
       body: "*"
+    };
+
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      parameters: {
+        headers: {
+          name: "X-Demo-Role"
+          description: "Роль пользователя: RECEPTION или OPERATOR."
+          type: STRING
+          required: true
+        }
+        headers: {
+          name: "X-Demo-Actor"
+          description: "UUID оператора, выполняющего запрос."
+          type: STRING
+          required: true
+        }
+      }
     };
   }
 }

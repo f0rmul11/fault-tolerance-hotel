@@ -233,6 +233,49 @@ func TestAppTransportsAndShutdown(t *testing.T) {
 		if spec.Paths["/v1/echo"]["get"] == nil || spec.Paths["/v1/echo"]["post"] == nil {
 			t.Fatal("OpenAPI must describe both Echo bindings")
 		}
+
+		for _, route := range []struct {
+			path          string
+			method        string
+			actorRequired bool
+		}{
+			{path: "/v1/bookings", method: "post", actorRequired: true},
+			{path: "/v1/bookings/{bookingId}", method: "get"},
+			{path: "/v1/rooms/availability", method: "post"},
+			{path: "/v1/check-in/bookings", method: "get", actorRequired: true},
+			{path: "/v1/check-in/bookings/{bookingId}/activate", method: "post", actorRequired: true},
+			{path: "/v1/check-in/bookings/{bookingId}/cancel", method: "post", actorRequired: true},
+		} {
+			t.Run(route.method+" "+route.path, func(t *testing.T) {
+				var operation struct {
+					Parameters []struct {
+						Name        string `json:"name"`
+						In          string `json:"in"`
+						Type        string `json:"type"`
+						Required    bool   `json:"required"`
+						Description string `json:"description"`
+					} `json:"parameters"`
+				}
+				if err := json.Unmarshal(spec.Paths[route.path][route.method], &operation); err != nil {
+					t.Fatal(err)
+				}
+				headers := make(map[string]bool)
+				for _, parameter := range operation.Parameters {
+					if parameter.In != "header" {
+						continue
+					}
+					if parameter.Type != "string" || parameter.Description == "" {
+						t.Fatalf("header must have a type and description: %+v", parameter)
+					}
+					headers[parameter.Name] = parameter.Required
+				}
+				actorRequired, hasActor := headers["X-Demo-Actor"]
+				if !headers["X-Demo-Role"] || !hasActor || actorRequired != route.actorRequired {
+					t.Fatalf("Swagger headers do not match access policy: %+v", headers)
+				}
+			})
+		}
+
 		response, err = client.Get(base + "/docs/")
 		if err != nil {
 			t.Fatal(err)

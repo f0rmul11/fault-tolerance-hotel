@@ -30,3 +30,19 @@ go build ./...
 ```
 
 Публичный каталог: `GET /v1/hotels`, `GET /v1/hotels/{hotel_id}`, `GET /v1/hotels/{hotel_id}/rooms`, `GET /v1/rooms/{room_id}`. Эти маршруты доступны без demo-роли, gateway напрямую проксирует Hotels, без вызовов Review.
+
+
+### Заголовки в Swagger
+
+В `/docs/` открой нужную операцию и нажми `Try it out`. Заголовки описаны
+в локальных proto через `openapiv2_operation.parameters.headers` и генерируются Buf:
+
+- Создание брони: `X-Demo-Role: GUEST`, `X-Demo-Actor: <UUID гостя>`.
+- Чтение брони и проверка доступности: `GUEST`, `RECEPTION` или `OPERATOR`;
+  actor обязателен для `GUEST`, для остальных ролей необязателен.
+- Список прибытий, активация и отмена: `RECEPTION` или `OPERATOR`, actor — обязательный UUID оператора.
+- Каталог Hotels и Echo публичные, эти заголовки не требуют.
+
+UUID `idempotencyKey` передаётся в теле запроса. Заголовок `X-Request-Id`
+не обязателен: gateway создаёт его сам. Заголовки Swagger не добавляются в message
+и не изменяют правила авторизации. Generated Swagger вручную не редактируется.
