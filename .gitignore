@@ -2,3 +2,8 @@
 .local/
 **/bin/
 **/coverage.out
+
+# Local development instructions
+/.agents/
+/AGENTS.md
+/docs/agent-context.md

@@ -29,6 +29,4 @@ go vet ./...
 go build ./...
 ```
 
-Правила для разработки шлюза: [Clay, proxy, auth, metadata и Buf](../../.agents/skills/hotelflow-contracts-events/references/api-gateway.md).
-
 Публичный каталог: `GET /v1/hotels`, `GET /v1/hotels/{hotel_id}`, `GET /v1/hotels/{hotel_id}/rooms`, `GET /v1/rooms/{room_id}`. Эти маршруты доступны без demo-роли, gateway напрямую проксирует Hotels, без вызовов Review.

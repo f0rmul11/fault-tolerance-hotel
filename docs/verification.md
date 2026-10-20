@@ -1,6 +1,6 @@
 # Проверки актуального стенда
 
-Требования — [specification.md](specification.md); контекст разработки — [agent-context.md](agent-context.md).
+Требования — [specification.md](specification.md).
 
 ## Воспроизводимые команды
 
