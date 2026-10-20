@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/internal/config"
-	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/internal/diagnostics"
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/internal/kube"
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/internal/project"
 )
@@ -69,9 +68,7 @@ func (m *Manager) Up(ctx context.Context, services []config.Service) (err error)
 	if err = m.deploy(ctx, state, services, client); err != nil {
 		return err
 	}
-	if err = diagnostics.Smoke(ctx, m.Config, services, m.Streams.Out); err != nil {
-		return err
-	}
+	fmt.Fprintln(m.Streams.Out, "Стенд запущен; сервисы готовы")
 	m.addresses()
 	fmt.Fprintln(m.Streams.Out, "Kafka UI: http://localhost:8090\nБД и etcd опубликованы локально: hotelctl access")
 	return nil

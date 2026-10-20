@@ -27,7 +27,7 @@ func NewCmdUp(f util.Factory, streams iostreams.IOStreams) *cobra.Command {
 	o := NewUpOptions(streams)
 	command := &cobra.Command{
 		Use:     "up [SERVICE...]",
-		Short:   "Start one k3s node, build, deploy and check the stand",
+		Short:   "Start one k3s node, build, deploy and wait for readiness",
 		Example: "  hotelctl up\n  hotelctl up api-gateway",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := o.Complete(f, args); err != nil {
