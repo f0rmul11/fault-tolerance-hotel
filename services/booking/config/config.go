@@ -34,7 +34,7 @@ type Config struct {
 	Postgres      Postgres          `yaml:"postgres"`
 	Outbox        Outbox            `yaml:"outbox"`
 	KafkaBrokers  []string          `yaml:"kafka_brokers" env:"KAFKA_BROKERS" env-separator:","`
-	Targets       map[string]string `yaml:"service"`
+	Targets       map[string]string `yaml:"service" env:"SERVICE_TARGETS"`
 	GrpcServer    GrpcServer        `yaml:"grpc_server"`
 	HttpServer    HttpServer        `yaml:"http_server"`
 	Graceful      Graceful          `yaml:"graceful"`

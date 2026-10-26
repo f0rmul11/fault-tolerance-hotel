@@ -18,14 +18,10 @@ func TestObservabilitySelectionAndReservedPorts(t *testing.T) {
 	originalRuntime := c.Runtime
 	c.Observability = Observability{
 		Enabled: true,
-		Stage:   "traces",
 	}
-	components, err := c.SelectComponents([]string{"otel-collector", "jaeger"})
-	if err != nil || len(components) != 2 {
-		t.Fatalf("tracing components: %+v, %v", components, err)
-	}
-	if _, err := c.SelectComponents([]string{"grafana"}); err == nil {
-		t.Fatal("reserved Grafana address must not become an active deployment")
+	components, err := c.SelectComponents([]string{"otel-collector", "jaeger", "loki", "grafana", "prometheus"})
+	if err != nil || len(components) != 5 {
+		t.Fatalf("observability components: %+v, %v", components, err)
 	}
 	for _, host := range []int{16686, 3000} {
 		if !slices.ContainsFunc(c.PortBindings(), func(port PortBinding) bool {
@@ -43,7 +39,7 @@ func TestObservabilitySelectionAndReservedPorts(t *testing.T) {
 	}
 }
 
-func TestObservabilityRejectsUnsupportedStagesAndPortCollisions(t *testing.T) {
+func TestObservabilityRejectsPortCollisions(t *testing.T) {
 	root, err := filepath.Abs("../../..")
 	if err != nil {
 		t.Fatal(err)
@@ -52,12 +48,6 @@ func TestObservabilityRejectsUnsupportedStagesAndPortCollisions(t *testing.T) {
 		name   string
 		change func(*Config)
 	}{
-		{
-			name: "future stage",
-			change: func(c *Config) {
-				c.Observability.Stage = "unknown"
-			},
-		},
 		{
 			name: "host port",
 			change: func(c *Config) {

@@ -49,8 +49,7 @@ type Service struct {
 }
 
 type Observability struct {
-	Enabled bool   `json:"enabled"`
-	Stage   string `json:"stage"`
+	Enabled bool `json:"enabled"`
 }
 
 type Config struct {
@@ -126,12 +125,6 @@ func (c Config) Validate() error {
 	}
 	if c.Runtime.BindAddress != "127.0.0.1" && c.Runtime.BindAddress != "0.0.0.0" {
 		return fmt.Errorf("runtime.bindAddress must be 127.0.0.1 or 0.0.0.0")
-	}
-	if c.Observability.Enabled && c.Observability.Stage != "traces" && c.Observability.Stage != "logs" && c.Observability.Stage != "metrics" {
-		return fmt.Errorf("observability.stage: поддерживаются traces, logs и metrics")
-	}
-	if !c.Observability.Enabled && c.Observability.Stage != "" && c.Observability.Stage != "traces" && c.Observability.Stage != "logs" && c.Observability.Stage != "metrics" {
-		return fmt.Errorf("observability.stage: неизвестный этап %q", c.Observability.Stage)
 	}
 	used := map[int]bool{}
 	for _, p := range c.Runtime.Ports.All() {
@@ -311,9 +304,6 @@ func (s *Service) UnmarshalJSON(data []byte) error {
 }
 
 func (c *Config) applyDefaults() {
-	if c.Observability.Enabled && c.Observability.Stage == "" {
-		c.Observability.Stage = "traces"
-	}
 	if c.APIVersion == "" {
 		c.APIVersion = "hotelflow/v1alpha1"
 	}

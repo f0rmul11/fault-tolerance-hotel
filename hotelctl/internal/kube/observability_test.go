@@ -3,7 +3,6 @@ package kube
 import (
 	"context"
 	"path/filepath"
-	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -12,13 +11,11 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
-	"sigs.k8s.io/yaml"
 )
 
-func TestTracingRenderHasOneCollectorAndNoFutureBackends(t *testing.T) {
+func TestObservabilityRenderHasOneCollectorAndAllBackends(t *testing.T) {
 	root, err := filepath.Abs("../../..")
 	if err != nil {
 		t.Fatal(err)
@@ -27,30 +24,21 @@ func TestTracingRenderHasOneCollectorAndNoFutureBackends(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c.Observability.Stage = "traces"
 	objects, err := RenderObservability(c)
 	if err != nil {
 		t.Fatal(err)
 	}
 	deployments := map[string]bool{}
 	configMaps := map[string]bool{}
-	var reservedGrafana bool
+	pvcs := map[string]bool{}
+	uiPorts := map[string]int32{}
+	collectorConfigs := 0
 	for _, object := range objects {
 		switch object.GetKind() {
 		case "ConfigMap":
 			configMaps[object.GetName()] = true
-			data, _, err := unstructured.NestedString(object.Object, "data", "config.yaml")
-			if err != nil {
-				t.Fatal(err)
-			}
-			var cfg map[string]any
-			if err := yaml.UnmarshalStrict([]byte(data), &cfg); err != nil {
-				t.Fatal(err)
-			}
-			service := cfg["service"].(map[string]any)
-			pipelines := service["pipelines"].(map[string]any)
-			if len(pipelines) != 1 || pipelines["traces"] == nil {
-				t.Fatal("tracing config includes a future signal")
+			if strings.HasPrefix(object.GetName(), "otel-collector-config-") {
+				collectorConfigs++
 			}
 		case "Deployment":
 			deployments[object.GetName()] = true
@@ -59,35 +47,52 @@ func TestTracingRenderHasOneCollectorAndNoFutureBackends(t *testing.T) {
 				t.Fatal(err)
 			}
 			if deployment.Spec.Replicas == nil || *deployment.Spec.Replicas != 1 || deployment.Spec.Strategy.Type != appsv1.RecreateDeploymentStrategyType {
-				t.Fatal("tracing infrastructure must remain single-instance during rollout")
+				t.Fatal("observability infrastructure must remain single-instance during rollout")
 			}
 		case "PersistentVolumeClaim":
-			t.Fatal("Jaeger memory storage must not acquire a PVC")
+			pvcs[object.GetName()] = true
 		case "Service":
-			if object.GetName() == "grafana" {
-				var service corev1.Service
-				if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &service); err != nil {
-					t.Fatal(err)
-				}
-				reservedGrafana = service.Spec.Ports[0].NodePort == 30300
+			var service corev1.Service
+			if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &service); err != nil {
+				t.Fatal(err)
+			}
+			if service.Spec.Type == corev1.ServiceTypeNodePort {
+				uiPorts[service.Name] = service.Spec.Ports[0].NodePort
 			}
 		}
 	}
-	if len(deployments) != 2 || !deployments["otel-collector"] || !deployments["jaeger"] || !reservedGrafana {
-		t.Fatalf("wrong infrastructure: deployments=%v Grafana port=%v", deployments, reservedGrafana)
+	if len(deployments) != 5 || collectorConfigs != 1 {
+		t.Fatalf("wrong infrastructure: deployments=%v collector configs=%d", deployments, collectorConfigs)
+	}
+	for _, name := range []string{"otel-collector", "jaeger", "loki", "grafana", "prometheus"} {
+		if !deployments[name] {
+			t.Fatalf("missing deployment %s", name)
+		}
+	}
+	if len(pvcs) != 3 || !pvcs["loki-data"] || !pvcs["grafana-data"] || !pvcs["prometheus-data"] {
+		t.Fatalf("unexpected PVCs (Jaeger must use memory): %v", pvcs)
+	}
+	if len(uiPorts) != 2 || uiPorts["grafana"] != 30300 || uiPorts["jaeger-ui"] != 30686 {
+		t.Fatalf("unexpected UI ports: %v", uiPorts)
 	}
 	for _, object := range objects {
 		if object.GetKind() != "Deployment" {
 			continue
 		}
-		volumes, _, _ := unstructured.NestedSlice(object.Object, "spec", "template", "spec", "volumes")
-		for _, raw := range volumes {
-			volume := raw.(map[string]any)
-			cm := volume["configMap"].(map[string]any)
-			if !configMaps[cm["name"].(string)] {
-				t.Fatalf("unresolved generated configMap: %v", cm)
+		var deployment appsv1.Deployment
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &deployment); err != nil {
+			t.Fatal(err)
+		}
+		for _, volume := range deployment.Spec.Template.Spec.Volumes {
+			if volume.ConfigMap != nil && !configMaps[volume.ConfigMap.Name] {
+				t.Fatalf("unresolved generated configMap: %s", volume.ConfigMap.Name)
 			}
 		}
+	}
+	c.Observability.Enabled = false
+	objects, err = RenderObservability(c)
+	if err != nil || len(objects) != 0 {
+		t.Fatalf("disabled observability rendered resources: %v, %v", objects, err)
 	}
 }
 
@@ -172,7 +177,8 @@ func TestRenderServiceConfiguresTelemetryEnablement(t *testing.T) {
 				}
 				for name, want := range map[string]string{
 					"TELEMETRY_ENABLED":           strconv.FormatBool(enabled),
-					"TELEMETRY_LOGS_ENABLED":      strconv.FormatBool(enabled && (c.Observability.Stage == "logs" || c.Observability.Stage == "metrics")),
+					"TELEMETRY_METRICS_ENABLED":   strconv.FormatBool(enabled),
+					"TELEMETRY_LOGS_ENABLED":      strconv.FormatBool(enabled),
 					"OTEL_EXPORTER_OTLP_ENDPOINT": "otel-collector.hotelflow.svc.cluster.local:4317",
 					"OTEL_EXPORTER_OTLP_INSECURE": "true",
 				} {
@@ -186,88 +192,6 @@ func TestRenderServiceConfiguresTelemetryEnablement(t *testing.T) {
 					}
 				}
 			})
-		}
-	}
-}
-
-func TestLogsStagePreservesTracingAndUIBindings(t *testing.T) {
-	root, err := filepath.Abs("../../..")
-	if err != nil {
-		t.Fatal(err)
-	}
-	c, err := config.Load(root, "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	c.Observability.Stage = "traces"
-	before, err := RenderObservability(c)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var jaegerBefore map[string]any
-	for _, object := range before {
-		if object.GetKind() == "Deployment" && object.GetName() == "jaeger" {
-			jaegerBefore, _, _ = unstructured.NestedMap(object.Object, "spec", "template")
-		}
-	}
-	portsBefore := c.PortBindings()
-	c.Observability.Stage = "logs"
-	after, err := RenderObservability(c)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(portsBefore, c.PortBindings()) {
-		t.Fatal("logs stage would change runtime port bindings")
-	}
-	deployments := map[string]bool{}
-	pvcs := map[string]bool{}
-	for _, object := range after {
-		if object.GetKind() == "PersistentVolumeClaim" {
-			pvcs[object.GetName()] = true
-		}
-		if object.GetKind() == "Deployment" {
-			deployments[object.GetName()] = true
-			if object.GetName() == "jaeger" {
-				template, _, _ := unstructured.NestedMap(object.Object, "spec", "template")
-				if !reflect.DeepEqual(jaegerBefore, template) {
-					t.Fatal("adding logs would restart memory-only Jaeger")
-				}
-			}
-		}
-		if object.GetKind() == "ConfigMap" && strings.HasPrefix(object.GetName(), "otel-collector-config-") {
-			data, _, _ := unstructured.NestedString(object.Object, "data", "config.yaml")
-			var cfg map[string]any
-			if err := yaml.UnmarshalStrict([]byte(data), &cfg); err != nil {
-				t.Fatal(err)
-			}
-			pipelines := cfg["service"].(map[string]any)["pipelines"].(map[string]any)
-			if len(pipelines) != 2 || pipelines["traces"] == nil || pipelines["logs"] == nil {
-				t.Fatal("logs stage must retain traces and exclude metrics")
-			}
-		}
-	}
-	if len(deployments) != 4 || !deployments["loki"] || !deployments["grafana"] || len(pvcs) != 2 || !pvcs["loki-data"] || !pvcs["grafana-data"] {
-		t.Fatalf("unexpected resources: deployments=%v PVCs=%v", deployments, pvcs)
-	}
-	for _, stage := range []string{"traces", "logs"} {
-		c.Observability.Stage = stage
-		objects, err := RenderService(c, c.Services[0], "hotelflow/test:config")
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, object := range objects {
-			if object.GetKind() != "Deployment" {
-				continue
-			}
-			var deployment appsv1.Deployment
-			if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &deployment); err != nil {
-				t.Fatal(err)
-			}
-			for _, env := range deployment.Spec.Template.Spec.Containers[0].Env {
-				if env.Name == "TELEMETRY_LOGS_ENABLED" && env.Value != strconv.FormatBool(stage == "logs") {
-					t.Fatalf("wrong logs switch for %s", stage)
-				}
-			}
 		}
 	}
 }

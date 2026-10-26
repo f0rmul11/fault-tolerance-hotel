@@ -25,11 +25,7 @@ func NewCmdAccess(f util.Factory, streams iostreams.IOStreams) *cobra.Command {
 			fmt.Fprintf(streams.Out, "HTTP: http://localhost:%d\nSwagger: http://localhost:%d/docs/\nKafka UI: http://localhost:8090\netcd: http://127.0.0.1:2379\n\n", c.Runtime.Ports.HTTP, c.Runtime.Ports.HTTP)
 			if c.Observability.Enabled {
 				fmt.Fprintln(streams.Out, "Jaeger: http://localhost:16686")
-				if c.Observability.Stage == "logs" || c.Observability.Stage == "metrics" {
-					fmt.Fprintln(streams.Out, "Grafana: http://localhost:3000 (логин admin; пароль в Secret hotelflow/grafana-admin)")
-				} else {
-					fmt.Fprintln(streams.Out, "Grafana: http://localhost:3000 (порт зарезервирован, UI появится на этапе логов)")
-				}
+				fmt.Fprintln(streams.Out, "Grafana: http://localhost:3000 (логин admin; пароль в Secret hotelflow/grafana-admin)")
 			}
 			w := tabwriter.NewWriter(streams.Out, 0, 4, 2, ' ', 0)
 			fmt.Fprintln(w, "HOST\tPORT\tDATABASE\tUSER")

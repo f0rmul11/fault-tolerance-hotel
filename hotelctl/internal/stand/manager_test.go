@@ -150,7 +150,6 @@ func TestEnablingTracingDoesNotInvalidateExistingRuntimeState(t *testing.T) {
 	owner := state.Owner
 	manager.Config.Observability = config.Observability{
 		Enabled: true,
-		Stage:   "traces",
 	}
 	if err := manager.compatible(state); err != nil {
 		t.Fatalf("existing stand must not require destroy to enable tracing: %v", err)
@@ -177,7 +176,6 @@ func TestFailedPortUpdatePreservesSavedBindingsForRetry(t *testing.T) {
 	manager.Config.Root = root
 	manager.Config.Observability = config.Observability{
 		Enabled: true,
-		Stage:   "traces",
 	}
 	if err := manager.Up(context.Background(), nil); !errors.Is(err, failure) {
 		t.Fatalf("unexpected failed update: %v", err)

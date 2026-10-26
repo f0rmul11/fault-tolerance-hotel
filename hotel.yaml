@@ -3,7 +3,6 @@ runtime:
 
 observability:
   enabled: true
-  stage: metrics
 
 services:
   - api-gateway

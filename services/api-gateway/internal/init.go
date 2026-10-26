@@ -38,6 +38,7 @@ import (
 	externalCheckinV1 "api-gateway/internal/pkg/pb/external/check-in/checkin/v1"
 	externalHotelsV1 "api-gateway/internal/pkg/pb/external/hotels/hotels/v1"
 	"api-gateway/internal/pkg/requestid"
+	"api-gateway/internal/pkg/requesttimeout"
 	"api-gateway/internal/pkg/rtconfig/global"
 	"api-gateway/internal/pkg/telemetry"
 	"api-gateway/internal/pkg/telemetry/traces"
@@ -63,17 +64,22 @@ func (a *App) initMainServer(ctx context.Context) error {
 	a.mainServer = server.NewServer(
 		config.Instance().GrpcServer.Port,
 		server.WithHTTPPort(config.Instance().HttpServer.Port),
-		server.WithHTTPMiddlewares(traces.HTTP, func(next http.Handler) http.Handler {
-			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				// HTTP Serve starts after both Clay servers have been initialized.
-				readyOnce.Do(func() {
-					close(serverReady)
+		server.WithHTTPMiddlewares(
+			requesttimeout.Middleware,
+			traces.HTTP,
+			func(next http.Handler) http.Handler {
+				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					// HTTP Serve starts after both Clay servers have been initialized.
+					readyOnce.Do(func() {
+						close(serverReady)
+					})
+					next.ServeHTTP(w, r)
 				})
-				next.ServeHTTP(w, r)
-			})
-		}),
+			},
+		),
 		server.WithRuntimeServeMuxOpts(httptransport.Options()...),
 		server.WithGRPCUnaryMiddlewares(
+			requesttimeout.Interceptor(),
 			requestid.Interceptor(),
 			auth.Interceptor(),
 		),

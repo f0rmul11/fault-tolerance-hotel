@@ -31,7 +31,7 @@ type Config struct {
 	Telemetry   telemetry.Config  `yaml:"telemetry"`
 	Postgres    Postgres          `yaml:"postgres"`
 	PostgresDSN string            `yaml:"postgres_dsn" env:"POSTGRES_DSN"`
-	Targets     map[string]string `yaml:"service"`
+	Targets     map[string]string `yaml:"service" env:"SERVICE_TARGETS"`
 	GrpcServer  GrpcServer        `yaml:"grpc_server"`
 	HttpServer  HttpServer        `yaml:"http_server"`
 	Graceful    Graceful          `yaml:"graceful"`

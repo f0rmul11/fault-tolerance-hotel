@@ -9,6 +9,7 @@ import (
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/pkg/cmd/deploy"
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/pkg/cmd/destroy"
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/pkg/cmd/doctor"
+	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/pkg/cmd/fault"
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/pkg/cmd/kubectl"
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/pkg/cmd/logs"
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/pkg/cmd/reset"
@@ -52,6 +53,7 @@ func NewHotelctlCommand(f util.Factory, streams iostreams.IOStreams, version str
 	command.AddCommand(access.NewCmdHosts(f, streams))
 	command.AddCommand(destroy.NewCmdDestroy(f, streams))
 	command.AddCommand(smoke.NewCmdSmoke(f, streams))
+	command.AddCommand(fault.NewCmdFault(f, streams))
 	command.AddCommand(reset.NewCmdReset(f, streams))
 	command.AddCommand(doctor.NewCmdDoctor(f, streams))
 	command.AddCommand(status.NewCmdStatus(f, streams))

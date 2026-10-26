@@ -10,17 +10,14 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-// RenderObservability renders the selected observability stage.
+// RenderObservability renders the complete observability stack.
 func RenderObservability(c config.Config) ([]*unstructured.Unstructured, error) {
 	if !c.Observability.Enabled {
 		return nil, nil
 	}
-	if c.Observability.Stage != "traces" && c.Observability.Stage != "logs" && c.Observability.Stage != "metrics" {
-		return nil, fmt.Errorf("observability.stage: поддерживаются traces, logs и metrics")
-	}
 	return Render(c.Root, config.Service{
 		Name:      "observability",
-		Manifests: "deploy/observability/" + c.Observability.Stage,
+		Manifests: "deploy/observability",
 	}, "")
 }
 
@@ -30,13 +27,18 @@ func RenderService(c config.Config, service config.Service, image string) ([]*un
 	if err != nil {
 		return nil, err
 	}
+	for _, object := range objects {
+		if err := configureEnvoyTargets(object, service); err != nil {
+			return nil, err
+		}
+	}
 	settings := []struct {
 		name  string
 		value string
 	}{
 		{name: "TELEMETRY_ENABLED", value: strconv.FormatBool(c.Observability.Enabled)},
-		{name: "TELEMETRY_METRICS_ENABLED", value: strconv.FormatBool(c.Observability.Enabled && c.Observability.Stage == "metrics")},
-		{name: "TELEMETRY_LOGS_ENABLED", value: strconv.FormatBool(c.Observability.Enabled && (c.Observability.Stage == "logs" || c.Observability.Stage == "metrics"))},
+		{name: "TELEMETRY_METRICS_ENABLED", value: strconv.FormatBool(c.Observability.Enabled)},
+		{name: "TELEMETRY_LOGS_ENABLED", value: strconv.FormatBool(c.Observability.Enabled)},
 	}
 	for _, object := range objects {
 		if object.GetKind() != "Deployment" || object.GetName() != service.Deployment {

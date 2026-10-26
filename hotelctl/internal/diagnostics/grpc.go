@@ -15,6 +15,11 @@ import (
 	"google.golang.org/protobuf/types/dynamicpb"
 )
 
+// CheckEcho probes a concrete transport route without mutating business data.
+func CheckEcho(ctx context.Context, address, method, serviceName string) error {
+	return echoRPC(ctx, address, method, serviceName)
+}
+
 // Resolve the schema from the server instead of importing service internals or
 // relying on coincidentally compatible protobuf wire layouts.
 func echoRPC(ctx context.Context, address, method, serviceName string) error {

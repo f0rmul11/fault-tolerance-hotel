@@ -223,8 +223,8 @@ ETCD_BIN=/absolute/path/to/etcd go test -race -tags=integration ./pkg/cmd/config
 
 ## Наблюдаемость
 
-`observability.enabled: true` и `stage: metrics` в `hotel.yaml` добавляют единый Collector, Jaeger memory, Loki, Grafana и Prometheus. Этап `traces` включает только экспорт трейсов.
-`up/deploy` применяют инфраструктуру; `components/status/start/stop/restart/logs` знают `otel-collector`, `jaeger`, а на этапах `logs`/`metrics` — `loki` и `grafana`, на `metrics` — `prometheus`.
+`observability.enabled: true` в `hotel.yaml` включает весь стек: единый Collector, Jaeger memory, Loki, Grafana и Prometheus. Один `deploy/observability/collector.yaml` содержит pipelines для трейсов, логов и метрик.
+`up/deploy` применяют единый набор манифестов `deploy/observability`; `components/status/start/stop/restart/logs` знают все пять компонентов: `otel-collector`, `jaeger`, `loki`, `grafana`, `prometheus`.
 `access` показывает постоянные адреса Jaeger `http://localhost:16686` и Grafana `http://localhost:3000`. Пароль Grafana создается один раз в Secret `hotelflow/grafana-admin`.
 Оба UI-порта публикуются на loopback. При первом изменении портов runtime пересоздает k3s-контейнер с прежним томом;
 host/NodePort конфликты проверяются до остановки работающего кластера. `destroy/reset` для этого не нужны.

@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: envoy
+  labels:
+    app.kubernetes.io/name: envoy
+    app.kubernetes.io/part-of: hotelflow
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: envoy
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: envoy
+        app.kubernetes.io/part-of: hotelflow
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 5
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: envoy
+          image: envoyproxy/envoy:v1.37.1@sha256:29496a88fba9c4c9cdef4afe8fec70f536c5ba111b1c2bddbc5436b091ceca33
+          args: ["-c", "/etc/envoy/envoy.json", "--concurrency", "2", "--log-level", "warn"]
+          imagePullPolicy: IfNotPresent
+          ports:
+            - {name: grpc, containerPort: 10001}
+          readinessProbe:
+            tcpSocket: {port: grpc}
+            periodSeconds: 2
+          livenessProbe:
+            tcpSocket: {port: grpc}
+            periodSeconds: 5
+          startupProbe:
+            tcpSocket: {port: 10001}
+            periodSeconds: 1
+            failureThreshold: 30
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {cpu: "1", memory: 256Mi}
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - {name: config, mountPath: /etc/envoy, readOnly: true}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: config
+          configMap: {name: envoy-config}
+        - name: tmp
+          emptyDir: {}

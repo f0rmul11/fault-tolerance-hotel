@@ -87,6 +87,11 @@ func (c Config) Components() []Service {
 		})
 	}
 	result = append(result, c.ObservabilityComponents()...)
+	result = append(result, Service{
+		Name:       "envoy",
+		Deployment: "envoy",
+		Namespace:  "hotelflow",
+	})
 	return append(result, c.Services...)
 }
 
@@ -114,40 +119,21 @@ func (c Config) SelectComponents(names []string) ([]Service, error) {
 	return result, nil
 }
 
-// ObservabilityComponents returns only the backends enabled for this stage.
+// ObservabilityComponents returns the complete observability stack.
 func (c Config) ObservabilityComponents() []Service {
 	if !c.Observability.Enabled {
 		return nil
 	}
-	result := []Service{
-		{
-			Name:       "otel-collector",
-			Deployment: "otel-collector",
-			Namespace:  "hotelflow",
-		},
-		{
-			Name:       "jaeger",
-			Deployment: "jaeger",
-			Namespace:  "hotelflow",
-		},
+	return []Service{
+		{Name: "otel-collector", Deployment: "otel-collector", Namespace: "hotelflow"},
+		{Name: "jaeger", Deployment: "jaeger", Namespace: "hotelflow"},
+		{Name: "loki", Deployment: "loki", Namespace: "hotelflow"},
+		{Name: "grafana", Deployment: "grafana", Namespace: "hotelflow"},
+		{Name: "prometheus", Deployment: "prometheus", Namespace: "hotelflow"},
 	}
-	if c.Observability.Stage == "logs" || c.Observability.Stage == "metrics" {
-		result = append(result,
-			Service{Name: "loki", Deployment: "loki", Namespace: "hotelflow"},
-			Service{Name: "grafana", Deployment: "grafana", Namespace: "hotelflow"},
-		)
-	}
-	if c.Observability.Stage == "metrics" {
-		result = append(result, Service{
-			Name:       "prometheus",
-			Deployment: "prometheus",
-			Namespace:  "hotelflow",
-		})
-	}
-	return result
 }
 
-// ObservabilityPortBindings reserves both UI addresses on the first tracing install.
+// ObservabilityPortBindings publishes the stable Jaeger and Grafana UI addresses.
 func (c Config) ObservabilityPortBindings() []PortBinding {
 	if !c.Observability.Enabled {
 		return nil

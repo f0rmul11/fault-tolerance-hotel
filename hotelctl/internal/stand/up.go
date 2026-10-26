@@ -98,11 +98,7 @@ func (m *Manager) Up(ctx context.Context, services []config.Service) (err error)
 func (m *Manager) addresses() {
 	if m.Config.Observability.Enabled {
 		fmt.Fprintln(m.Streams.Out, "Jaeger: http://localhost:16686")
-		if m.Config.Observability.Stage == "logs" || m.Config.Observability.Stage == "metrics" {
-			fmt.Fprintln(m.Streams.Out, "Grafana: http://localhost:3000 (логин admin; пароль в Secret hotelflow/grafana-admin)")
-		} else {
-			fmt.Fprintln(m.Streams.Out, "Grafana: http://localhost:3000 (порт зарезервирован, UI появится на этапе логов)")
-		}
+		fmt.Fprintln(m.Streams.Out, "Grafana: http://localhost:3000 (логин admin; пароль в Secret hotelflow/grafana-admin)")
 	}
 	for _, service := range m.Config.Services {
 		if service.GRPC.Host != 0 {
@@ -161,6 +157,10 @@ func (m *Manager) deploy(
 	if err != nil {
 		return err
 	}
+	envoy, err := kube.RenderEnvoy(m.Config)
+	if err != nil {
+		return err
+	}
 	if m.Config.Observability.Enabled {
 		if err := client.CheckObservabilityPorts(ctx); err != nil {
 			return err
@@ -200,15 +200,20 @@ func (m *Manager) deploy(
 			return err
 		}
 	}
+	fmt.Fprintln(m.Streams.Out, "Запуск Envoy для межсервисных RPC")
+	if err := client.Apply(ctx, envoy, m.Streams.Out); err != nil {
+		return err
+	}
+	if err := client.WaitDeployment(ctx, kube.EnvoyService()); err != nil {
+		return err
+	}
 	if m.Config.Observability.Enabled {
 		fmt.Fprintln(m.Streams.Out, "Запуск инфраструктуры наблюдаемости")
 		if err := client.Apply(ctx, observability, m.Streams.Out); err != nil {
 			return err
 		}
-		if m.Config.Observability.Stage == "logs" || m.Config.Observability.Stage == "metrics" {
-			if err := client.EnsureGrafanaCredentials(ctx); err != nil {
-				return err
-			}
+		if err := client.EnsureGrafanaCredentials(ctx); err != nil {
+			return err
 		}
 		for _, component := range m.Config.ObservabilityComponents() {
 			if err := client.WaitDeployment(ctx, component); err != nil {

@@ -31,7 +31,7 @@ func Instance() *Config {
 type Config struct {
 	Telemetry     telemetry.Config  `yaml:"telemetry"`
 	RuntimeConfig rtconfig.Config   `yaml:"runtime_config"`
-	Targets       map[string]string `yaml:"service"`
+	Targets       map[string]string `yaml:"service" env:"SERVICE_TARGETS"`
 	GrpcServer    GrpcServer        `yaml:"grpc_server"`
 	HttpServer    HttpServer        `yaml:"http_server"`
 	Graceful      Graceful          `yaml:"graceful"`

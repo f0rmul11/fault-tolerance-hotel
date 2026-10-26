@@ -21,17 +21,16 @@ flowchart LR
 ```yaml
 observability:
   enabled: true
-  stage: metrics
 ```
 
-`hotelctl up` разворачивает `deploy/observability/metrics` в namespace `hotelflow` и ожидает готовности Collector/Jaeger/Loki/Grafana/Prometheus. Этап `traces` также поддерживается: он оставляет только экспорт трейсов. Команда `up` не выполняет smoke или бизнес-запросы.
+`hotelctl up` разворачивает единый набор манифестов `deploy/observability` в namespace `hotelflow` и ожидает готовности Collector, Jaeger, Loki, Grafana и Prometheus. Единственный [collector.yaml](collector.yaml) содержит pipelines traces, logs и metrics; все три сигнала включаются вместе. Команда `up` не выполняет smoke или бизнес-запросы.
 
 - Jaeger: [http://localhost:16686](http://localhost:16686), постоянный NodePort 30686.
 - Grafana: [http://localhost:3000](http://localhost:3000), постоянный NodePort30300, вход `admin`. Пароль хранится в Secret `hotelflow/grafana-admin`.
 - Loki: `loki.hotelflow.svc.cluster.local:3100`, только внутри кластера; запросы пользователя идут через Grafana.
 - Collector: `otel-collector.hotelflow.svc.cluster.local:4317` для приложений; 4318 — OTLP/HTTP внутри кластера. На Mac эти порты не опубликованы.
 
-Оба UI binding добавляются на первом этапе. Текущий Docker runtime обновляет binding через пересоздание контейнера k3s с тем же именованным томом; при первой установке наблюдаемости будет краткий перерыв работы стенда. До остановки проверяются новые host-порты; для работающего кластера проверяются занятые NodePort. Не выполнять `destroy` или `reset` для включения трейсов. Структура сохраненного Runtime не меняется.
+Оба UI binding добавляются при включении наблюдаемости. Текущий Docker runtime обновляет binding через пересоздание контейнера k3s с тем же именованным томом; при первой установке наблюдаемости будет краткий перерыв работы стенда. До остановки проверяются новые host-порты; для работающего кластера проверяются занятые NodePort. Не выполнять `destroy` или `reset` для включения трейсов. Структура сохраненного Runtime не меняется.
 
 ```sh
 make build
@@ -42,7 +41,7 @@ make build
 ./bin/hotelctl logs jaeger -f
 ```
 
-В `components`, `status`, `start/stop/restart/logs` на этапе `logs` доступны `otel-collector`, `jaeger`, `loki`, `grafana`. На этапе `traces` Grafana остается резервом порта без активного workload. `hotelctl deploy <service>` также использует актуальные observability manifests. `observability.enabled: false` отключает OTLP export при последующем deploy приложений; это не удаляет ранее созданные Kubernetes ресурсы.
+В `components`, `status`, `start/stop/restart/logs` доступны `otel-collector`, `jaeger`, `loki`, `grafana` и `prometheus`. `hotelctl deploy <service>` также применяет единый набор observability manifests. `observability.enabled: false` отключает экспорт всех трех сигналов при последующем deploy приложений; это не удаляет ранее созданные Kubernetes ресурсы.
 
 ## Конфигурация и память
 
@@ -57,7 +56,7 @@ make build
 
 ## Инициализация telemetry и spans в приложениях
 
-`internal/pkg/telemetry` управляет жизненным циклом наблюдаемости. Реализованы tracing и logs на OpenTelemetry Go SDK **1.47.0** с официальными `otelhttp`/`otelgrpc` **0.72.0**. Зависимости согласованы во всех шести самостоятельных Go-модулях; версия etcd-клиента Gateway сохранена.
+`internal/pkg/telemetry` управляет жизненным циклом наблюдаемости. Реализованы traces, logs и metrics на OpenTelemetry Go SDK **1.47.0** с официальными `otelhttp`/`otelgrpc` **0.72.0**. Зависимости согласованы во всех шести самостоятельных Go-модулях; версия etcd-клиента Gateway сохранена.
 
 Структура пакета:
 
@@ -73,7 +72,7 @@ internal/pkg/telemetry
     NewProvider, global Prometheus registry → OTel bridge → OTLP
 ```
 
-`Config` содержит `Enabled`, `ServiceName`, `ServiceNamespace`, `ServiceVersion`, `TracerName`, `OTLPEndpoint`, `OTLPInsecure`, `LogsEnabled`, `LogLevel`, `MetricsEnabled` и `MetricsInterval`. Настройки загружаются существующим `cleanenv` вместе с конфигурацией приложения и доступны через `config.Instance().Telemetry`. `Init(ctx, config)` принимает готовую конфигурацию и возвращает `*Telemetry` с `TracerProvider` и опциональным `LoggerProvider`; объект владеет providers и общим соединением OTLP. Пример подключения в `App` сервиса Booking:
+`Config` содержит `Enabled`, `ServiceName`, `ServiceNamespace`, `ServiceVersion`, `TracerName`, `OTLPEndpoint`, `OTLPInsecure`, `LogsEnabled`, `LogLevel`, `MetricsEnabled` и `MetricsInterval`. Настройки загружаются существующим `cleanenv` вместе с конфигурацией приложения и доступны через `config.Instance().Telemetry`. `Init(ctx, config)` принимает готовую конфигурацию и возвращает `*Telemetry` с `TracerProvider` и опциональными `LoggerProvider` и `MeterProvider`; объект владеет providers и общим соединением OTLP. Пример подключения в `App` сервиса Booking:
 
 ```go
 type App struct {
@@ -114,7 +113,7 @@ defer span.End()
 
 Соединение использует OTLP/gRPC; `OTLPInsecure=true` задает транспорт без TLS. Kubernetes-манифесты передают Downward API resource attributes и ограничивают batch queue до 2048 spans. Resource attributes из `OTEL_RESOURCE_ATTRIBUTES`, sampler и batch-параметры читает сам OpenTelemetry SDK.
 
-`OTEL_TRACES_SAMPLER` и `OTEL_BSP_*` обрабатывает Go SDK: sampler не зафиксирован в коде, в стенде задан `parentbased_always_on`. У Jaeger отдельно используется `always_off` только для его самотрассировки. Logs provider включается отдельно через `Config.LogsEnabled` / `TELEMETRY_LOGS_ENABLED`; `hotelctl` выставляет его для этапов `logs` и `metrics`. Metrics provider включается на этапе `metrics`; HTTP/gRPC instruments по-прежнему получают noop MeterProvider. Stdout logging сохраняется.
+`OTEL_TRACES_SAMPLER` и `OTEL_BSP_*` обрабатывает Go SDK: sampler не зафиксирован в коде, в стенде задан `parentbased_always_on`. У Jaeger отдельно используется `always_off` только для его самотрассировки. `hotelctl` включает providers логов и метрик вместе с трейсами через `observability.enabled`; HTTP/gRPC instruments по-прежнему получают noop MeterProvider. Stdout logging сохраняется.
 
 `App.Run` напрямую вызывает `a.telemetry.Shutdown(ctx)` в `defer` после public drain, остановки workers, закрытия клиентов/БД и admin server. Вызов получает контекст приложения; отдельного shutdown-helper и дополнительного timeout нет. При ошибке инициализации вызывается тот же nil-safe `Shutdown(ctx)`. Сначала сбрасываются logs, затем metrics и traces, после чего закрывается принадлежащее `Telemetry` общее соединение OTLP. В манифестах `OTEL_BSP_EXPORT_TIMEOUT=3000` ограничивает экспорт одного batch тремя секундами; Kubernetes termination grace составляет 30 секунд. Collector не включен в readiness бизнес-сервисов.
 
@@ -137,7 +136,7 @@ Loki 3.7.9 при заполнении диска WAL выше 90% приост�
 ./bin/hotelctl kubectl -n hotelflow get secret grafana-admin -o jsonpath='{.data.admin-password}' | base64 --decode
 ```
 
-Anonymous access и регистрация выключены. В Grafana заранее настроен datasource **Loki** (`hotelflow-loki`); откройте Explore. На этапе `metrics` также доступен datasource Prometheus.
+Anonymous access и регистрация выключены. В Grafana заранее настроен datasource **Loki** (`hotelflow-loki`); откройте Explore. Также настроен datasource **Prometheus** (`hotelflow-prometheus`).
 
 ```logql
 {service_namespace="hotelflow"}
@@ -161,7 +160,7 @@ SDK log queue ограничена 2048 записями, batch512, interval1s, 
 
 В индексе Loki `service_name`, `service_namespace`, `deployment_environment_name`, `k8s_namespace_name` и `level`. Trace/span/request/correlation/booking/Pod/instance IDs остаются structured metadata. В строке лога Grafana поле `trace_id` дает ссылку **Открыть в Jaeger** на постоянный адрес `localhost:16686`. После рестарта memory-only Jaeger старый лог может ссылаться на уже удаленный trace.
 
-Для отката только логов установите `observability.stage: traces` и выполните `hotelctl up`: приложения перестанут экспортировать logs, Collector вернется к traces pipeline. Уже созданные Loki/Grafana/PVC не удаляются; их можно остановить, пока активен этап `logs`, командами `hotelctl stop loki grafana`. Логи/трейсы выключаются вместе через `observability.enabled: false` после deploy. Ни один вариант не требует `destroy/reset`.
+Для экспериментов компоненты можно остановить через `hotelctl stop loki grafana` и вернуть через `hotelctl start loki grafana`. Все сигналы выключаются вместе через `observability.enabled: false` после deploy приложений. Удаление данных для изменения конфигурации не требуется.
 
 Источники: [Loki native OTLP](https://grafana.com/docs/loki/latest/send-data/otel/), [OpenTelemetry Logs SDK](https://pkg.go.dev/go.opentelemetry.io/otel/sdk/log@v1.47.0), [otelslog](https://pkg.go.dev/go.opentelemetry.io/contrib/bridges/otelslog@v0.21.0).
 
@@ -186,7 +185,7 @@ SDK log queue ограничена 2048 записями, batch512, interval1s, 
 
 Тесты не используют внешнюю БД или брокер и не заменяют отдельный `hotelctl smoke --business` и поиск живого trace в Jaeger после установки.
 
-## Проверенный запуск первого этапа — 26 октября 2026
+## Проверенный запуск трейсов — 26 октября 2026
 
 Финальные образы всех шести приложений собраны и развернуты в действующем k3s. Collector и Jaeger имеют по одной готовой реплике. `hotelctl smoke --business --timeout 3m` прошел: каталог, идемпотентное бронирование, конфликт пересечения, заселение, отмена и три уведомления. Тестовая бронь отменена, номер освобожден.
 
@@ -206,7 +205,7 @@ SDK log queue ограничена 2048 записями, batch512, interval1s, 
 Примеры в UI доступны до рестарта/eviction Jaeger. Локальные JSON-снимки и результаты приемки сохранены в `.local/hotelctl/observability-verification/2026-10-26/` и не входят в Git.
 
 
-## Проверенный запуск второго этапа — 26 октября 2026
+## Проверенный запуск логов — 26 октября 2026
 
 Loki и Grafana развернуты в действующем k3s; Collector принимает traces и logs через один OTLP receiver. Все шесть приложений и четыре компонента наблюдаемости имеют по одной готовой реплике. Контейнер k3s и Pod Jaeger не пересоздавались при добавлении логов; история Jaeger сохранилась.
 
@@ -222,14 +221,14 @@ Loki и Grafana развернуты в действующем k3s; Collector п
 
 При первом запуске обнаружена блокировка записи Loki из-за заполненного общего диска OrbStack: WAL disk usage 92,65% превышал штатный порог 90%, хотя readiness и datasource health были успешны. Удалены только 24 dangling intermediate images, точно сопоставленные с build-логами этой работы; рабочие images и volumes сохранены. После освобождения около 12 GiB Loki автоматически возобновил прием. В конце проверки свободно около 25 GiB, `df` показывает 89% использования; защита диска не отключалась. Часть первых логов до освобождения места вышла за retry window и потеряна; приемка выше выполнена на свежем сценарии после восстановления.
 
-Проверены конфиги точными images: Collector `validate`, Loki `-verify-config=true`, Kustomize rendering. `go test -race ./...` и `go vet ./...` прошли во всех шести Go-модулях и `hotelctl`. SDK-тест принимает реальные OTLP logs и traces через общий gRPC connection: проверяет фильтр уровня, атрибуты/группы, корреляцию, отсутствие IDs у startup-записи, flush перед закрытием соединения и отсутствие экспорта ошибок самого SDK. Проверены также повторное использование Grafana Secret и отсутствие изменения Jaeger/портов при выборе этапа `logs`.
+Проверены конфиги точными images: Collector `validate`, Loki `-verify-config=true`, Kustomize rendering. `go test -race ./...` и `go vet ./...` прошли во всех шести Go-модулях и `hotelctl`. SDK-тест принимает реальные OTLP logs и traces через общий gRPC connection: проверяет фильтр уровня, атрибуты/группы, корреляцию, отсутствие IDs у startup-записи, flush перед закрытием соединения и отсутствие экспорта ошибок самого SDK. Проверены также повторное использование Grafana Secret и отсутствие изменения Jaeger/портов при первоначальном добавлении логов.
 
 Результаты, JSON-снимки и smoke-логи сохранены локально в `.local/hotelctl/observability-verification/2026-10-26-logs/`; они не входят в Git. Проверки retention за фактические 72 часа и восстановления всего хоста в этот запуск не выполнялись.
 
 
 ## Метрики: глобальный Prometheus registry
 
-Этап `metrics` подготавливает инфраструктуру и SDK для пользовательских метрик. Согласованный API регистрации — `github.com/prometheus/client_golang/prometheus`: `prometheus.MustRegister` либо `promauto`, использующий глобальный `DefaultRegisterer`. SDK не заменяет и не очищает этот registry.
+Инфраструктура и SDK готовы для пользовательских метрик. Согласованный API регистрации — `github.com/prometheus/client_golang/prometheus`: `prometheus.MustRegister` либо `promauto`, использующий глобальный `DefaultRegisterer`. SDK не заменяет и не очищает этот registry.
 
 ```text
 prometheus.DefaultRegisterer / DefaultGatherer
@@ -255,7 +254,7 @@ telemetry:
   otlp_insecure: true
 ```
 
-В k3s общий `TELEMETRY_ENABLED` следует `observability.enabled` на всех этапах; `TELEMETRY_METRICS_ENABLED` включается только для этапа `metrics`; `TELEMETRY_LOGS_ENABLED` включен для `logs` и `metrics`. Интервал переопределяется через `TELEMETRY_METRICS_INTERVAL`, timeout reader/export — через стандартный `OTEL_METRIC_EXPORT_TIMEOUT=3000`. `Telemetry` владеет MeterProvider; прямой `Shutdown(ctx)` последовательно завершает logs, metrics, traces и затем общее соединение. Недоступность backend не входит в readiness приложения.
+В k3s `TELEMETRY_ENABLED`, `TELEMETRY_METRICS_ENABLED` и `TELEMETRY_LOGS_ENABLED` вместе следуют `observability.enabled`. Интервал переопределяется через `TELEMETRY_METRICS_INTERVAL`, timeout reader/export — через стандартный `OTEL_METRIC_EXPORT_TIMEOUT=3000`. `Telemetry` владеет MeterProvider; прямой `Shutdown(ctx)` последовательно завершает logs, metrics, traces и затем общее соединение. Недоступность backend не входит в readiness приложения.
 
 Ниже только пример будущего пользовательского кода — эта метрика не зарегистрирована в сервисах:
 
@@ -277,7 +276,7 @@ Prometheus **3.13.5 LTS** закреплен digest, имеет одну реп�
 
 В Prometheus `service.name`/`service.namespace` дают `job`, новый UUID процесса — `instance`. Дополнительно продвигаются только service_name, service_namespace, deployment_environment_name и k8s_namespace_name. Runtime series остаются раздельными между процессами. Push не создает scrape-серию `up`; пустой результат запроса не равен подтвержденной недоступности приложения. Cumulative counters/histograms после пропуска экспорта сохраняют итог живого процесса, пропущенные gauges не восстанавливаются.
 
-Откат: `stage: logs` и `hotelctl up` отключают metrics export и возвращают Collector к traces/logs. Prometheus и PVC не удаляются; остановить его можно заранее через `hotelctl stop prometheus`, пока активен этап `metrics`. Метрики не требуют `reset` или `destroy`.
+Prometheus запускается вместе с остальным стеком. Для отдельного эксперимента его можно остановить через `hotelctl stop prometheus`, а затем вернуть через `hotelctl start prometheus`; PVC сохраняется.
 
 Источники: [официальный Prometheus bridge](https://pkg.go.dev/go.opentelemetry.io/contrib/bridges/prometheus@v0.72.0), [Prometheus OTLP](https://prometheus.io/docs/guides/opentelemetry/), [Prometheus 3.13.5 LTS](https://prometheus.io/download/).
 
