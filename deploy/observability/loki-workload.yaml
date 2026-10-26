@@ -3,7 +3,8 @@ kind: PersistentVolumeClaim
 metadata:
   name: loki-data
 spec:
-  accessModes: [ReadWriteOnce]
+  accessModes:
+    - ReadWriteOnce
   storageClassName: local-path
   resources:
     requests:
@@ -45,37 +46,57 @@ spec:
         - name: loki
           image: grafana/loki:3.7.9@sha256:0db216b630ae1f348a1584c67f3cead8b4c1fc839169a39501db664744158e28
           imagePullPolicy: IfNotPresent
-          args: [-target=all, -config.file=/etc/loki/config.yaml]
+          args:
+            - -target=all
+            - -config.file=/etc/loki/config.yaml
           ports:
-            - {name: ui, containerPort: 3100}
+            - name: ui
+              containerPort: 3100
           resources:
-            requests: {cpu: 100m, memory: 128Mi}
-            limits: {cpu: "1", memory: 768Mi}
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 768Mi
           securityContext:
             readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false
             capabilities:
-              drop: [ALL]
+              drop:
+                - ALL
           volumeMounts:
-            - {name: data, mountPath: /loki}
-            - {name: config, mountPath: /etc/loki, readOnly: true}
-            - {name: tmp, mountPath: /tmp}
+            - name: data
+              mountPath: /loki
+            - name: config
+              mountPath: /etc/loki
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
           startupProbe:
-            httpGet: {path: /ready, port: ui}
+            httpGet:
+              path: /ready
+              port: ui
             periodSeconds: 2
             failureThreshold: 90
           readinessProbe:
-            httpGet: {path: /ready, port: ui}
+            httpGet:
+              path: /ready
+              port: ui
             periodSeconds: 5
           livenessProbe:
-            httpGet: {path: /ready, port: ui}
+            httpGet:
+              path: /ready
+              port: ui
             periodSeconds: 10
             failureThreshold: 6
       volumes:
         - name: data
-          persistentVolumeClaim: {claimName: loki-data}
+          persistentVolumeClaim:
+            claimName: loki-data
         - name: config
-          configMap: {name: loki-config}
+          configMap:
+            name: loki-config
         - name: tmp
           emptyDir: {}
 ---
@@ -88,4 +109,6 @@ spec:
   selector:
     app.kubernetes.io/name: loki
   ports:
-    - {name: http, port: 3100, targetPort: ui}
+    - name: http
+      port: 3100
+      targetPort: ui

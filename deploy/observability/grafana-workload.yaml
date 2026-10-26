@@ -3,7 +3,8 @@ kind: PersistentVolumeClaim
 metadata:
   name: grafana-data
 spec:
-  accessModes: [ReadWriteOnce]
+  accessModes:
+    - ReadWriteOnce
   storageClassName: local-path
   resources:
     requests:
@@ -48,47 +49,72 @@ spec:
           env:
             - name: GF_SECURITY_ADMIN_USER
               valueFrom:
-                secretKeyRef: {name: grafana-admin, key: admin-user}
+                secretKeyRef:
+                  name: grafana-admin
+                  key: admin-user
             - name: GF_SECURITY_ADMIN_PASSWORD
               valueFrom:
-                secretKeyRef: {name: grafana-admin, key: admin-password}
+                secretKeyRef:
+                  name: grafana-admin
+                  key: admin-password
             - name: GF_PATHS_CONFIG
               value: /etc/hotelflow-grafana/grafana.ini
           ports:
-            - {name: ui, containerPort: 3000}
+            - name: ui
+              containerPort: 3000
           resources:
-            requests: {cpu: 100m, memory: 128Mi}
-            limits: {cpu: "1", memory: 512Mi}
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
           securityContext:
             readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false
             capabilities:
-              drop: [ALL]
+              drop:
+                - ALL
           volumeMounts:
-            - {name: data, mountPath: /var/lib/grafana}
-            - {name: config, mountPath: /etc/hotelflow-grafana, readOnly: true}
-            - {name: tmp, mountPath: /tmp}
-            - {name: datasources, mountPath: /etc/grafana/provisioning/datasources, readOnly: true}
+            - name: data
+              mountPath: /var/lib/grafana
+            - name: config
+              mountPath: /etc/hotelflow-grafana
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+            - name: datasources
+              mountPath: /etc/grafana/provisioning/datasources
+              readOnly: true
           startupProbe:
-            httpGet: {path: /api/health, port: ui}
+            httpGet:
+              path: /api/health
+              port: ui
             periodSeconds: 2
             failureThreshold: 90
           readinessProbe:
-            httpGet: {path: /api/health, port: ui}
+            httpGet:
+              path: /api/health
+              port: ui
             periodSeconds: 5
           livenessProbe:
-            httpGet: {path: /api/health, port: ui}
+            httpGet:
+              path: /api/health
+              port: ui
             periodSeconds: 10
             failureThreshold: 6
       volumes:
         - name: data
-          persistentVolumeClaim: {claimName: grafana-data}
+          persistentVolumeClaim:
+            claimName: grafana-data
         - name: config
-          configMap: {name: grafana-config}
+          configMap:
+            name: grafana-config
         - name: tmp
           emptyDir: {}
         - name: datasources
-          configMap: {name: grafana-datasources}
+          configMap:
+            name: grafana-datasources
 ---
 apiVersion: v1
 kind: Service
@@ -102,4 +128,7 @@ spec:
   selector:
     app.kubernetes.io/name: grafana
   ports:
-    - {name: ui, port: 3000, targetPort: ui, nodePort: 30300}
+    - name: ui
+      port: 3000
+      targetPort: ui
+      nodePort: 30300

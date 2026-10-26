@@ -34,34 +34,52 @@ spec:
         - name: collector
           image: otel/opentelemetry-collector-contrib:0.163.2@sha256:7f22d2a6748110ffb6a59bc0df448bccbf501cdb667d610ede4c61d3863d5849
           imagePullPolicy: IfNotPresent
-          args: [--config=/etc/otelcol/config.yaml]
+          args:
+            - --config=/etc/otelcol/config.yaml
           env:
             - name: GOMEMLIMIT
               value: 400MiB
           ports:
-            - {name: otlp-grpc, containerPort: 4317}
-            - {name: otlp-http, containerPort: 4318}
-            - {name: health, containerPort: 13133}
-            - {name: self-metrics, containerPort: 8888}
+            - name: otlp-grpc
+              containerPort: 4317
+            - name: otlp-http
+              containerPort: 4318
+            - name: health
+              containerPort: 13133
+            - name: self-metrics
+              containerPort: 8888
           resources:
-            requests: {cpu: 100m, memory: 128Mi}
-            limits: {cpu: "1", memory: 512Mi}
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
           securityContext:
             readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false
             capabilities:
-              drop: [ALL]
+              drop:
+                - ALL
           volumeMounts:
-            - {name: config, mountPath: /etc/otelcol, readOnly: true}
+            - name: config
+              mountPath: /etc/otelcol
+              readOnly: true
           startupProbe:
-            httpGet: {path: /, port: health}
+            httpGet:
+              path: /
+              port: health
             periodSeconds: 2
             failureThreshold: 30
           readinessProbe:
-            httpGet: {path: /, port: health}
+            httpGet:
+              path: /
+              port: health
             periodSeconds: 5
           livenessProbe:
-            httpGet: {path: /, port: health}
+            httpGet:
+              path: /
+              port: health
             periodSeconds: 10
             failureThreshold: 3
       volumes:
@@ -78,6 +96,12 @@ spec:
   selector:
     app.kubernetes.io/name: otel-collector
   ports:
-    - {name: otlp-grpc, port: 4317, targetPort: otlp-grpc}
-    - {name: otlp-http, port: 4318, targetPort: otlp-http}
-    - {name: self-metrics, port: 8888, targetPort: self-metrics}
+    - name: otlp-grpc
+      port: 4317
+      targetPort: otlp-grpc
+    - name: otlp-http
+      port: 4318
+      targetPort: otlp-http
+    - name: self-metrics
+      port: 8888
+      targetPort: self-metrics

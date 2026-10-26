@@ -3,7 +3,8 @@ kind: PersistentVolumeClaim
 metadata:
   name: prometheus-data
 spec:
-  accessModes: [ReadWriteOnce]
+  accessModes:
+    - ReadWriteOnce
   storageClassName: local-path
   resources:
     requests:
@@ -21,7 +22,9 @@ spec:
   selector:
     app.kubernetes.io/name: prometheus
   ports:
-    - {name: http, port: 9090, targetPort: http}
+    - name: http
+      port: 9090
+      targetPort: http
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -64,34 +67,52 @@ spec:
             - --storage.tsdb.path=/prometheus
             - --web.enable-otlp-receiver
           ports:
-            - {name: http, containerPort: 9090}
+            - name: http
+              containerPort: 9090
           resources:
-            requests: {cpu: 200m, memory: 256Mi}
-            limits: {cpu: "1", memory: 1Gi}
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
           securityContext:
             readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false
             capabilities:
-              drop: [ALL]
+              drop:
+                - ALL
           volumeMounts:
-            - {name: data, mountPath: /prometheus}
-            - {name: config, mountPath: /etc/prometheus, readOnly: true}
-            - {name: tmp, mountPath: /tmp}
+            - name: data
+              mountPath: /prometheus
+            - name: config
+              mountPath: /etc/prometheus
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
           startupProbe:
-            httpGet: {path: /-/ready, port: http}
+            httpGet:
+              path: /-/ready
+              port: http
             periodSeconds: 2
             failureThreshold: 90
           readinessProbe:
-            httpGet: {path: /-/ready, port: http}
+            httpGet:
+              path: /-/ready
+              port: http
             periodSeconds: 5
           livenessProbe:
-            httpGet: {path: /-/healthy, port: http}
+            httpGet:
+              path: /-/healthy
+              port: http
             periodSeconds: 10
             failureThreshold: 6
       volumes:
         - name: data
-          persistentVolumeClaim: {claimName: prometheus-data}
+          persistentVolumeClaim:
+            claimName: prometheus-data
         - name: config
-          configMap: {name: prometheus-config}
+          configMap:
+            name: prometheus-config
         - name: tmp
           emptyDir: {}

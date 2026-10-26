@@ -30,7 +30,8 @@ processors:
           - set(attributes["level"], "error") where severity_number >= 17 and severity_number <= 20
           - set(attributes["level"], "fatal") where severity_number >= 21 and severity_number <= 24
   groupbyattrs/log_level:
-    keys: [level]
+    keys:
+      - level
   batch/traces:
     timeout: 1s
     send_batch_size: 512
