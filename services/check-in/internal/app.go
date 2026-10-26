@@ -21,6 +21,7 @@ import (
 	"check-in/internal/pkg/healthcheck"
 	"check-in/internal/pkg/inbox"
 	"check-in/internal/pkg/outbox"
+	"check-in/internal/pkg/telemetry"
 	"check-in/internal/pkg/worker"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -33,6 +34,7 @@ import (
 
 // App application
 type App struct {
+	telemetry    *telemetry.Telemetry
 	inbox        *inbox.Inbox
 	eventRouter  *event_router.EventRouter[string, []byte]
 	inboxWorkers []worker.Worker
@@ -80,6 +82,7 @@ func New(ctx context.Context) *App {
 	app.runAdminServer(ctx)
 
 	if err := app.init(ctx); err != nil {
+		_ = app.telemetry.Shutdown(ctx)
 		log.Fatalf("[APP] Не удалось инициализировать приложение: %s", err.Error())
 	}
 	return app
@@ -111,6 +114,15 @@ func (a *App) runAdminServer(_ context.Context) {
 
 // Run запуск приложения
 func (a *App) Run(ctx context.Context) {
+	defer func() {
+		a.publicCloser.CloseAll()
+		closer.CloseAll()
+		a.adminCloser.CloseAll()
+		if err := a.telemetry.Shutdown(ctx); err != nil {
+			slog.Warn("Не удалось завершить экспорт телеметрии", "error", err)
+		}
+	}()
+
 	if a.mainServer != nil {
 		go func() {
 			if err := a.mainServer.Run(a.controllers...); err != nil {
@@ -140,13 +152,11 @@ func (a *App) Run(ctx context.Context) {
 
 	a.publicCloser.Wait()
 
-	closer.CloseAll()
-
-	a.adminCloser.CloseAll()
 }
 
 func (a *App) init(ctx context.Context) error {
 	initFuncs := []func(context.Context) error{
+		a.initTelemetry,
 		a.initMainServer,
 		a.initGrpcConn,
 		a.initPostgres,

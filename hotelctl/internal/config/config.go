@@ -48,12 +48,18 @@ type Service struct {
 	EchoMethod string      `json:"echoMethod,omitempty"`
 }
 
+type Observability struct {
+	Enabled bool   `json:"enabled"`
+	Stage   string `json:"stage"`
+}
+
 type Config struct {
-	APIVersion string    `json:"apiVersion"`
-	Name       string    `json:"name"`
-	Runtime    Runtime   `json:"runtime"`
-	Services   []Service `json:"services"`
-	Root       string    `json:"-"`
+	APIVersion    string        `json:"apiVersion"`
+	Name          string        `json:"name"`
+	Runtime       Runtime       `json:"runtime"`
+	Services      []Service     `json:"services"`
+	Root          string        `json:"-"`
+	Observability Observability `json:"observability,omitempty"`
 }
 
 // FindRoot walks up from a supplied directory; no dependency on a git executable.
@@ -121,6 +127,12 @@ func (c Config) Validate() error {
 	if c.Runtime.BindAddress != "127.0.0.1" && c.Runtime.BindAddress != "0.0.0.0" {
 		return fmt.Errorf("runtime.bindAddress must be 127.0.0.1 or 0.0.0.0")
 	}
+	if c.Observability.Enabled && c.Observability.Stage != "traces" && c.Observability.Stage != "logs" && c.Observability.Stage != "metrics" {
+		return fmt.Errorf("observability.stage: поддерживаются traces, logs и metrics")
+	}
+	if !c.Observability.Enabled && c.Observability.Stage != "" && c.Observability.Stage != "traces" && c.Observability.Stage != "logs" && c.Observability.Stage != "metrics" {
+		return fmt.Errorf("observability.stage: неизвестный этап %q", c.Observability.Stage)
+	}
 	used := map[int]bool{}
 	for _, p := range c.Runtime.Ports.All() {
 		if p < 1024 || p > 65535 || used[p] {
@@ -148,6 +160,15 @@ func (c Config) Validate() error {
 		}
 		used[dependency.Port.Host] = true
 		nodes[dependency.Port.Node] = true
+	}
+	for _, component := range c.ObservabilityComponents() {
+		names[component.Name] = true
+	}
+	for _, binding := range c.ObservabilityPortBindings() {
+		if used[binding.Host] || nodes[binding.Node] {
+			return fmt.Errorf("порт наблюдаемости %d или NodePort %d уже используется", binding.Host, binding.Node)
+		}
+		used[binding.Host], nodes[binding.Node] = true, true
 	}
 	for _, s := range c.Services {
 		if !namePattern.MatchString(s.Name) || names[s.Name] {
@@ -256,6 +277,7 @@ func (r Runtime) PortBindings() []PortBinding {
 
 func (c Config) PortBindings() []PortBinding {
 	result := c.Runtime.PortBindings()
+	result = append(result, c.ObservabilityPortBindings()...)
 	for _, dependency := range Dependencies() {
 		if dependency.Port.Host != 0 {
 			result = append(result, dependency.Port)
@@ -289,6 +311,9 @@ func (s *Service) UnmarshalJSON(data []byte) error {
 }
 
 func (c *Config) applyDefaults() {
+	if c.Observability.Enabled && c.Observability.Stage == "" {
+		c.Observability.Stage = "traces"
+	}
 	if c.APIVersion == "" {
 		c.APIVersion = "hotelflow/v1alpha1"
 	}

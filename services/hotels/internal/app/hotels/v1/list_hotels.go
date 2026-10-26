@@ -9,9 +9,13 @@ import (
 	"hotels/internal/application/usecase/hotel/list"
 	entity "hotels/internal/domain/entity/hotel"
 	pb "hotels/internal/pkg/pb/hotels/hotels/v1"
+	"hotels/internal/pkg/telemetry/traces"
 )
 
 func (s *Service) ListHotels(ctx context.Context, req *pb.ListHotelsRequest) (*pb.ListHotelsResponse, error) {
+	ctx, span := traces.Start(ctx, "handler.hotels.ListHotels")
+	defer span.End()
+
 	limit := mo.None[int]()
 	if req.Limit != nil {
 		limit = mo.Some(int(req.GetLimit()))

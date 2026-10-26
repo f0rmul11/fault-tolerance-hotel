@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"reflect"
+	"slices"
 	"strconv"
 	"time"
 
@@ -97,6 +99,9 @@ func (e *Engine) Ensure(ctx context.Context, s *project.State, out io.Writer) er
 			return err
 		}
 		if err := checkOwner("network", networkName(s), networkInfo.Labels, s); err != nil {
+			return err
+		}
+		if err := checkNewPortBindings(info.HostConfig.PortBindings, publishedPorts(s)); err != nil {
 			return err
 		}
 		fmt.Fprintln(out, "Updating published ports; restarting k3s with the existing data volume")
@@ -304,4 +309,32 @@ func publishedPorts(s *project.State) nat.PortMap {
 		}}
 	}
 	return ports
+}
+
+// checkNewPortBindings catches host conflicts before the existing node is stopped.
+// Existing Docker bindings remain occupied by our own running container.
+func checkNewPortBindings(current, desired nat.PortMap) error {
+	var existing []nat.PortBinding
+	for _, bindings := range current {
+		existing = append(existing, bindings...)
+	}
+	var listeners []net.Listener
+	defer func() {
+		for _, listener := range listeners {
+			_ = listener.Close()
+		}
+	}()
+	for _, bindings := range desired {
+		for _, binding := range bindings {
+			if slices.Contains(existing, binding) {
+				continue
+			}
+			listener, err := net.Listen("tcp", net.JoinHostPort(binding.HostIP, binding.HostPort))
+			if err != nil {
+				return fmt.Errorf("новый порт %s:%s занят; k3s оставлен без изменений: %w", binding.HostIP, binding.HostPort, err)
+			}
+			listeners = append(listeners, listener)
+		}
+	}
+	return nil
 }

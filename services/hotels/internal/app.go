@@ -25,10 +25,12 @@ import (
 	"hotels/internal/infrastructure/storage"
 	"hotels/internal/pkg/closer"
 	"hotels/internal/pkg/healthcheck"
+	"hotels/internal/pkg/telemetry"
 )
 
 // App application
 type App struct {
+	telemetry  *telemetry.Telemetry
 	gateway    *gateway.Registry
 	services   *service.Registry
 	pool       *pgxpool.Pool
@@ -72,6 +74,7 @@ func New(ctx context.Context) *App {
 	app.runAdminServer(ctx)
 
 	if err := app.init(ctx); err != nil {
+		_ = app.telemetry.Shutdown(ctx)
 		log.Fatalf("[APP] Не удалось инициализировать приложение: %s", err.Error())
 	}
 	return app
@@ -102,7 +105,16 @@ func (a *App) runAdminServer(_ context.Context) {
 }
 
 // Run запуск приложения
-func (a *App) Run(_ context.Context) {
+func (a *App) Run(ctx context.Context) {
+	defer func() {
+		a.publicCloser.CloseAll()
+		closer.CloseAll()
+		a.adminCloser.CloseAll()
+		if err := a.telemetry.Shutdown(ctx); err != nil {
+			slog.Warn("Не удалось завершить экспорт телеметрии", "error", err)
+		}
+	}()
+
 	if a.mainServer != nil {
 		go func() {
 			if err := a.mainServer.Run(a.controllers...); err != nil {
@@ -123,13 +135,11 @@ func (a *App) Run(_ context.Context) {
 
 	a.publicCloser.Wait()
 
-	closer.CloseAll()
-
-	a.adminCloser.CloseAll()
 }
 
 func (a *App) init(ctx context.Context) error {
 	initFuncs := []func(context.Context) error{
+		a.initTelemetry,
 		a.initMainServer,
 		a.initGrpcConn,
 		a.initPostgres,

@@ -12,6 +12,7 @@ import (
 	"check-in/internal/events"
 	"check-in/internal/pkg/event"
 	"check-in/internal/pkg/pipe"
+	"check-in/internal/pkg/telemetry/traces"
 )
 
 const Type = "checkin.cancellation-requested.v1"
@@ -44,6 +45,8 @@ func New(c *entity.CheckIn) pipe.Func[event.Events] {
 			"x-app-name":       "check-in",
 			"x-event-type":     Type,
 		}
+		traces.Inject(ctx, headers)
+
 		headersRaw, err := json.Marshal(headers)
 		if err != nil {
 			return nil, err

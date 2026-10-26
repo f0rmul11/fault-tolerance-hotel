@@ -15,7 +15,7 @@ import (
 func NewCmdAccess(f util.Factory, streams iostreams.IOStreams) *cobra.Command {
 	return &cobra.Command{
 		Use:   "access",
-		Short: "Адреса API, Kafka UI, etcd и баз данных на компьютере",
+		Short: "Адреса API, Jaeger, Kafka UI, etcd и баз данных на компьютере",
 		Args:  cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			c, err := f.Config()
@@ -23,6 +23,14 @@ func NewCmdAccess(f util.Factory, streams iostreams.IOStreams) *cobra.Command {
 				return err
 			}
 			fmt.Fprintf(streams.Out, "HTTP: http://localhost:%d\nSwagger: http://localhost:%d/docs/\nKafka UI: http://localhost:8090\netcd: http://127.0.0.1:2379\n\n", c.Runtime.Ports.HTTP, c.Runtime.Ports.HTTP)
+			if c.Observability.Enabled {
+				fmt.Fprintln(streams.Out, "Jaeger: http://localhost:16686")
+				if c.Observability.Stage == "logs" || c.Observability.Stage == "metrics" {
+					fmt.Fprintln(streams.Out, "Grafana: http://localhost:3000 (логин admin; пароль в Secret hotelflow/grafana-admin)")
+				} else {
+					fmt.Fprintln(streams.Out, "Grafana: http://localhost:3000 (порт зарезервирован, UI появится на этапе логов)")
+				}
+			}
 			w := tabwriter.NewWriter(streams.Out, 0, 4, 2, ' ', 0)
 			fmt.Fprintln(w, "HOST\tPORT\tDATABASE\tUSER")
 			for _, dependency := range config.Dependencies() {

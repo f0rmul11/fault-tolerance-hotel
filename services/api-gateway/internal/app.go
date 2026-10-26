@@ -16,6 +16,7 @@ import (
 	"api-gateway/internal/pkg/closer"
 	"api-gateway/internal/pkg/healthcheck"
 	"api-gateway/internal/pkg/rtconfig"
+	"api-gateway/internal/pkg/telemetry"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/not-for-prod/clay/server"
@@ -25,6 +26,7 @@ import (
 
 // App application
 type App struct {
+	telemetry     *telemetry.Telemetry
 	runtimeConfig atomic.Pointer[rtconfig.Manager]
 	mainServer    *server.Server
 
@@ -67,6 +69,7 @@ func New(ctx context.Context) *App {
 	if err := app.init(ctx); err != nil {
 		closer.CloseAll()
 		app.adminCloser.CloseAll()
+		_ = app.telemetry.Shutdown(ctx)
 		log.Fatalf("[APP] Не удалось инициализировать приложение: %s", err.Error())
 	}
 	return app
@@ -97,7 +100,16 @@ func (a *App) runAdminServer(_ context.Context) {
 }
 
 // Run запуск приложения
-func (a *App) Run(_ context.Context) {
+func (a *App) Run(ctx context.Context) {
+	defer func() {
+		a.publicCloser.CloseAll()
+		closer.CloseAll()
+		a.adminCloser.CloseAll()
+		if err := a.telemetry.Shutdown(ctx); err != nil {
+			slog.Warn("Не удалось завершить экспорт телеметрии", "error", err)
+		}
+	}()
+
 	if a.mainServer != nil {
 		go func() {
 			if err := a.mainServer.Run(a.controllers...); err != nil {
@@ -118,13 +130,11 @@ func (a *App) Run(_ context.Context) {
 	a.publicCloser.Wait()
 
 	// Watch живёт до окончания drain публичного сервера.
-	closer.CloseAll()
-
-	a.adminCloser.CloseAll()
 }
 
 func (a *App) init(ctx context.Context) error {
 	initFuncs := []func(context.Context) error{
+		a.initTelemetry,
 		a.initRuntimeConfig,
 		a.initMainServer,
 		a.initGrpcConn,

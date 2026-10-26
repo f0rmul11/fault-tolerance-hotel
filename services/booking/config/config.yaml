@@ -46,3 +46,14 @@ inbox:
   topics:
     checkin.events.v1:
       batch_size: 1
+
+telemetry:
+  metrics_enabled: true
+  metrics_interval: 15s
+  logs_enabled: true
+  log_level: info
+  enabled: false
+  service_name: booking
+  service_namespace: hotelflow
+  otlp_endpoint: otel-collector:4317
+  otlp_insecure: true

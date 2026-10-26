@@ -39,6 +39,8 @@ import (
 	externalHotelsV1 "api-gateway/internal/pkg/pb/external/hotels/hotels/v1"
 	"api-gateway/internal/pkg/requestid"
 	"api-gateway/internal/pkg/rtconfig/global"
+	"api-gateway/internal/pkg/telemetry"
+	"api-gateway/internal/pkg/telemetry/traces"
 )
 
 func (a *App) initControllers(_ context.Context) error {
@@ -61,7 +63,7 @@ func (a *App) initMainServer(ctx context.Context) error {
 	a.mainServer = server.NewServer(
 		config.Instance().GrpcServer.Port,
 		server.WithHTTPPort(config.Instance().HttpServer.Port),
-		server.WithHTTPMiddlewares(func(next http.Handler) http.Handler {
+		server.WithHTTPMiddlewares(traces.HTTP, func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				// HTTP Serve starts after both Clay servers have been initialized.
 				readyOnce.Do(func() {
@@ -76,6 +78,7 @@ func (a *App) initMainServer(ctx context.Context) error {
 			auth.Interceptor(),
 		),
 		server.WithGRPCOpts(
+			grpc.StatsHandler(traces.ServerHandler()),
 			grpc.KeepaliveParams(keepalive.ServerParameters{
 				MaxConnectionIdle: config.Instance().GrpcServer.MaxConnectionIdle,
 				MaxConnectionAge:  config.Instance().GrpcServer.MaxConnectionAge,
@@ -185,6 +188,7 @@ func (a *App) initGrpcConn(_ context.Context) error {
 		var err error
 
 		conn, err := grpc.NewClient(address,
+			grpc.WithStatsHandler(traces.ClientHandler()),
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
 			grpc.WithUnaryInterceptor(intercept.ProxyMetadata()),
 		)
@@ -246,5 +250,15 @@ func (a *App) initHealthCheck(_ context.Context) error {
 		atomic.StoreInt32(&a.terminated, 1)
 		return nil
 	})
+	return nil
+}
+
+// initTelemetry runs before instrumented transports and background workers.
+func (a *App) initTelemetry(ctx context.Context) error {
+	instance, err := telemetry.Init(ctx, config.Instance().Telemetry)
+	if err != nil {
+		return err
+	}
+	a.telemetry = instance
 	return nil
 }

@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/internal/config"
@@ -136,5 +138,55 @@ func TestJSONStatusReportsKubernetesFailureAsError(t *testing.T) {
 	}
 	if result.Error == "" {
 		t.Fatal("JSON must preserve the diagnostic")
+	}
+}
+
+func TestEnablingTracingDoesNotInvalidateExistingRuntimeState(t *testing.T) {
+	manager := newTestManager(t, &runtimeStub{}, io.Discard)
+	state, err := manager.load(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	owner := state.Owner
+	manager.Config.Observability = config.Observability{
+		Enabled: true,
+		Stage:   "traces",
+	}
+	if err := manager.compatible(state); err != nil {
+		t.Fatalf("existing stand must not require destroy to enable tracing: %v", err)
+	}
+	if state.Owner != owner {
+		t.Fatal("enabling tracing changed existing ownership")
+	}
+}
+
+func TestFailedPortUpdatePreservesSavedBindingsForRetry(t *testing.T) {
+	failure := errors.New("new host port occupied")
+	runtime := &runtimeStub{
+		ensureErr: failure,
+	}
+	manager := newTestManager(t, runtime, io.Discard)
+	before, err := manager.load(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, err := filepath.Abs("../../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager.Config.Root = root
+	manager.Config.Observability = config.Observability{
+		Enabled: true,
+		Stage:   "traces",
+	}
+	if err := manager.Up(context.Background(), nil); !errors.Is(err, failure) {
+		t.Fatalf("unexpected failed update: %v", err)
+	}
+	after, err := manager.Store.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(before.PortBindings(), after.PortBindings()) {
+		t.Fatal("failed update persisted bindings that the runtime has not applied")
 	}
 }

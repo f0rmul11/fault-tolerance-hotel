@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"notification/internal/dto/push"
+	"notification/internal/pkg/telemetry/traces"
 )
 
 type Sender interface {
@@ -22,6 +23,9 @@ func New(push Sender) *UseCase {
 }
 
 func (s *UseCase) Execute(ctx context.Context, input Input) error {
+	ctx, span := traces.Start(ctx, "usecase.notification.confirmed")
+	defer span.End()
+
 	return s.push.Send(ctx, push.Message{
 		CorrelationID: input.CorrelationID,
 		BookingID:     input.BookingID,

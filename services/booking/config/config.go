@@ -6,6 +6,8 @@ import (
 	"os"
 	"sync"
 
+	"booking/internal/pkg/telemetry"
+
 	"github.com/ilyakaznacheev/cleanenv"
 )
 
@@ -26,6 +28,7 @@ func Instance() *Config {
 }
 
 type Config struct {
+	Telemetry     telemetry.Config  `yaml:"telemetry"`
 	Inbox         Inbox             `yaml:"inbox"`
 	ConsumerGroup string            `yaml:"consumer_group" env:"KAFKA_CONSUMER_GROUP"`
 	Postgres      Postgres          `yaml:"postgres"`

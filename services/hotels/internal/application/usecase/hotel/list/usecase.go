@@ -5,6 +5,7 @@ import (
 
 	entity "hotels/internal/domain/entity/hotel"
 	app "hotels/internal/pkg/hotelserror"
+	"hotels/internal/pkg/telemetry/traces"
 )
 
 type Storage interface {
@@ -28,6 +29,9 @@ func New(storage Storage, enricher Enricher) *UseCase {
 }
 
 func (s *UseCase) Execute(ctx context.Context, input Input) ([]*entity.Hotel, error) {
+	ctx, span := traces.Start(ctx, "usecase.hotel.list")
+	defer span.End()
+
 	limit := input.Limit.OrElse(20)
 	if limit < 1 || limit > 100 || input.Offset < 0 {
 		return nil, app.NewInvalidArgumentErr("Лимит должен быть от 1 до 100, смещение — неотрицательным")

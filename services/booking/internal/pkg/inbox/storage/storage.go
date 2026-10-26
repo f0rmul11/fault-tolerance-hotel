@@ -4,13 +4,14 @@ import (
 	"context"
 	"time"
 
-	"booking/internal/pkg/inbox/message"
-	"booking/internal/pkg/transaction/wrapper"
-
 	"github.com/georgysavva/scany/v2/pgxscan"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lib/pq"
 	"github.com/samber/lo"
+
+	"booking/internal/pkg/inbox/message"
+	"booking/internal/pkg/telemetry/traces"
+	"booking/internal/pkg/transaction/wrapper"
 )
 
 type Storage struct {
@@ -22,7 +23,13 @@ func NewStorage(pool *pgxpool.Pool) *Storage {
 }
 
 // SaveMessages сохраняет сообщения для дальнейшей отправки в kafka
-func (s Storage) SaveMessages(ctx context.Context, messages message.Messages) error {
+func (s Storage) SaveMessages(ctx context.Context, messages message.Messages) (err error) {
+	ctx, span := traces.Start(ctx, "storage.inbox.SaveMessages")
+	defer span.End()
+	defer func() {
+		traces.RecordError(span, err)
+	}()
+
 	sql := `
 		with income_messages as (
 			select
@@ -72,7 +79,7 @@ func (s Storage) SaveMessages(ctx context.Context, messages message.Messages) er
 		from unique_messages;
 	`
 
-	_, err := s.wrapper.Pool(ctx).Exec(ctx, sql,
+	_, err = s.wrapper.Pool(ctx).Exec(ctx, sql,
 		messages.EntitiesIDs(),
 		messages.CorrelationIDs(),
 		messages.Topics(),

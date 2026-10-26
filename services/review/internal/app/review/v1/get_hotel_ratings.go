@@ -8,9 +8,13 @@ import (
 
 	entity "review/internal/domain/entity/rating"
 	pb "review/internal/pkg/pb/review/review/v1"
+	"review/internal/pkg/telemetry/traces"
 )
 
 func (s *Service) GetHotelRatings(ctx context.Context, req *pb.GetHotelRatingsRequest) (*pb.GetHotelRatingsResponse, error) {
+	ctx, span := traces.Start(ctx, "handler.review.GetHotelRatings")
+	defer span.End()
+
 	ratings, err := s.usecases.GetHotelRatings.Execute(ctx, lo.Map(req.GetHotelIds(), func(id string, _ int) uuid.UUID {
 		return uuid.FromStringOrNil(id)
 	}))

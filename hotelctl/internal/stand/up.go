@@ -3,6 +3,7 @@ package stand
 import (
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/internal/config"
@@ -40,12 +41,32 @@ func (m *Manager) Up(ctx context.Context, services []config.Service) (err error)
 			}
 		}
 	}()
-	state.Bindings = m.Config.PortBindings()
-	if err = m.Store.Save(state); err != nil {
+	if _, err = kube.RenderObservability(m.Config); err != nil {
 		return err
 	}
+	if m.Config.Observability.Enabled && !slices.Equal(state.PortBindings(), m.Config.PortBindings()) {
+		status, statusErr := m.Runtime.Status(ctx, state)
+		if statusErr != nil {
+			return statusErr
+		}
+		if status.Running {
+			client, clientErr := kube.New(m.Config.Kubeconfig())
+			if clientErr != nil {
+				return clientErr
+			}
+			if err = client.CheckObservabilityPorts(ctx); err != nil {
+				return err
+			}
+		}
+	}
+	state.Bindings = m.Config.PortBindings()
 	fmt.Fprintln(m.Streams.Out, "Starting one k3s node")
 	if err = m.Runtime.Ensure(ctx, state, m.Streams.Out); err != nil {
+		return err
+	}
+	// Save the new bindings only after reconciliation succeeds. A failed
+	// preflight must not hide a pending port update on the next attempt.
+	if err = m.Store.Save(state); err != nil {
 		return err
 	}
 	data, err := m.Runtime.Kubeconfig(ctx, state)
@@ -75,6 +96,14 @@ func (m *Manager) Up(ctx context.Context, services []config.Service) (err error)
 }
 
 func (m *Manager) addresses() {
+	if m.Config.Observability.Enabled {
+		fmt.Fprintln(m.Streams.Out, "Jaeger: http://localhost:16686")
+		if m.Config.Observability.Stage == "logs" || m.Config.Observability.Stage == "metrics" {
+			fmt.Fprintln(m.Streams.Out, "Grafana: http://localhost:3000 (логин admin; пароль в Secret hotelflow/grafana-admin)")
+		} else {
+			fmt.Fprintln(m.Streams.Out, "Grafana: http://localhost:3000 (порт зарезервирован, UI появится на этапе логов)")
+		}
+	}
 	for _, service := range m.Config.Services {
 		if service.GRPC.Host != 0 {
 			fmt.Fprintf(
@@ -124,7 +153,16 @@ func (m *Manager) deploy(
 		if image == "" {
 			return fmt.Errorf("%s has no built image; run hotelctl build %s", service.Name, service.Name)
 		}
-		if _, err := kube.Render(m.Config.Root, service, image); err != nil {
+		if _, err := kube.RenderService(m.Config, service, image); err != nil {
+			return err
+		}
+	}
+	observability, err := kube.RenderObservability(m.Config)
+	if err != nil {
+		return err
+	}
+	if m.Config.Observability.Enabled {
+		if err := client.CheckObservabilityPorts(ctx); err != nil {
 			return err
 		}
 	}
@@ -162,13 +200,29 @@ func (m *Manager) deploy(
 			return err
 		}
 	}
+	if m.Config.Observability.Enabled {
+		fmt.Fprintln(m.Streams.Out, "Запуск инфраструктуры наблюдаемости")
+		if err := client.Apply(ctx, observability, m.Streams.Out); err != nil {
+			return err
+		}
+		if m.Config.Observability.Stage == "logs" || m.Config.Observability.Stage == "metrics" {
+			if err := client.EnsureGrafanaCredentials(ctx); err != nil {
+				return err
+			}
+		}
+		for _, component := range m.Config.ObservabilityComponents() {
+			if err := client.WaitDeployment(ctx, component); err != nil {
+				return err
+			}
+		}
+	}
 	for _, service := range services {
 		image := state.Images[service.Name]
 		fmt.Fprintf(m.Streams.Out, "Deploying %s (%s)\n", service.Name, image)
 		if err := m.Runtime.Import(ctx, state, image, m.Config.StateDir(), m.Streams.Out); err != nil {
 			return err
 		}
-		objects, err := kube.Render(m.Config.Root, service, image)
+		objects, err := kube.RenderService(m.Config, service, image)
 		if err != nil {
 			return err
 		}

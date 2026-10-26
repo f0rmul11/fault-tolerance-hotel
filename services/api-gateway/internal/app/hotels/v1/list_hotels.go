@@ -3,12 +3,16 @@ package hotels
 import (
 	pb "api-gateway/internal/pkg/pb/api-gateway/hotels/v1"
 	external "api-gateway/internal/pkg/pb/external/hotels/hotels/v1"
+	"api-gateway/internal/pkg/telemetry/traces"
 	"context"
 
 	"github.com/samber/lo"
 )
 
 func (i *Implementation) ListHotels(ctx context.Context, req *pb.ListHotelsRequest) (*pb.ListHotelsResponse, error) {
+	ctx, span := traces.Start(ctx, "handler.hotels.ListHotels")
+	defer span.End()
+
 	response, err := i.external.ListHotels(ctx, &external.ListHotelsRequest{
 		Limit:  req.Limit,
 		Offset: req.GetOffset(),

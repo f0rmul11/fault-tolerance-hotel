@@ -4,10 +4,23 @@ import (
 	"context"
 	"errors"
 
+	"go.opentelemetry.io/otel/trace"
+
+	"check-in/internal/pkg/telemetry/traces"
 	"check-in/internal/pkg/transaction/abstract"
 )
 
 func Exec(ctx context.Context, callback func(context.Context) error) (err error) {
+	// Polling transactions have no request parent and must not create idle traces.
+	if trace.SpanContextFromContext(ctx).IsValid() {
+		var span trace.Span
+		ctx, span = traces.Start(ctx, "transaction.Exec")
+		defer span.End()
+		defer func() {
+			traces.RecordError(span, err)
+		}()
+	}
+
 	if abstract.TxFromContext(ctx) != nil {
 		return callback(ctx)
 	}

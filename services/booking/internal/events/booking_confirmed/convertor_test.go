@@ -7,10 +7,12 @@ import (
 	"time"
 
 	"github.com/gofrs/uuid"
+	"go.opentelemetry.io/otel/trace"
 
 	entity "booking/internal/domain/entity"
 	"booking/internal/domain/vo"
 	"booking/internal/events"
+	"booking/internal/pkg/telemetry/traces"
 )
 
 func TestEventCarriesRoomAndPeriod(t *testing.T) {
@@ -26,9 +28,26 @@ func TestEventCarriesRoomAndPeriod(t *testing.T) {
 
 	b.SetRoomDetails("101", "Standard")
 
-	batch, err := New(b)(context.Background(), nil)
+	traceID, _ := trace.TraceIDFromHex("4bf92f3577b34da6a3ce929d0e0e4736")
+	spanID, _ := trace.SpanIDFromHex("00f067aa0ba902b7")
+	parent := trace.NewSpanContext(trace.SpanContextConfig{
+		TraceID:    traceID,
+		SpanID:     spanID,
+		TraceFlags: trace.FlagsSampled,
+	})
+	ctx := trace.ContextWithSpanContext(context.Background(), parent)
+	batch, err := New(b)(ctx, nil)
 	if err != nil || len(batch) != 1 {
 		t.Fatal(err)
+	}
+
+	var headers map[string]string
+	if err := json.Unmarshal(batch[0].Headers, &headers); err != nil {
+		t.Fatal(err)
+	}
+	continued := trace.SpanContextFromContext(traces.Extract(context.Background(), headers))
+	if continued.TraceID() != parent.TraceID() || continued.SpanID() != parent.SpanID() {
+		t.Fatal("event lost the causal context before saving to outbox")
 	}
 
 	var wire struct {

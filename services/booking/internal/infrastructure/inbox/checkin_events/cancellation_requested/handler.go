@@ -7,6 +7,7 @@ import (
 
 	"booking/internal/application/usecase/booking/cancel"
 	checkindto "booking/internal/dto/checkin"
+	"booking/internal/pkg/telemetry/traces"
 )
 
 const eventType = "checkin.cancellation-requested.v1"
@@ -17,7 +18,13 @@ func NewHandler(usecase *cancel.UseCase) *Handler {
 	return &Handler{usecase: usecase}
 }
 
-func (h *Handler) HandleEvent(ctx context.Context, body []byte) error {
+func (h *Handler) HandleEvent(ctx context.Context, body []byte) (err error) {
+	ctx, span := traces.Start(ctx, "handler.event.cancellation_requested")
+	defer span.End()
+	defer func() {
+		traces.RecordError(span, err)
+	}()
+
 	envelope, err := deserialize(body)
 	if err != nil {
 		return err

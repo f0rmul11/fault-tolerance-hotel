@@ -6,9 +6,13 @@ import (
 	"api-gateway/internal/pkg/auth"
 	pb "api-gateway/internal/pkg/pb/api-gateway/checkin/v1"
 	external "api-gateway/internal/pkg/pb/external/check-in/checkin/v1"
+	"api-gateway/internal/pkg/telemetry/traces"
 )
 
 func (s *Implementation) CancelBooking(ctx context.Context, r *pb.CancelBookingRequest) (*pb.CancelBookingResponse, error) {
+	ctx, span := traces.Start(ctx, "handler.checkin.CancelBooking")
+	defer span.End()
+
 	caller := auth.Caller(ctx)
 	response, err := s.external.CancelBooking(ctx, &external.CancelBookingRequest{
 		Context: &external.RequestContext{

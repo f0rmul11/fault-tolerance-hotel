@@ -1,0 +1,59 @@
+# Jaeger 2.22.0, in-memory; restart removes all traces.
+---
+extensions:
+  jaeger_storage:
+    backends:
+      memory:
+        memory:
+          max_traces: 5000
+  jaeger_query:
+    storage:
+      traces: memory
+    http:
+      endpoint: 0.0.0.0:16686
+    grpc:
+      endpoint: 0.0.0.0:16685
+  healthcheckv2:
+    use_v2: true
+    http:
+      endpoint: 0.0.0.0:13133
+      status:
+        enabled: true
+        path: "/status"
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+processors:
+  batch:
+    timeout: 1s
+    send_batch_size: 512
+    send_batch_max_size: 1024
+exporters:
+  jaeger_storage_exporter:
+    trace_storage: memory
+service:
+  extensions:
+  - jaeger_storage
+  - jaeger_query
+  - healthcheckv2
+  pipelines:
+    traces:
+      receivers:
+      - otlp
+      processors:
+      - batch
+      exporters:
+      - jaeger_storage_exporter
+  telemetry:
+    logs:
+      level: info
+    metrics:
+      level: normal
+      readers:
+      - pull:
+          exporter:
+            prometheus:
+              host: 0.0.0.0
+              port: 8888

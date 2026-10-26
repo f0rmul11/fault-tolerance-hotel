@@ -12,9 +12,13 @@ import (
 	"check-in/internal/domain/entity"
 	"check-in/internal/domain/vo"
 	pb "check-in/internal/pkg/pb/check-in/checkin/v1"
+	"check-in/internal/pkg/telemetry/traces"
 )
 
 func (s *Server) ListArrivals(ctx context.Context, r *pb.ListArrivalsRequest) (*pb.ListArrivalsResponse, error) {
+	ctx, span := traces.Start(ctx, "handler.checkin.ListArrivals")
+	defer span.End()
+
 	period := mo.None[vo.Period]()
 	if r.GetStartsAt() != "" || r.GetEndsAt() != "" {
 		value, err := vo.ParsePeriod(r.GetStartsAt(), r.GetEndsAt())

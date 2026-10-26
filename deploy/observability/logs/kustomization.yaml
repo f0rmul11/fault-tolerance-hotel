@@ -1,0 +1,21 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: hotelflow
+resources:
+  - ../traces
+  - loki-workload.yaml
+  - grafana-workload.yaml
+configMapGenerator:
+  - name: otel-collector-config
+    behavior: replace
+    files:
+      - config.yaml=collector.yaml
+  - name: loki-config
+    files:
+      - config.yaml=loki.yaml
+  - name: grafana-config
+    files:
+      - grafana.ini
+  - name: grafana-datasources
+    files:
+      - datasources.yaml=grafana-datasources.yaml

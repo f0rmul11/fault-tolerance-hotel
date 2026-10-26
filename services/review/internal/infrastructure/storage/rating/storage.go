@@ -8,6 +8,7 @@ import (
 
 	entity "review/internal/domain/entity/rating"
 	"review/internal/infrastructure/storage/rating/dao"
+	"review/internal/pkg/telemetry/traces"
 	"review/internal/pkg/transaction/wrapper"
 )
 
@@ -20,6 +21,9 @@ func New(db wrapper.Database) *Storage {
 }
 
 func (s *Storage) Get(ctx context.Context, ids []uuid.UUID) ([]*entity.Rating, error) {
+	ctx, span := traces.Start(ctx, "storage.rating.Get")
+	defer span.End()
+
 	const query = `
 		select *
 		from public.ratings

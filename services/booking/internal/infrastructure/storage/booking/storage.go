@@ -14,6 +14,7 @@ import (
 	"booking/internal/domain/vo"
 	"booking/internal/infrastructure/storage/booking/dao"
 	app "booking/internal/pkg/bookingerror"
+	"booking/internal/pkg/telemetry/traces"
 	"booking/internal/pkg/transaction/wrapper"
 )
 
@@ -26,6 +27,9 @@ func New(db wrapper.Database) *Storage {
 }
 
 func (s *Storage) Create(ctx context.Context, b *entity.Booking, key uuid.UUID) error {
+	ctx, span := traces.Start(ctx, "storage.booking.Create")
+	defer span.End()
+
 	const query = `
 		insert into public.bookings (
 			id,
@@ -85,6 +89,9 @@ func (s *Storage) Create(ctx context.Context, b *entity.Booking, key uuid.UUID) 
 }
 
 func (s *Storage) Get(ctx context.Context, id uuid.UUID) (*entity.Booking, error) {
+	ctx, span := traces.Start(ctx, "storage.booking.Get")
+	defer span.End()
+
 	const query = `
 		select *
 		from public.bookings
@@ -102,6 +109,9 @@ func (s *Storage) Get(ctx context.Context, id uuid.UUID) (*entity.Booking, error
 
 // FindByKey возвращает nil, если эта операция ещё не была сохранена.
 func (s *Storage) FindByKey(ctx context.Context, guestID, key uuid.UUID) (*entity.Booking, error) {
+	ctx, span := traces.Start(ctx, "storage.booking.FindByKey")
+	defer span.End()
+
 	const query = `
 		select *
 		from public.bookings
@@ -120,6 +130,9 @@ func (s *Storage) FindByKey(ctx context.Context, guestID, key uuid.UUID) (*entit
 
 // FreeRooms — снимок доступности; запрет пересечений при записи обеспечивает EXCLUDE.
 func (s *Storage) FreeRooms(ctx context.Context, roomIDs []int64, period vo.Period) ([]int64, error) {
+	ctx, span := traces.Start(ctx, "storage.booking.FreeRooms")
+	defer span.End()
+
 	const query = `
 		select candidate.room_id
 		from unnest($1::bigint[]) as candidate(room_id)
@@ -141,6 +154,9 @@ func (s *Storage) FreeRooms(ctx context.Context, roomIDs []int64, period vo.Peri
 
 // Save применяет доменную версию через CAS, одним SQL для всего набора.
 func (s *Storage) Save(ctx context.Context, objects ...*entity.Booking) error {
+	ctx, span := traces.Start(ctx, "storage.booking.Save")
+	defer span.End()
+
 	const query = `
 		update public.bookings b
 		set

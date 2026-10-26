@@ -10,6 +10,7 @@ import (
 	dto "hotels/internal/dto/hotel"
 	"hotels/internal/pkg/grpc/intercept"
 	pb "hotels/internal/pkg/pb/external/review/review/v1"
+	"hotels/internal/pkg/telemetry/traces"
 )
 
 type ExternalClient pb.ReviewServiceClient
@@ -27,6 +28,9 @@ func NewClient(external ExternalClient) *Client {
 }
 
 func (c *Client) GetHotelRatings(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]dto.Rating, error) {
+	ctx, span := traces.Start(ctx, "gateway.review.GetHotelRatings")
+	defer span.End()
+
 	response, err := c.external.GetHotelRatings(ctx, &pb.GetHotelRatingsRequest{
 		HotelIds: lo.Map(ids, func(id uuid.UUID, _ int) string {
 			return id.String()

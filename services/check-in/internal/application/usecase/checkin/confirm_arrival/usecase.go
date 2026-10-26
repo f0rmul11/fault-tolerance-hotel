@@ -7,6 +7,7 @@ import (
 
 	"check-in/internal/domain/entity"
 	app "check-in/internal/pkg/checkinerror"
+	"check-in/internal/pkg/telemetry/traces"
 )
 
 type Storage interface {
@@ -21,6 +22,9 @@ func New(storage Storage) *UseCase {
 }
 
 func (s *UseCase) Execute(ctx context.Context, input Input) error {
+	ctx, span := traces.Start(ctx, "usecase.checkin.confirm_arrival")
+	defer span.End()
+
 	c, err := s.storage.Get(ctx, input.BookingID)
 	if err != nil {
 		return err

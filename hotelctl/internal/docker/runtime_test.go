@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -63,6 +65,14 @@ func TestServicePortUpdatePreservesVolumeAndOwner(t *testing.T) {
 		false,
 	} {
 		t.Run(fmt.Sprint("owned=", owned), func(t *testing.T) {
+			listener, err := net.Listen("tcp", "127.0.0.1:0")
+			if err != nil {
+				t.Fatal(err)
+			}
+			newHostPort := listener.Addr().(*net.TCPAddr).Port
+			if err := listener.Close(); err != nil {
+				t.Fatal(err)
+			}
 			state := &project.State{
 				Name:  "test",
 				Owner: "ours",
@@ -79,7 +89,7 @@ func TestServicePortUpdatePreservesVolumeAndOwner(t *testing.T) {
 			}
 			oldPorts := publishedPorts(state)
 			state.Bindings = append(state.Runtime.PortBindings(), config.PortBinding{
-				Host: 9091,
+				Host: newHostPort,
 				Node: 30091,
 			})
 			var removed, created atomic.Int32
@@ -144,7 +154,7 @@ func TestServicePortUpdatePreservesVolumeAndOwner(t *testing.T) {
 						t.Error("owner changed")
 					}
 					binding := body.HostConfig.PortBindings[nat.Port("30091/tcp")]
-					if len(binding) != 1 || binding[0].HostPort != "9091" {
+					if len(binding) != 1 || binding[0].HostPort != strconv.Itoa(newHostPort) {
 						t.Error("new service port missing")
 					}
 					if len(body.HostConfig.Mounts) != 1 || body.HostConfig.Mounts[0].Source != "test-k3s-data" {
@@ -203,5 +213,31 @@ func TestDependencyPortsStayOnLoopback(t *testing.T) {
 				t.Fatalf("dependency %s exposed on %s", port, mapping.HostIP)
 			}
 		}
+	}
+}
+
+func TestNewPortPreflightRejectsOccupiedPortAndAcceptsOwnedBinding(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	_, port, err := net.SplitHostPort(listener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	desired := nat.PortMap{
+		nat.Port("30686/tcp"): []nat.PortBinding{
+			{
+				HostIP:   "127.0.0.1",
+				HostPort: port,
+			},
+		},
+	}
+	if err := checkNewPortBindings(nil, desired); err == nil {
+		t.Fatal("occupied new UI port must reject runtime update")
+	}
+	if err := checkNewPortBindings(desired, desired); err != nil {
+		t.Fatalf("existing owned mapping cannot be checked as a new listener: %v", err)
 	}
 }

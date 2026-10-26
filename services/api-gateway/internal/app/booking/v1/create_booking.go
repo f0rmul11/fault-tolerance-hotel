@@ -6,9 +6,13 @@ import (
 	"api-gateway/internal/pkg/auth"
 	bookingV1 "api-gateway/internal/pkg/pb/api-gateway/booking/v1"
 	externalV1 "api-gateway/internal/pkg/pb/external/booking/booking/v1"
+	"api-gateway/internal/pkg/telemetry/traces"
 )
 
 func (i *Implementation) CreateBooking(ctx context.Context, req *bookingV1.CreateBookingRequest) (*bookingV1.CreateBookingResponse, error) {
+	ctx, span := traces.Start(ctx, "handler.booking.CreateBooking")
+	defer span.End()
+
 	response, err := i.external.CreateBooking(ctx, &externalV1.CreateBookingRequest{
 		Context:        auth.Caller(ctx),
 		IdempotencyKey: req.GetIdempotencyKey(),

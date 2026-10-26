@@ -9,6 +9,7 @@ import (
 	"github.com/gofrs/uuid"
 
 	event_router "notification/internal/pkg/event-router"
+	"notification/internal/pkg/telemetry/traces"
 )
 
 type MessageHandler struct {
@@ -21,7 +22,13 @@ func NewMessageHandler(router *event_router.EventRouter[string, []byte]) *Messag
 	}
 }
 
-func (h *MessageHandler) Handle(ctx context.Context, _ sarama.ConsumerGroupSession, message *sarama.ConsumerMessage) error {
+func (h *MessageHandler) Handle(ctx context.Context, _ sarama.ConsumerGroupSession, message *sarama.ConsumerMessage) (err error) {
+	ctx, span := traces.Start(ctx, "handler.kafka.booking_events")
+	defer span.End()
+	defer func() {
+		traces.RecordError(span, err)
+	}()
+
 	var base BaseEvent
 	if err := json.Unmarshal(message.Value, &base); err != nil {
 		return err

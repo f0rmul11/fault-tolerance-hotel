@@ -10,9 +10,13 @@ import (
 	"booking/internal/application/usecase/booking/get"
 	"booking/internal/pkg/grpc/intercept"
 	pb "booking/internal/pkg/pb/booking/booking/v1"
+	"booking/internal/pkg/telemetry/traces"
 )
 
 func (s *Server) GetBooking(ctx context.Context, r *pb.GetBookingRequest) (*pb.GetBookingResponse, error) {
+	ctx, span := traces.Start(ctx, "handler.booking.GetBooking")
+	defer span.End()
+
 	b, err := s.usecases.GetBooking.Execute(
 		ctx,
 		get.Input{

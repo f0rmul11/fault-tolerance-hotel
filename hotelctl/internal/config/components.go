@@ -86,6 +86,7 @@ func (c Config) Components() []Service {
 			Namespace:  "hotelflow",
 		})
 	}
+	result = append(result, c.ObservabilityComponents()...)
 	return append(result, c.Services...)
 }
 
@@ -111,4 +112,56 @@ func (c Config) SelectComponents(names []string) ([]Service, error) {
 		}
 	}
 	return result, nil
+}
+
+// ObservabilityComponents returns only the backends enabled for this stage.
+func (c Config) ObservabilityComponents() []Service {
+	if !c.Observability.Enabled {
+		return nil
+	}
+	result := []Service{
+		{
+			Name:       "otel-collector",
+			Deployment: "otel-collector",
+			Namespace:  "hotelflow",
+		},
+		{
+			Name:       "jaeger",
+			Deployment: "jaeger",
+			Namespace:  "hotelflow",
+		},
+	}
+	if c.Observability.Stage == "logs" || c.Observability.Stage == "metrics" {
+		result = append(result,
+			Service{Name: "loki", Deployment: "loki", Namespace: "hotelflow"},
+			Service{Name: "grafana", Deployment: "grafana", Namespace: "hotelflow"},
+		)
+	}
+	if c.Observability.Stage == "metrics" {
+		result = append(result, Service{
+			Name:       "prometheus",
+			Deployment: "prometheus",
+			Namespace:  "hotelflow",
+		})
+	}
+	return result
+}
+
+// ObservabilityPortBindings reserves both UI addresses on the first tracing install.
+func (c Config) ObservabilityPortBindings() []PortBinding {
+	if !c.Observability.Enabled {
+		return nil
+	}
+	return []PortBinding{
+		{
+			Host:      16686,
+			Node:      30686,
+			LocalOnly: true,
+		},
+		{
+			Host:      3000,
+			Node:      30300,
+			LocalOnly: true,
+		},
+	}
 }

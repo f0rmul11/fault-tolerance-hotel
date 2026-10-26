@@ -10,6 +10,7 @@ import (
 	"booking/internal/events/checkin_rejected"
 	app "booking/internal/pkg/bookingerror"
 	"booking/internal/pkg/event"
+	"booking/internal/pkg/telemetry/traces"
 	"booking/internal/pkg/transaction"
 )
 
@@ -31,6 +32,9 @@ func New(storage Storage, flusher event.Flusher) *UseCase {
 }
 
 func (s *UseCase) Execute(ctx context.Context, input Input) error {
+	ctx, span := traces.Start(ctx, "usecase.booking.cancel")
+	defer span.End()
+
 	request := input.Request
 	if err := request.Validate(); err != nil {
 		return err

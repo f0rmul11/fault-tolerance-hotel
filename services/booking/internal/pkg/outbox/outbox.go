@@ -6,13 +6,14 @@ import (
 	"log/slog"
 	"sync"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/samber/lo"
+
 	"booking/internal/pkg/event"
 	"booking/internal/pkg/outbox/message"
 	"booking/internal/pkg/outbox/storage"
+	"booking/internal/pkg/telemetry/traces"
 	"booking/internal/pkg/transaction"
-
-	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/samber/lo"
 )
 
 // Topic название топика в Kafka
@@ -54,7 +55,13 @@ func (s *Outbox) RegisterHandler(handler Handler) {
 }
 
 // Flush кладет сообщение в outbox таблицу для последующей отправки в брокер
-func (s *Outbox) Flush(ctx context.Context, events event.Events) error {
+func (s *Outbox) Flush(ctx context.Context, events event.Events) (err error) {
+	ctx, span := traces.Start(ctx, "outbox.Flush")
+	defer span.End()
+	defer func() {
+		traces.RecordError(span, err)
+	}()
+
 	var messages = make(message.Messages, 0, len(events))
 
 	for _, ev := range events {
@@ -71,7 +78,7 @@ func (s *Outbox) Flush(ctx context.Context, events event.Events) error {
 		return nil
 	}
 
-	err := s.storage.SaveMessages(ctx, messages)
+	err = s.storage.SaveMessages(ctx, messages)
 	if err != nil {
 		return err
 	}
@@ -110,10 +117,7 @@ func (s *Outbox) HandlePendingMessages(ctx context.Context) {
 				defer wg.Done()
 				// обрабатываем сообщения в топике (последовательно)
 				s.processMessagesByTopic(ctx, topic, messages)
-			}(
-				topic,
-				messages,
-			)
+			}(topic, messages)
 		}
 		wg.Wait()
 

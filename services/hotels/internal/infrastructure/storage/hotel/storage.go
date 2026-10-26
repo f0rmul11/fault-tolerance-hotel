@@ -11,6 +11,7 @@ import (
 	entity "hotels/internal/domain/entity/hotel"
 	"hotels/internal/infrastructure/storage/hotel/dao"
 	app "hotels/internal/pkg/hotelserror"
+	"hotels/internal/pkg/telemetry/traces"
 	"hotels/internal/pkg/transaction/wrapper"
 )
 
@@ -23,6 +24,9 @@ func New(db wrapper.Database) *Storage {
 }
 
 func (s *Storage) Get(ctx context.Context, id uuid.UUID) (*entity.Hotel, error) {
+	ctx, span := traces.Start(ctx, "storage.hotel.Get")
+	defer span.End()
+
 	const query = `
 		select *
 		from public.hotels
@@ -41,6 +45,9 @@ func (s *Storage) Get(ctx context.Context, id uuid.UUID) (*entity.Hotel, error) 
 }
 
 func (s *Storage) List(ctx context.Context, limit, offset int) ([]*entity.Hotel, error) {
+	ctx, span := traces.Start(ctx, "storage.hotel.List")
+	defer span.End()
+
 	const query = `
 		select *
 		from public.hotels

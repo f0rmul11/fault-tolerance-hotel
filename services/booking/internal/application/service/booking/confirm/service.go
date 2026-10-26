@@ -10,6 +10,7 @@ import (
 	"booking/internal/events/booking_confirmed"
 	app "booking/internal/pkg/bookingerror"
 	"booking/internal/pkg/event"
+	"booking/internal/pkg/telemetry/traces"
 	"booking/internal/pkg/transaction"
 )
 
@@ -31,6 +32,9 @@ func New(storage Storage, flusher event.Flusher) *Service {
 
 // Confirm сохраняет бронь и событие одной транзакцией; пересечения запрещает БД.
 func (s *Service) Confirm(ctx context.Context, booking *entity.Booking, key uuid.UUID, limits vo.Limits) (*entity.Booking, error) {
+	ctx, span := traces.Start(ctx, "service.booking.confirm.Confirm")
+	defer span.End()
+
 	err := transaction.Exec(ctx, func(txCtx context.Context) error {
 		if !limits.Allows(booking.Period()) {
 			return app.NewBusinessErr("Длительность бронирования не соответствует условиям номера")

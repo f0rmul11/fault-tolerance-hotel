@@ -3,11 +3,12 @@ package inbox
 import (
 	"context"
 
-	"booking/internal/pkg/inbox/message"
-	"booking/internal/pkg/inbox/storage"
-
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/samber/lo"
+
+	"booking/internal/pkg/inbox/message"
+	"booking/internal/pkg/inbox/storage"
+	"booking/internal/pkg/telemetry/traces"
 )
 
 type Mode int8
@@ -57,7 +58,13 @@ func (i *Inbox) RegisterHandler(handler Handler) {
 	i.handlers[Topic(topic)] = handler
 }
 
-func (i *Inbox) SaveMessages(ctx context.Context, messages message.Messages) error {
+func (i *Inbox) SaveMessages(ctx context.Context, messages message.Messages) (err error) {
+	ctx, span := traces.Start(ctx, "inbox.SaveMessages")
+	defer span.End()
+	defer func() {
+		traces.RecordError(span, err)
+	}()
+
 	if err := i.storage.SaveMessages(ctx, messages); err != nil {
 		return err
 	}

@@ -6,6 +6,8 @@ import (
 	"os"
 	"sync"
 
+	"hotels/internal/pkg/telemetry"
+
 	"github.com/ilyakaznacheev/cleanenv"
 )
 
@@ -26,6 +28,7 @@ func Instance() *Config {
 }
 
 type Config struct {
+	Telemetry   telemetry.Config  `yaml:"telemetry"`
 	Postgres    Postgres          `yaml:"postgres"`
 	PostgresDSN string            `yaml:"postgres_dsn" env:"POSTGRES_DSN"`
 	Targets     map[string]string `yaml:"service"`

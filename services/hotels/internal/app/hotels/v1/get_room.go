@@ -6,6 +6,7 @@ import (
 	"time"
 
 	app "hotels/internal/pkg/hotelserror"
+	"hotels/internal/pkg/telemetry/traces"
 
 	"github.com/samber/lo"
 
@@ -13,6 +14,9 @@ import (
 )
 
 func (s *Service) GetRoom(ctx context.Context, req *pb.GetRoomRequest) (*pb.GetRoomResponse, error) {
+	ctx, span := traces.Start(ctx, "handler.hotels.GetRoom")
+	defer span.End()
+
 	id, err := strconv.ParseInt(req.GetRoomId(), 10, 64)
 	if err != nil {
 		return nil, app.NewInvalidArgumentErr("Идентификатор номера должен быть числом")

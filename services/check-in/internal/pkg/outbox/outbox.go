@@ -6,13 +6,14 @@ import (
 	"log/slog"
 	"sync"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/samber/lo"
+
 	"check-in/internal/pkg/event"
 	"check-in/internal/pkg/outbox/message"
 	"check-in/internal/pkg/outbox/storage"
+	"check-in/internal/pkg/telemetry/traces"
 	"check-in/internal/pkg/transaction"
-
-	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/samber/lo"
 )
 
 // Topic название топика в Kafka
@@ -54,7 +55,13 @@ func (s *Outbox) RegisterHandler(handler Handler) {
 }
 
 // Flush кладет сообщение в outbox таблицу для последующей отправки в брокер
-func (s *Outbox) Flush(ctx context.Context, events event.Events) error {
+func (s *Outbox) Flush(ctx context.Context, events event.Events) (err error) {
+	ctx, span := traces.Start(ctx, "outbox.Flush")
+	defer span.End()
+	defer func() {
+		traces.RecordError(span, err)
+	}()
+
 	var messages = make(message.Messages, 0, len(events))
 
 	for _, ev := range events {
@@ -71,7 +78,7 @@ func (s *Outbox) Flush(ctx context.Context, events event.Events) error {
 		return nil
 	}
 
-	err := s.storage.SaveMessages(ctx, messages)
+	err = s.storage.SaveMessages(ctx, messages)
 	if err != nil {
 		return err
 	}

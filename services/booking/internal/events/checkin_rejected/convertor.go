@@ -13,6 +13,7 @@ import (
 	"booking/internal/events"
 	"booking/internal/pkg/event"
 	"booking/internal/pkg/pipe"
+	"booking/internal/pkg/telemetry/traces"
 )
 
 const Type = "booking.checkin-rejected.v1"
@@ -46,6 +47,8 @@ func New(b *entity.Booking, request checkindto.Request, message string) pipe.Fun
 			"x-app-name":       "booking",
 			"x-event-type":     Type,
 		}
+		traces.Inject(ctx, headers)
+
 		headersRaw, err := json.Marshal(headers)
 		if err != nil {
 			return nil, err

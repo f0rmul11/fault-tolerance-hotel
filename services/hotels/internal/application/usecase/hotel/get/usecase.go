@@ -8,6 +8,7 @@ import (
 	entity "hotels/internal/domain/entity/hotel"
 	dto "hotels/internal/dto/hotel"
 	app "hotels/internal/pkg/hotelserror"
+	"hotels/internal/pkg/telemetry/traces"
 )
 
 type Storage interface {
@@ -31,6 +32,9 @@ func New(storage Storage, review Review) *UseCase {
 }
 
 func (s *UseCase) Execute(ctx context.Context, id uuid.UUID) (*entity.Hotel, error) {
+	ctx, span := traces.Start(ctx, "usecase.hotel.get")
+	defer span.End()
+
 	if id == uuid.Nil {
 		return nil, app.NewInvalidArgumentErr("Некорректный идентификатор отеля")
 	}

@@ -6,6 +6,7 @@ import (
 	"github.com/gofrs/uuid"
 
 	"notification/internal/application/usecase/notification/activated"
+	"notification/internal/pkg/telemetry/traces"
 )
 
 const eventType = "booking.activated.v1"
@@ -20,7 +21,13 @@ func NewHandler(usecase *activated.UseCase) *Handler {
 	}
 }
 
-func (h *Handler) HandleEvent(ctx context.Context, body []byte) error {
+func (h *Handler) HandleEvent(ctx context.Context, body []byte) (err error) {
+	ctx, span := traces.Start(ctx, "handler.event.booking_activated")
+	defer span.End()
+	defer func() {
+		traces.RecordError(span, err)
+	}()
+
 	event, err := deserialize(body)
 	if err != nil {
 		return err

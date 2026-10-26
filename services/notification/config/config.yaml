@@ -17,3 +17,14 @@ kafka_brokers:
 consumer_group: notification-booking-events
 # Уведомления выводятся в stdout, внешнего провайдера нет.
 service: {}
+
+telemetry:
+  metrics_enabled: true
+  metrics_interval: 15s
+  logs_enabled: true
+  log_level: info
+  enabled: false
+  service_name: notification
+  service_namespace: hotelflow
+  otlp_endpoint: otel-collector:4317
+  otlp_insecure: true

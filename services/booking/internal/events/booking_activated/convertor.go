@@ -13,6 +13,7 @@ import (
 	"booking/internal/events"
 	"booking/internal/pkg/event"
 	"booking/internal/pkg/pipe"
+	"booking/internal/pkg/telemetry/traces"
 )
 
 const Type = "booking.activated.v1"
@@ -45,6 +46,8 @@ func New(b *entity.Booking, request checkindto.Request) pipe.Func[event.Events] 
 			"x-app-name":       "booking",
 			"x-event-type":     Type,
 		}
+		traces.Inject(ctx, headers)
+
 		headersRaw, err := json.Marshal(headers)
 		if err != nil {
 			return nil, err

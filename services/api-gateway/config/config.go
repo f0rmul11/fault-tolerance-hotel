@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"api-gateway/internal/pkg/rtconfig"
+	"api-gateway/internal/pkg/telemetry"
 
 	"github.com/ilyakaznacheev/cleanenv"
 )
@@ -28,6 +29,7 @@ func Instance() *Config {
 }
 
 type Config struct {
+	Telemetry     telemetry.Config  `yaml:"telemetry"`
 	RuntimeConfig rtconfig.Config   `yaml:"runtime_config"`
 	Targets       map[string]string `yaml:"service"`
 	GrpcServer    GrpcServer        `yaml:"grpc_server"`

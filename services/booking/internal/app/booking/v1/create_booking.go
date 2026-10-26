@@ -2,6 +2,7 @@ package booking
 
 import (
 	"booking/internal/pkg/bookingerror"
+	"booking/internal/pkg/telemetry/traces"
 	"context"
 	"strconv"
 	"time"
@@ -15,6 +16,9 @@ import (
 )
 
 func (s *Server) CreateBooking(ctx context.Context, r *pb.CreateBookingRequest) (*pb.CreateBookingResponse, error) {
+	ctx, span := traces.Start(ctx, "handler.booking.CreateBooking")
+	defer span.End()
+
 	roomID, err := strconv.ParseInt(r.GetRoomId(), 10, 64)
 	if err != nil {
 		return nil, bookingerror.NewInvalidArgumentErr("Идентификатор номера должен быть числом")

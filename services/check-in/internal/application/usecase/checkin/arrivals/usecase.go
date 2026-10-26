@@ -6,6 +6,7 @@ import (
 
 	"check-in/internal/domain/entity"
 	"check-in/internal/domain/vo"
+	"check-in/internal/pkg/telemetry/traces"
 )
 
 type Storage interface {
@@ -25,6 +26,9 @@ func New(storage Storage, location *time.Location) *UseCase {
 }
 
 func (s *UseCase) Execute(ctx context.Context, input Input) ([]*entity.CheckIn, error) {
+	ctx, span := traces.Start(ctx, "usecase.checkin.arrivals")
+	defer span.End()
+
 	period, ok := input.Period.Get()
 	if !ok {
 		now := time.Now().In(s.location)

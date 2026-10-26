@@ -28,6 +28,8 @@ import (
 
 	"notification/internal/pkg/closer"
 	"notification/internal/pkg/grpcdesc"
+	"notification/internal/pkg/telemetry"
+	"notification/internal/pkg/telemetry/traces"
 
 	echoV1 "notification/internal/pkg/pb/notification/echo/v1"
 
@@ -58,7 +60,7 @@ func (a *App) initMainServer(ctx context.Context) error {
 	a.mainServer = server.NewServer(
 		config.Instance().GrpcServer.Port,
 		server.WithHTTPPort(config.Instance().HttpServer.Port),
-		server.WithHTTPMiddlewares(func(next http.Handler) http.Handler {
+		server.WithHTTPMiddlewares(traces.HTTP, func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				// HTTP Serve starts after both Clay servers have been initialized.
 				readyOnce.Do(func() {
@@ -68,6 +70,7 @@ func (a *App) initMainServer(ctx context.Context) error {
 			})
 		}),
 		server.WithGRPCOpts(
+			grpc.StatsHandler(traces.ServerHandler()),
 			grpc.ChainUnaryInterceptor(intercept.ErrorInterceptor()),
 			grpc.KeepaliveParams(keepalive.ServerParameters{
 				MaxConnectionIdle: config.Instance().GrpcServer.MaxConnectionIdle,
@@ -252,5 +255,15 @@ func (a *App) initHandlers(_ context.Context) error {
 func (a *App) initMessageBus(_ context.Context) error {
 	a.messageBus = messagebus.NewRegistry(a.eventRouter)
 	a.publicCloser.Add(a.messageBus.Stop)
+	return nil
+}
+
+// initTelemetry runs before instrumented transports and background workers.
+func (a *App) initTelemetry(ctx context.Context) error {
+	instance, err := telemetry.Init(ctx, config.Instance().Telemetry)
+	if err != nil {
+		return err
+	}
+	a.telemetry = instance
 	return nil
 }

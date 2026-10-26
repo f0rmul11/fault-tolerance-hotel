@@ -220,3 +220,13 @@ ETCD_BIN=/absolute/path/to/etcd go test -race -tags=integration ./pkg/cmd/config
 `stop` без аргументов останавливает весь контейнер k3s, как и раньше; возобновление — `up`.
 `up/deploy` снова применяют манифесты и могут вернуть остановленные компоненты: в ходе
 эксперимента используйте именно stop/start, а не deploy.
+
+## Наблюдаемость
+
+`observability.enabled: true` и `stage: metrics` в `hotel.yaml` добавляют единый Collector, Jaeger memory, Loki, Grafana и Prometheus. Этап `traces` включает только экспорт трейсов.
+`up/deploy` применяют инфраструктуру; `components/status/start/stop/restart/logs` знают `otel-collector`, `jaeger`, а на этапах `logs`/`metrics` — `loki` и `grafana`, на `metrics` — `prometheus`.
+`access` показывает постоянные адреса Jaeger `http://localhost:16686` и Grafana `http://localhost:3000`. Пароль Grafana создается один раз в Secret `hotelflow/grafana-admin`.
+Оба UI-порта публикуются на loopback. При первом изменении портов runtime пересоздает k3s-контейнер с прежним томом;
+host/NodePort конфликты проверяются до остановки работающего кластера. `destroy/reset` для этого не нужны.
+Jaeger не сохраняет историю после остановки/рестарта. Loki/Grafana используют PVC; Prometheus также использует PVC; метрики registry поступают через OTLP без scrape.
+Подробнее: [трейсы, логи и метрики](../deploy/observability/README.md).

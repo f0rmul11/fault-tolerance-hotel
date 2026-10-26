@@ -1,6 +1,10 @@
 runtime:
   image: rancher/k3s:v1.35.2-k3s1
 
+observability:
+  enabled: true
+  stage: metrics
+
 services:
   - api-gateway
   - booking

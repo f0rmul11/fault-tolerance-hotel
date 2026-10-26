@@ -10,9 +10,13 @@ import (
 	"check-in/internal/application/usecase/checkin/cancel"
 	"check-in/internal/pkg/grpc/intercept"
 	pb "check-in/internal/pkg/pb/check-in/checkin/v1"
+	"check-in/internal/pkg/telemetry/traces"
 )
 
 func (s *Server) CancelBooking(ctx context.Context, r *pb.CancelBookingRequest) (*pb.CancelBookingResponse, error) {
+	ctx, span := traces.Start(ctx, "handler.checkin.CancelBooking")
+	defer span.End()
+
 	c, err := s.usecases.CancelCheckIn.Execute(
 		ctx,
 		cancel.Input{

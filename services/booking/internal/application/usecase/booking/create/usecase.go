@@ -10,6 +10,7 @@ import (
 	"booking/internal/domain/vo"
 	roomdto "booking/internal/dto/room"
 	app "booking/internal/pkg/bookingerror"
+	"booking/internal/pkg/telemetry/traces"
 )
 
 type Storage interface {
@@ -39,6 +40,9 @@ func New(storage Storage, rooms Rooms, confirmer Confirmer) *UseCase {
 }
 
 func (s *UseCase) Execute(ctx context.Context, input Input) (*entity.Booking, error) {
+	ctx, span := traces.Start(ctx, "usecase.booking.create")
+	defer span.End()
+
 	if input.IdempotencyKey == uuid.Nil {
 		return nil, app.NewInvalidArgumentErr("Не указан ключ идемпотентности")
 	}

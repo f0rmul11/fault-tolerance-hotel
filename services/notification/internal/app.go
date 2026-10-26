@@ -19,6 +19,7 @@ import (
 	"notification/internal/pkg/closer"
 	event_router "notification/internal/pkg/event-router"
 	"notification/internal/pkg/healthcheck"
+	"notification/internal/pkg/telemetry"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/not-for-prod/clay/server"
@@ -28,6 +29,7 @@ import (
 
 // App application
 type App struct {
+	telemetry   *telemetry.Telemetry
 	gateway     *gateway.Registry
 	usecases    *usecase.Registry
 	eventRouter *event_router.EventRouter[string, []byte]
@@ -70,6 +72,7 @@ func New(ctx context.Context) *App {
 	app.runAdminServer(ctx)
 
 	if err := app.init(ctx); err != nil {
+		_ = app.telemetry.Shutdown(ctx)
 		log.Fatalf("[APP] Не удалось инициализировать приложение: %s", err.Error())
 	}
 	return app
@@ -101,6 +104,15 @@ func (a *App) runAdminServer(_ context.Context) {
 
 // Run запуск приложения
 func (a *App) Run(ctx context.Context) {
+	defer func() {
+		a.publicCloser.CloseAll()
+		closer.CloseAll()
+		a.adminCloser.CloseAll()
+		if err := a.telemetry.Shutdown(ctx); err != nil {
+			slog.Warn("Не удалось завершить экспорт телеметрии", "error", err)
+		}
+	}()
+
 	if a.mainServer != nil {
 		go func() {
 			if err := a.mainServer.Run(a.controllers...); err != nil {
@@ -123,13 +135,11 @@ func (a *App) Run(ctx context.Context) {
 
 	a.publicCloser.Wait()
 
-	closer.CloseAll()
-
-	a.adminCloser.CloseAll()
 }
 
 func (a *App) init(ctx context.Context) error {
 	initFuncs := []func(context.Context) error{
+		a.initTelemetry,
 		a.initMainServer,
 		a.initGrpcConn,
 		a.initGateway,

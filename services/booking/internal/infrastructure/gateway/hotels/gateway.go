@@ -13,6 +13,7 @@ import (
 	roomdto "booking/internal/dto/room"
 	"booking/internal/pkg/grpc/intercept"
 	pb "booking/internal/pkg/pb/external/hotels/hotels/v1"
+	"booking/internal/pkg/telemetry/traces"
 )
 
 type ExternalClient pb.HotelsServiceClient
@@ -30,6 +31,9 @@ func NewClient(external ExternalClient) *Client {
 }
 
 func (c *Client) Get(ctx context.Context, id int64) (roomdto.Room, error) {
+	ctx, span := traces.Start(ctx, "gateway.hotels.Get")
+	defer span.End()
+
 	var trailers metadata.MD
 	response, err := c.external.GetRoom(ctx, &pb.GetRoomRequest{RoomId: strconv.FormatInt(id, 10)}, grpc.Trailer(&trailers))
 	if err != nil {
@@ -47,6 +51,9 @@ func (c *Client) Get(ctx context.Context, id int64) (roomdto.Room, error) {
 }
 
 func (c *Client) List(ctx context.Context, hotelID uuid.UUID) ([]roomdto.Room, error) {
+	ctx, span := traces.Start(ctx, "gateway.hotels.List")
+	defer span.End()
+
 	var trailers metadata.MD
 	response, err := c.external.ListRooms(ctx, &pb.ListRoomsRequest{HotelId: hotelID.String()}, grpc.Trailer(&trailers))
 	if err != nil {

@@ -58,7 +58,7 @@ func TestServiceDefaultsAndExplicitOverrides(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(c.Services) != 6 || len(c.PortBindings()) != 20 {
+	if len(c.Services) != 6 || len(c.PortBindings()) != 22 {
 		t.Fatalf("unexpected service/port count: %d/%d", len(c.Services), len(c.PortBindings()))
 	}
 	for i, service := range c.Services[1:] {

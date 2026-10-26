@@ -6,6 +6,7 @@ import (
 	"github.com/gofrs/uuid"
 
 	"check-in/internal/application/usecase/checkin/confirm_arrival"
+	"check-in/internal/pkg/telemetry/traces"
 )
 
 const eventType = "booking.activated.v1"
@@ -16,7 +17,13 @@ func NewHandler(usecase *confirm_arrival.UseCase) *Handler {
 	return &Handler{usecase: usecase}
 }
 
-func (h *Handler) HandleEvent(ctx context.Context, body []byte) error {
+func (h *Handler) HandleEvent(ctx context.Context, body []byte) (err error) {
+	ctx, span := traces.Start(ctx, "handler.event.booking_activated")
+	defer span.End()
+	defer func() {
+		traces.RecordError(span, err)
+	}()
+
 	e, err := deserialize(body)
 	if err != nil {
 		return err

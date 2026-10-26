@@ -1,0 +1,18 @@
+# Loki datasource; trace_id is structured metadata.
+---
+apiVersion: 1
+datasources:
+- name: Loki
+  uid: hotelflow-loki
+  type: loki
+  access: proxy
+  url: http://loki:3100
+  editable: false
+  jsonData:
+    derivedFields:
+    - name: trace_id
+      matcherType: label
+      matcherRegex: "^trace_id$"
+      url: http://localhost:16686/trace/$${__value.raw}
+      urlDisplayLabel: Открыть в Jaeger
+  isDefault: true

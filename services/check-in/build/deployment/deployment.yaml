@@ -22,7 +22,7 @@ spec:
         app.kubernetes.io/name: check-in
         app.kubernetes.io/part-of: hotelflow
     spec:
-      terminationGracePeriodSeconds: 20
+      terminationGracePeriodSeconds: 30
       automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
@@ -40,6 +40,56 @@ spec:
             - name: admin
               containerPort: 8081
           env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef: {fieldPath: metadata.name}
+            - name: POD_UID
+              valueFrom:
+                fieldRef: {fieldPath: metadata.uid}
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef: {fieldPath: metadata.namespace}
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef: {fieldPath: spec.nodeName}
+            - name: OTEL_SERVICE_NAME
+              value: check-in
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: service.namespace=hotelflow,deployment.environment.name=lab,k8s.namespace.name=$(POD_NAMESPACE),k8s.pod.name=$(POD_NAME),k8s.pod.uid=$(POD_UID),k8s.node.name=$(NODE_NAME)
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: otel-collector.hotelflow.svc.cluster.local:4317
+            - name: OTEL_EXPORTER_OTLP_INSECURE
+              value: "true"
+            - name: OTEL_TRACES_SAMPLER
+              value: parentbased_always_on
+            - name: TELEMETRY_ENABLED
+              value: "true"
+            - name: TELEMETRY_LOGS_ENABLED
+              value: "true"
+            - name: LOG_LEVEL
+              value: info
+            - name: OTEL_BLRP_MAX_QUEUE_SIZE
+              value: "2048"
+            - name: OTEL_BLRP_MAX_EXPORT_BATCH_SIZE
+              value: "512"
+            - name: OTEL_BLRP_SCHEDULE_DELAY
+              value: "1000"
+            - name: OTEL_BLRP_EXPORT_TIMEOUT
+              value: "3000"
+            - name: TELEMETRY_METRICS_ENABLED
+              value: "true"
+            - name: TELEMETRY_METRICS_INTERVAL
+              value: 15s
+            - name: OTEL_METRIC_EXPORT_TIMEOUT
+              value: "3000"
+            - name: OTEL_BSP_MAX_QUEUE_SIZE
+              value: "2048"
+            - name: OTEL_BSP_MAX_EXPORT_BATCH_SIZE
+              value: "512"
+            - name: OTEL_BSP_SCHEDULE_DELAY
+              value: "1000"
+            - name: OTEL_BSP_EXPORT_TIMEOUT
+              value: "3000"
             - name: GRPC_PORT
               value: "9090"
             - name: ADMIN_HTTP_PORT

@@ -24,3 +24,14 @@ runtime_config:
   schema_path: rtconfig.yaml
   startup_timeout: 5s
   shutdown_timeout: 3s
+
+telemetry:
+  metrics_enabled: true
+  metrics_interval: 15s
+  logs_enabled: true
+  log_level: info
+  enabled: false
+  service_name: api-gateway
+  service_namespace: hotelflow
+  otlp_endpoint: otel-collector:4317
+  otlp_insecure: true

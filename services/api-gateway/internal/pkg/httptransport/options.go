@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strings"
 
+	"api-gateway/internal/pkg/telemetry/traces"
+
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -14,6 +16,7 @@ import (
 // Options настраивает generated HTTP-адаптер Clay; тело ошибки сериализует grpc-gateway.
 func Options() []runtime.ServeMuxOption {
 	return []runtime.ServeMuxOption{
+		runtime.WithMiddlewares(traces.AnnotateHTTPRoute),
 		runtime.WithMarshalerOption(runtime.MIMEWildcard, &runtime.JSONPb{
 			MarshalOptions: protojson.MarshalOptions{
 				UseProtoNames:   true,

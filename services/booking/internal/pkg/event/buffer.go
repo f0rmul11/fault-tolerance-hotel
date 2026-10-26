@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"booking/internal/pkg/pipe"
+	"booking/internal/pkg/telemetry/traces"
 )
 
 // Flusher функция для обработки содержимого буфера
@@ -45,7 +46,13 @@ func (b *Buffer) Add(eventCallback pipe.Func[Events]) {
 }
 
 // Flush сбрасывает событие в функцию flusher для обработки и очищает буфер
-func (b *Buffer) Flush(ctx context.Context) error {
+func (b *Buffer) Flush(ctx context.Context) (err error) {
+	ctx, span := traces.Start(ctx, "event.Flush")
+	defer span.End()
+	defer func() {
+		traces.RecordError(span, err)
+	}()
+
 	b.lock.Lock()
 	defer b.lock.Unlock()
 

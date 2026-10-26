@@ -1,0 +1,103 @@
+# Collector 0.163.2: traces and logs.
+---
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 384
+    spike_limit_mib: 96
+  # Derive a bounded level per LogRecord, then split mixed-severity batches
+  # before promoting the value to a resource attribute for Loki indexing.
+  transform/log_level:
+    error_mode: ignore
+    log_statements:
+      - context: log
+        statements:
+          - set(attributes["level"], "unknown")
+          - set(attributes["level"], "trace") where severity_number >= 1 and severity_number <= 4
+          - set(attributes["level"], "debug") where severity_number >= 5 and severity_number <= 8
+          - set(attributes["level"], "info") where severity_number >= 9 and severity_number <= 12
+          - set(attributes["level"], "warn") where severity_number >= 13 and severity_number <= 16
+          - set(attributes["level"], "error") where severity_number >= 17 and severity_number <= 20
+          - set(attributes["level"], "fatal") where severity_number >= 21 and severity_number <= 24
+  groupbyattrs/log_level:
+    keys: [level]
+  batch/traces:
+    timeout: 1s
+    send_batch_size: 512
+    send_batch_max_size: 1024
+  batch/logs:
+    timeout: 1s
+    send_batch_size: 512
+    send_batch_max_size: 1024
+exporters:
+  otlp_grpc/jaeger:
+    endpoint: jaeger:4317
+    tls:
+      insecure: true
+    timeout: 5s
+    sending_queue:
+      enabled: true
+      num_consumers: 2
+      sizer: items
+      queue_size: 10000
+    retry_on_failure:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 10s
+      max_elapsed_time: 60s
+  otlp_http/loki:
+    endpoint: http://loki:3100/otlp
+    timeout: 5s
+    sending_queue:
+      enabled: true
+      num_consumers: 1
+      sizer: items
+      queue_size: 10000
+    retry_on_failure:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 10s
+      max_elapsed_time: 60s
+service:
+  extensions:
+  - health_check
+  pipelines:
+    traces:
+      receivers:
+      - otlp
+      processors:
+      - memory_limiter
+      - batch/traces
+      exporters:
+      - otlp_grpc/jaeger
+    logs:
+      receivers:
+      - otlp
+      processors:
+      - memory_limiter
+      - transform/log_level
+      - groupbyattrs/log_level
+      - batch/logs
+      exporters:
+      - otlp_http/loki
+  telemetry:
+    logs:
+      level: info
+    metrics:
+      level: normal
+      readers:
+      - pull:
+          exporter:
+            prometheus:
+              host: 0.0.0.0
+              port: 8888

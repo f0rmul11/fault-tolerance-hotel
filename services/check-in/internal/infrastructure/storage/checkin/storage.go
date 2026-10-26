@@ -14,6 +14,7 @@ import (
 	checkindto "check-in/internal/dto/checkin"
 	"check-in/internal/infrastructure/storage/checkin/dao"
 	app "check-in/internal/pkg/checkinerror"
+	"check-in/internal/pkg/telemetry/traces"
 	"check-in/internal/pkg/transaction/wrapper"
 )
 
@@ -24,6 +25,9 @@ func New(db wrapper.Database) *Storage {
 }
 
 func (s *Storage) Create(ctx context.Context, c *entity.CheckIn) error {
+	ctx, span := traces.Start(ctx, "storage.checkin.Create")
+	defer span.End()
+
 	const query = `
 		insert into public.checkins (
 			id,
@@ -62,6 +66,9 @@ func (s *Storage) Create(ctx context.Context, c *entity.CheckIn) error {
 }
 
 func (s *Storage) Get(ctx context.Context, bookingID uuid.UUID) (*entity.CheckIn, error) {
+	ctx, span := traces.Start(ctx, "storage.checkin.Get")
+	defer span.End()
+
 	const query = `
 		select *
 		from public.checkins
@@ -79,6 +86,9 @@ func (s *Storage) Get(ctx context.Context, bookingID uuid.UUID) (*entity.CheckIn
 }
 
 func (s *Storage) ListArrivals(ctx context.Context, p vo.Period) ([]*entity.CheckIn, error) {
+	ctx, span := traces.Start(ctx, "storage.checkin.ListArrivals")
+	defer span.End()
+
 	const query = `
 		select *
 		from public.checkins
@@ -105,6 +115,9 @@ func (s *Storage) ListArrivals(ctx context.Context, p vo.Period) ([]*entity.Chec
 
 // ClaimRequest reserves an HTTP idempotency key in the same transaction as the state and outbox.
 func (s *Storage) ClaimRequest(ctx context.Context, r checkindto.Request) (bool, error) {
+	ctx, span := traces.Start(ctx, "storage.checkin.ClaimRequest")
+	defer span.End()
+
 	const insertQuery = `
 		insert into public.requests (
 			actor_id,
@@ -147,6 +160,9 @@ func (s *Storage) ClaimRequest(ctx context.Context, r checkindto.Request) (bool,
 }
 
 func (s *Storage) Save(ctx context.Context, objects ...*entity.CheckIn) error {
+	ctx, span := traces.Start(ctx, "storage.checkin.Save")
+	defer span.End()
+
 	const query = `
 		update public.checkins c
 		set

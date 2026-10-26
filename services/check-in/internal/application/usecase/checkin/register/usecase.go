@@ -6,6 +6,7 @@ import (
 	"github.com/gofrs/uuid"
 
 	"check-in/internal/domain/entity"
+	"check-in/internal/pkg/telemetry/traces"
 )
 
 type Storage interface {
@@ -19,6 +20,9 @@ func New(storage Storage) *UseCase {
 }
 
 func (s *UseCase) Execute(ctx context.Context, input Input) error {
+	ctx, span := traces.Start(ctx, "usecase.checkin.register")
+	defer span.End()
+
 	id, err := uuid.NewV4()
 	if err != nil {
 		return err

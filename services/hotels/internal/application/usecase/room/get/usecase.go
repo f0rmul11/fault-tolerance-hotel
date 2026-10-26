@@ -5,6 +5,7 @@ import (
 
 	entity "hotels/internal/domain/entity/room"
 	app "hotels/internal/pkg/hotelserror"
+	"hotels/internal/pkg/telemetry/traces"
 )
 
 type Storage interface {
@@ -20,6 +21,9 @@ func New(storage Storage) *UseCase {
 }
 
 func (s *UseCase) Execute(ctx context.Context, id int64) (*entity.Room, error) {
+	ctx, span := traces.Start(ctx, "usecase.room.get")
+	defer span.End()
+
 	if id <= 0 {
 		return nil, app.NewInvalidArgumentErr("Идентификатор номера должен быть положительным числом")
 	}

@@ -7,6 +7,7 @@ import (
 
 	entity "hotels/internal/domain/entity/room"
 	app "hotels/internal/pkg/hotelserror"
+	"hotels/internal/pkg/telemetry/traces"
 )
 
 type Storage interface {
@@ -22,6 +23,9 @@ func New(storage Storage) *UseCase {
 }
 
 func (s *UseCase) Execute(ctx context.Context, id uuid.UUID) ([]*entity.Room, error) {
+	ctx, span := traces.Start(ctx, "usecase.room.list")
+	defer span.End()
+
 	if id == uuid.Nil {
 		return nil, app.NewInvalidArgumentErr("Не указан идентификатор")
 	}

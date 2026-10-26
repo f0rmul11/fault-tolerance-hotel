@@ -10,9 +10,13 @@ import (
 
 	entity "hotels/internal/domain/entity/room"
 	pb "hotels/internal/pkg/pb/hotels/hotels/v1"
+	"hotels/internal/pkg/telemetry/traces"
 )
 
 func (s *Service) ListRooms(ctx context.Context, req *pb.ListRoomsRequest) (*pb.ListRoomsResponse, error) {
+	ctx, span := traces.Start(ctx, "handler.hotels.ListRooms")
+	defer span.End()
+
 	result, err := s.usecases.ListRooms.Execute(ctx, uuid.FromStringOrNil(req.GetHotelId()))
 	if err != nil {
 		return nil, err

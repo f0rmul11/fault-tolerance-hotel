@@ -11,6 +11,7 @@ import (
 	"check-in/internal/events/cancellation_requested"
 	app "check-in/internal/pkg/checkinerror"
 	"check-in/internal/pkg/event"
+	"check-in/internal/pkg/telemetry/traces"
 	"check-in/internal/pkg/transaction"
 )
 
@@ -33,6 +34,9 @@ func New(storage Storage, flusher event.Flusher) *UseCase {
 }
 
 func (s *UseCase) Execute(ctx context.Context, input Input) (*entity.CheckIn, error) {
+	ctx, span := traces.Start(ctx, "usecase.checkin.cancel")
+	defer span.End()
+
 	if input.BookingID == uuid.Nil {
 		return nil, app.NewInvalidArgumentErr("Не указан идентификатор брони")
 	}

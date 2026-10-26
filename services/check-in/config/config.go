@@ -8,6 +8,8 @@ import (
 	"time"
 	_ "time/tzdata"
 
+	"check-in/internal/pkg/telemetry"
+
 	"github.com/ilyakaznacheev/cleanenv"
 )
 
@@ -28,6 +30,7 @@ func Instance() *Config {
 }
 
 type Config struct {
+	Telemetry     telemetry.Config  `yaml:"telemetry"`
 	Timezone      string            `yaml:"timezone" env:"CHECKIN_TIMEZONE"`
 	Inbox         Inbox             `yaml:"inbox"`
 	ConsumerGroup string            `yaml:"consumer_group" env:"KAFKA_CONSUMER_GROUP"`

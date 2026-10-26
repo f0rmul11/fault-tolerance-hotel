@@ -7,6 +7,7 @@ import (
 
 	"booking/internal/domain/entity"
 	"booking/internal/pkg/bookingerror"
+	"booking/internal/pkg/telemetry/traces"
 )
 
 type Storage interface {
@@ -24,6 +25,9 @@ func New(storage Storage) *UseCase {
 }
 
 func (s *UseCase) Execute(ctx context.Context, input Input) (*entity.Booking, error) {
+	ctx, span := traces.Start(ctx, "usecase.booking.get")
+	defer span.End()
+
 	if input.BookingID == uuid.Nil {
 		return nil, bookingerror.NewInvalidArgumentErr("Не указан идентификатор брони")
 	}

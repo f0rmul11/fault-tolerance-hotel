@@ -21,3 +21,14 @@ postgres:
   min_connections: 0
   max_idle_connections: 0
   max_conn_lifetime: 1h
+
+telemetry:
+  metrics_enabled: true
+  metrics_interval: 15s
+  logs_enabled: true
+  log_level: info
+  enabled: false
+  service_name: hotels
+  service_namespace: hotelflow
+  otlp_endpoint: otel-collector:4317
+  otlp_insecure: true

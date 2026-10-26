@@ -94,3 +94,10 @@ AKHQ: [http://localhost:8090](http://localhost:8090), доступен сраз�
 
 Согласованный сброс учебных БД, Kafka и восстановление seed: `make reset`.
 Подробности и продолжение после прерывания — [hotelctl](hotelctl/README.md#сброс-учебных-данных).
+
+## Наблюдаемость
+
+OpenTelemetry Collector, Jaeger, Loki, Prometheus и Grafana включены в `hotel.yaml` (этап `metrics`).
+Jaeger: [http://localhost:16686](http://localhost:16686); Grafana: [http://localhost:3000](http://localhost:3000). Трейсы, логи и метрики глобального Prometheus registry проходят через единый OTel Collector. Стандартные Go/process-метрики включены; собственные метрики регистрируются через prometheus/promauto.
+Первый `up` с новыми портами перезапускает контейнер k3s с сохранением его тома.
+[Устройство, команды и ограничения](deploy/observability/README.md).

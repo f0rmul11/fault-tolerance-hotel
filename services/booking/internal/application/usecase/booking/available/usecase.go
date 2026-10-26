@@ -8,6 +8,7 @@ import (
 	"booking/internal/domain/vo"
 	roomdto "booking/internal/dto/room"
 	app "booking/internal/pkg/bookingerror"
+	"booking/internal/pkg/telemetry/traces"
 )
 
 type Rooms interface {
@@ -31,6 +32,9 @@ func New(rooms Rooms, storage Storage) *UseCase {
 }
 
 func (s *UseCase) Execute(ctx context.Context, input Input) ([]int64, error) {
+	ctx, span := traces.Start(ctx, "usecase.booking.available")
+	defer span.End()
+
 	if input.HotelID == uuid.Nil {
 		return nil, app.NewInvalidArgumentErr("Не указан отель")
 	}

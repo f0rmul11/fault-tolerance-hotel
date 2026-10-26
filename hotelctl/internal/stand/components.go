@@ -81,7 +81,7 @@ func (m *Manager) control(ctx context.Context, state *project.State, cluster com
 			}
 		}
 		if action == "stop" {
-			fmt.Fprintln(m.Streams.Out, "Компоненты остановлены. Данные сохранены; восстановление: hotelctl start <имя>.")
+			fmt.Fprintln(m.Streams.Out, "Компоненты остановлены. Постоянные тома сохранены; память Jaeger и очереди Collector не сохраняются. Запуск: hotelctl start <имя>.")
 			return nil
 		}
 	}

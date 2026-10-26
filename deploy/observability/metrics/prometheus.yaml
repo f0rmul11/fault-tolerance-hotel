@@ -1,0 +1,24 @@
+# Prometheus 3.13.5 LTS.
+# Required args: --config.file=/etc/prometheus/prometheus.yaml
+#                --storage.tsdb.path=/prometheus --web.enable-otlp-receiver
+# /prometheus is a PVC; suggested initial capacity 10Gi.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  rule_query_offset: 30s
+storage:
+  tsdb:
+    out_of_order_time_window: 10m
+    retention:
+      time: 7d
+      size: 8GB
+otlp:
+  translation_strategy: UnderscoreEscapingWithSuffixes
+  keep_identifying_resource_attributes: true
+  promote_scope_metadata: true
+  promote_resource_attributes:
+    - service.name
+    - service.namespace
+    - deployment.environment.name
+    - k8s.namespace.name
+scrape_configs: []

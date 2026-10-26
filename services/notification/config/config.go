@@ -6,6 +6,8 @@ import (
 	"os"
 	"sync"
 
+	"notification/internal/pkg/telemetry"
+
 	"github.com/ilyakaznacheev/cleanenv"
 )
 
@@ -26,6 +28,7 @@ func Instance() *Config {
 }
 
 type Config struct {
+	Telemetry     telemetry.Config  `yaml:"telemetry"`
 	KafkaBrokers  []string          `yaml:"kafka_brokers" env:"KAFKA_BROKERS" env-separator:","`
 	ConsumerGroup string            `yaml:"consumer_group" env:"KAFKA_CONSUMER_GROUP"`
 	Targets       map[string]string `yaml:"service"`

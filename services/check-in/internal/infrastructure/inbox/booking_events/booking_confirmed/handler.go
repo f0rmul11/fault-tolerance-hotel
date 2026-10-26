@@ -8,6 +8,7 @@ import (
 
 	"check-in/internal/application/usecase/checkin/register"
 	"check-in/internal/domain/vo"
+	"check-in/internal/pkg/telemetry/traces"
 )
 
 const eventType = "booking.confirmed.v1"
@@ -18,7 +19,13 @@ func NewHandler(usecase *register.UseCase) *Handler {
 	return &Handler{usecase: usecase}
 }
 
-func (h *Handler) HandleEvent(ctx context.Context, body []byte) error {
+func (h *Handler) HandleEvent(ctx context.Context, body []byte) (err error) {
+	ctx, span := traces.Start(ctx, "handler.event.booking_confirmed")
+	defer span.End()
+	defer func() {
+		traces.RecordError(span, err)
+	}()
+
 	e, err := deserialize(body)
 	if err != nil {
 		return err

@@ -41,6 +41,8 @@ import (
 	"booking/internal/pkg/outbox"
 	pb "booking/internal/pkg/pb/booking/booking/v1"
 	echoV1 "booking/internal/pkg/pb/booking/echo/v1"
+	"booking/internal/pkg/telemetry"
+	"booking/internal/pkg/telemetry/traces"
 	"booking/internal/pkg/worker"
 )
 
@@ -65,7 +67,7 @@ func (a *App) initMainServer(ctx context.Context) error {
 	a.mainServer = server.NewServer(
 		config.Instance().GrpcServer.Port,
 		server.WithHTTPPort(config.Instance().HttpServer.Port),
-		server.WithHTTPMiddlewares(func(next http.Handler) http.Handler {
+		server.WithHTTPMiddlewares(traces.HTTP, func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				// HTTP Serve starts after both Clay servers have been initialized.
 				readyOnce.Do(func() {
@@ -75,6 +77,7 @@ func (a *App) initMainServer(ctx context.Context) error {
 			})
 		}),
 		server.WithGRPCOpts(
+			grpc.StatsHandler(traces.ServerHandler()),
 			grpc.ChainUnaryInterceptor(intercept.ErrorInterceptor(), intercept.AuthInterceptor()),
 			grpc.KeepaliveParams(keepalive.ServerParameters{
 				MaxConnectionIdle: config.Instance().GrpcServer.MaxConnectionIdle,
@@ -166,6 +169,7 @@ func (a *App) initGrpcConn(_ context.Context) error {
 	for srv, address := range config.Instance().Targets {
 		var err error
 		conn, err := grpc.NewClient(address,
+			grpc.WithStatsHandler(traces.ClientHandler()),
 			grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDisableRetry())
 		if err != nil {
 			return fmt.Errorf(
@@ -319,5 +323,15 @@ func (a *App) initInboxWorkers(ctx context.Context) error {
 		a.inboxWorkers = append(a.inboxWorkers, background)
 		a.publicCloser.Add(background.Stop)
 	}
+	return nil
+}
+
+// initTelemetry runs before instrumented transports and background workers.
+func (a *App) initTelemetry(ctx context.Context) error {
+	instance, err := telemetry.Init(ctx, config.Instance().Telemetry)
+	if err != nil {
+		return err
+	}
+	a.telemetry = instance
 	return nil
 }

@@ -7,6 +7,7 @@ import (
 
 	entity "review/internal/domain/entity/rating"
 	app "review/internal/pkg/reviewerror"
+	"review/internal/pkg/telemetry/traces"
 )
 
 type Storage interface {
@@ -22,6 +23,9 @@ func New(storage Storage) *UseCase {
 }
 
 func (s *UseCase) Execute(ctx context.Context, ids []uuid.UUID) ([]*entity.Rating, error) {
+	ctx, span := traces.Start(ctx, "usecase.rating.get")
+	defer span.End()
+
 	if len(ids) == 0 {
 		return nil, nil
 	}

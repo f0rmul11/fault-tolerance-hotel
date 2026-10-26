@@ -7,6 +7,7 @@ import (
 
 	entity "hotels/internal/domain/entity/hotel"
 	dto "hotels/internal/dto/hotel"
+	"hotels/internal/pkg/telemetry/traces"
 )
 
 type Review interface {
@@ -22,6 +23,9 @@ func New(review Review) *Service {
 }
 
 func (s *Service) Hotels(ctx context.Context, hotels []*entity.Hotel) error {
+	ctx, span := traces.Start(ctx, "service.hotel.enrich.Hotels")
+	defer span.End()
+
 	if len(hotels) == 0 {
 		return nil
 	}

@@ -3,13 +3,14 @@ package storage
 import (
 	"context"
 
-	"check-in/internal/pkg/outbox/message"
-	"check-in/internal/pkg/transaction/wrapper"
-
 	"github.com/georgysavva/scany/v2/pgxscan"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lib/pq"
 	"github.com/samber/lo"
+
+	"check-in/internal/pkg/outbox/message"
+	"check-in/internal/pkg/telemetry/traces"
+	"check-in/internal/pkg/transaction/wrapper"
 )
 
 type Storage struct {
@@ -23,7 +24,13 @@ func NewStorage(pool *pgxpool.Pool) *Storage {
 }
 
 // SaveMessages сохраняет сообщения для дальнейшей отправки в kafka
-func (s Storage) SaveMessages(ctx context.Context, messages message.Messages) error {
+func (s Storage) SaveMessages(ctx context.Context, messages message.Messages) (err error) {
+	ctx, span := traces.Start(ctx, "storage.outbox.SaveMessages")
+	defer span.End()
+	defer func() {
+		traces.RecordError(span, err)
+	}()
+
 	sql := `
 		insert into outbox (
 			entity_id,
@@ -44,7 +51,7 @@ func (s Storage) SaveMessages(ctx context.Context, messages message.Messages) er
 			unnest($7::timestamp[]) as created_at;
 	`
 
-	_, err := s.wrapper.Pool(ctx).Exec(ctx, sql,
+	_, err = s.wrapper.Pool(ctx).Exec(ctx, sql,
 		messages.EntitiesIDs(),
 		messages.Topics(),
 		messages.Keys(),

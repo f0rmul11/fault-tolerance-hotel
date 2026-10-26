@@ -18,7 +18,7 @@ func (m *Manager) Stop(ctx context.Context) error {
 	if err = m.Runtime.Stop(ctx, state); err != nil {
 		return err
 	}
-	fmt.Fprintln(m.Streams.Out, "Stand stopped. Data is preserved; hotelctl up resumes it.")
+	fmt.Fprintln(m.Streams.Out, "Стенд остановлен. Постоянные тома сохранены; память Jaeger и очереди Collector очищены. Запуск: hotelctl up.")
 	return nil
 }
 
