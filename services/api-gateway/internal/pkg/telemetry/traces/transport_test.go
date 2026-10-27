@@ -93,6 +93,9 @@ func TestClayHTTPAndGRPCShareTraceWithoutDuplicateServerSpan(t *testing.T) {
 	if response.Code != http.StatusOK {
 		t.Fatalf("HTTP status = %d: %s", response.Code, response.Body.String())
 	}
+	if got := response.Result().Header.Get("X-Trace-Id"); got != incoming.TraceID().String() {
+		t.Fatalf("response trace ID = %q, want downstream trace %s", got, incoming.TraceID())
+	}
 	var body struct {
 		Message string `json:"message"`
 	}
@@ -174,6 +177,34 @@ func TestHTTPProbeAndDebugRequestsAreNotTraced(t *testing.T) {
 	}
 	if calls != 3 || len(recorder.Ended()) != 0 {
 		t.Fatalf("filters must preserve handlers without recording spans: calls=%d spans=%d", calls, len(recorder.Ended()))
+	}
+}
+
+func TestHTTPTraceIDHeaderOnSuccessAndErrors(t *testing.T) {
+	for _, code := range []int{200, 403, 404, 405, 422, 500, 503, 504} {
+		t.Run(strconv.Itoa(code), func(t *testing.T) {
+			recorder := traceProviderForTest(t)
+			var active trace.TraceID
+			handler := traces.HTTP(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				active = trace.SpanContextFromContext(r.Context()).TraceID()
+				w.WriteHeader(code)
+			}))
+			request := httptest.NewRequest(http.MethodGet, "/v1/echo", nil)
+			request.Header.Set("X-Trace-Id", "not-a-trace-id")
+			request.Header.Set("traceparent", "invalid")
+			response := httptest.NewRecorder()
+			handler.ServeHTTP(response, request)
+
+			// Result snapshots the headers at WriteHeader, detecting late writes.
+			got := response.Result().Header.Values("X-Trace-Id")
+			if response.Code != code || !active.IsValid() || len(got) != 1 || got[0] != active.String() {
+				t.Fatalf("status=%d, header=%v, active trace=%s", response.Code, got, active)
+			}
+			spans := recorder.Ended()
+			if len(spans) != 1 || spans[0].SpanContext().TraceID() != active {
+				t.Fatal("response header does not identify the exported trace")
+			}
+		})
 	}
 }
 

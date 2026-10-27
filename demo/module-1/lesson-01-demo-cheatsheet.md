@@ -6,6 +6,8 @@ cd /Users/d.bulykin/Desktop/faut-tolerance-course/hotel
 
 Запросы отправлять из Swagger после `ACTIVE`. `fault` снимается автоматически или по Ctrl+C.
 
+Трейс запроса: скопировать `x-trace-id` из Response headers → открыть `http://localhost:16686/trace/<x-trace-id>`. Заголовок есть и при ошибке; экспорт трейса может занять несколько секунд.
+
 ## 1. Таймаут, но бронь создана
 
 ```bash

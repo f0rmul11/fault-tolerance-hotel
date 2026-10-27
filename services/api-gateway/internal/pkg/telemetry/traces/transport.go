@@ -23,7 +23,14 @@ type httpRoute struct {
 
 // HTTP instruments the real HTTP listener, including Clay's local HTTP adapter.
 func HTTP(next http.Handler) http.Handler {
-	handler := otelhttp.NewHandler(next, "HTTP",
+	handler := otelhttp.NewHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// The server span already exists here. Set the header before any handler
+		// can write a response, including routing, validation and downstream errors.
+		if sc := trace.SpanContextFromContext(r.Context()); sc.IsValid() {
+			w.Header().Set("X-Trace-Id", sc.TraceID().String())
+		}
+		next.ServeHTTP(w, r)
+	}), "HTTP",
 		otelhttp.WithPropagators(propagation.TraceContext{}),
 		otelhttp.WithMeterProvider(metricnoop.NewMeterProvider()),
 		otelhttp.WithSpanNameFormatter(func(_ string, r *http.Request) string {
