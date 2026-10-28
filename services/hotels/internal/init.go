@@ -49,7 +49,7 @@ func (a *App) initControllers(_ context.Context) error {
 	return nil
 }
 
-func (a *App) initMainServer(ctx context.Context) error {
+func (a *App) initMainServer(_ context.Context) error {
 	serverReady := make(chan struct{})
 	var readyOnce sync.Once
 
@@ -191,6 +191,9 @@ func (a *App) initGrpcConn(_ context.Context) error {
 
 func (a *App) initHealthCheck(_ context.Context) error {
 	a.healthCheck = healthcheck.NewHandler()
+	a.healthCheck.AddReadinessCheck("runtime_config", func() error {
+		return a.runtimeConfig.Load().CheckInitialSync()
+	})
 
 	// поверяю, что нет утечки горутин на старте (как пример)
 	a.healthCheck.AddLivenessCheck("goroutines", func() error {
