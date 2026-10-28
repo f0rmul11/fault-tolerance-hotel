@@ -12,7 +12,7 @@ cfg := config.NewClient(manager)
 enabled = cfg.GetValue(ctx, config.RoomsListEnabled).Bool()
 ```
 
-Клиент подключён к lifecycle Hotels и устанавливается до начала serving. Writer доступен через `hotelctl config get/set` — см. [инструкцию CLI](../../../../../hotelctl/README.md#runtime-конфигурация-в-etcd). Отдельный `config-etcd` с PVC разворачивается вместе со стендом; endpoint внутри k3s — `http://config-etcd.hotelflow.svc.cluster.local:2379`. Первичная синхронизация reader проверяется в admin `/healthcheck/ready` как `runtime_config`. Флаг `rooms_list_enabled` проверяется use case `ListRooms` перед чтением БД: false запрещает операцию с FailedPrecondition (HTTP 409). Review не вызывается; остальные методы не используют этот флаг.
+Клиент подключён к lifecycle Hotels и устанавливается до начала serving. Writer доступен через `hotelctl config get/set` — см. [инструкцию CLI](../../../../../hotelctl/README.md#runtime-конфигурация-в-etcd). Отдельный `config-etcd` с PVC разворачивается вместе со стендом; endpoint внутри k3s — `http://config-etcd.hotelflow.svc.cluster.local:2379`. В исходном варианте урока проверка первой синхронизации не подключена к readiness; её добавляют на демонстрации как `runtime_config`. Флаг `rooms_list_enabled` проверяется use case `ListRooms` перед чтением БД: false запрещает операцию с FailedPrecondition (HTTP 409). Review не вызывается; остальные методы не используют этот флаг.
 
 ## Структура
 
@@ -84,7 +84,7 @@ a.runtimeConfig.Store(client)
 return nil
 ```
 
-Возвращается обычный `*rtconfig.Manager`, без дополнительной обёртки. Его `CheckReady()` возвращает ошибку до запуска и после закрытия; валидные defaults или последний snapshot достаточны для готовности. В Hotels указатель публикуется после успешного `Init`. Для `/healthcheck/ready` используется более строгая `CheckInitialSync()`: требуется первый успешно применённый snapshot из etcd, включая валидный пустой snapshot с подтверждёнными defaults. Невалидная первая загрузка не допускает трафик. После синхронизации свежесть, соединение с etcd и значения флагов на готовность не влияют; последнее валидное состояние сохраняется. До запуска и после закрытия клиента проверка возвращает ошибку. Отдельного HTTP status endpoint нет.
+Возвращается обычный `*rtconfig.Manager`, без дополнительной обёртки. Его `CheckReady()` возвращает ошибку до запуска и после закрытия; валидные defaults или последний snapshot достаточны для готовности. В Hotels указатель публикуется после успешного `Init`. Для исправленного варианта `/healthcheck/ready` предназначена более строгая `CheckInitialSync()` (в исходном варианте урока не подключена): требуется первый успешно применённый snapshot из etcd, включая валидный пустой snapshot с подтверждёнными defaults. Невалидная первая загрузка не допускает трафик. После синхронизации свежесть, соединение с etcd и значения флагов на готовность не влияют; последнее валидное состояние сохраняется. До запуска и после закрытия клиента проверка возвращает ошибку. Отдельного HTTP status endpoint нет.
 
 `global.Init` вызывается один раз при старте приложения. `global.Client()` только возвращает установленный клиент; чтение не запускает сеть. Для независимых клиентов используйте `rtconfig.New`/`Manager.Start`/`Manager.Close` и самостоятельно управляйте их lifecycle.
 
