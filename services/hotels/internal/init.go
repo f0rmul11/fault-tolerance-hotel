@@ -9,7 +9,6 @@ import (
 	"runtime"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
@@ -49,7 +48,7 @@ func (a *App) initControllers(_ context.Context) error {
 	return nil
 }
 
-func (a *App) initMainServer(ctx context.Context) error {
+func (a *App) initMainServer(_ context.Context) error {
 	serverReady := make(chan struct{})
 	var readyOnce sync.Once
 
@@ -77,57 +76,6 @@ func (a *App) initMainServer(ctx context.Context) error {
 			}),
 		),
 	)
-
-	a.publicCloser.Add(func() error {
-		gracefulCtx, cancel := context.WithTimeout(context.Background(), config.Instance().Graceful.Timeout)
-		defer cancel()
-
-		// Synchronize Stop with Clay initialization, including a shutdown before
-		// the first external request. The admin listener starts independently.
-		client := &http.Client{
-			Timeout: 100 * time.Millisecond,
-			Transport: &http.Transport{
-				DisableKeepAlives: true,
-			},
-		}
-		defer client.CloseIdleConnections()
-		ticker := time.NewTicker(20 * time.Millisecond)
-		defer ticker.Stop()
-	waiting:
-		for {
-			select {
-			case <-serverReady:
-				break waiting
-			case <-gracefulCtx.Done():
-				return fmt.Errorf("hotels: server did not finish initialization: %w", gracefulCtx.Err())
-			case <-ticker.C:
-				response, err := client.Get(fmt.Sprintf("http://127.0.0.1:%d/swagger.json", config.Instance().HttpServer.Port))
-				if err == nil {
-					response.Body.Close()
-				}
-			}
-		}
-
-		done := make(chan struct{})
-		go func() {
-			err := a.mainServer.Stop(gracefulCtx)
-			if err != nil {
-				slog.Error("Не удалось остановить основной сервер", "error", err)
-			}
-			close(done)
-		}()
-
-		select {
-		case <-done:
-			slog.Info("Основной сервер остановлен", "service", "hotels")
-		case <-gracefulCtx.Done():
-			err := fmt.Errorf("hotels: error while graceful shutdown server: %w", gracefulCtx.Err())
-			// Do not call Stop again: Clay GracefulStop does not honor the context.
-			// Returning lets main exit after closers complete.
-			return fmt.Errorf("hotels: stopped: %w", err)
-		}
-		return nil
-	})
 
 	return nil
 }
