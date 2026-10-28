@@ -3,6 +3,7 @@ package internal
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -20,9 +21,12 @@ import (
 	reflection "google.golang.org/grpc/reflection/grpc_reflection_v1"
 
 	"hotels/internal/application/usecase"
+	runtimeconfig "hotels/internal/config"
 	"hotels/internal/pkg/closer"
 	"hotels/internal/pkg/healthcheck"
 	echoV1 "hotels/internal/pkg/pb/hotels/echo/v1"
+	"hotels/internal/pkg/rtconfig"
+	"hotels/internal/pkg/rtconfig/global"
 )
 
 // Проверяем App с Clay, настоящими TCP listeners и сгенерированными
@@ -45,6 +49,8 @@ func TestAppTransportsAndShutdown(t *testing.T) {
 	t.Setenv("HTTP_PORT", httpPort)
 	t.Setenv("ADMIN_HTTP_PORT", adminPort)
 	t.Setenv("GRACEFUL_TIMEOUT", "2s")
+	t.Setenv("RTCONFIG_ENDPOINTS", "http://127.0.0.1:"+availablePort(t))
+	t.Setenv("RTCONFIG_STARTUP_TIMEOUT", "50ms")
 	process := exec.Command(os.Args[0], "-test.run=^TestServiceProcess$")
 	process.Env = append(os.Environ(), "HOTEL_SERVICE_HELPER=1")
 	var logs bytes.Buffer
@@ -77,7 +83,7 @@ func TestAppTransportsAndShutdown(t *testing.T) {
 	defer client.CloseIdleConnections()
 	deadline := time.Now().Add(5 * time.Second)
 	for {
-		response, err := client.Get("http://127.0.0.1:" + adminPort + "/healthcheck/ready")
+		response, err := client.Get("http://127.0.0.1:" + adminPort + "/healthcheck/startup")
 		if err == nil {
 			response.Body.Close()
 			if response.StatusCode == http.StatusOK {
@@ -85,9 +91,28 @@ func TestAppTransportsAndShutdown(t *testing.T) {
 			}
 		}
 		if time.Now().After(deadline) {
-			t.Fatal("app did not become ready")
+			t.Fatal("app did not complete startup")
 		}
 		time.Sleep(20 * time.Millisecond)
+	}
+
+	response, err := client.Get("http://127.0.0.1:" + adminPort + "/healthcheck/ready")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var checks map[string]string
+	decodeErr := json.NewDecoder(response.Body).Decode(&checks)
+	response.Body.Close()
+	if decodeErr != nil || response.StatusCode != http.StatusServiceUnavailable || checks["runtime_config"] != rtconfig.ErrNotSynced.Error() {
+		t.Fatalf("offline startup readiness: %v, %v", checks, decodeErr)
+	}
+	response, err = client.Get("http://127.0.0.1:" + adminPort + "/runtime-config/status")
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+	if response.StatusCode != http.StatusNotFound {
+		t.Fatalf("removed runtime endpoint still available: %d", response.StatusCode)
 	}
 
 	conn, err := grpc.NewClient("127.0.0.1:"+grpcPort, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -185,6 +210,19 @@ func TestServiceProcess(t *testing.T) {
 		t.Fatal(err)
 	}
 	app.runAdminServer(ctx)
+	if err := app.initRuntimeConfig(ctx); err != nil {
+		t.Fatal(err)
+	}
+	value := runtimeconfig.GetValue(ctx, runtimeconfig.RoomsListEnabled)
+	if value.Err() != nil || value.Type() != rtconfig.BoolType {
+		t.Fatalf("runtime facade not initialized before serving: %v", value.Err())
+	}
+	app.publicCloser.Add(func() error {
+		if err := app.runtimeConfig.Load().CheckReady(); err != nil {
+			t.Errorf("runtime config stopped before public drain completed: %v", err)
+		}
+		return nil
+	})
 	if err := app.initMainServer(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -192,6 +230,9 @@ func TestServiceProcess(t *testing.T) {
 		t.Fatal(err)
 	}
 	app.Run(ctx)
+	if !app.runtimeConfig.Load().Status().Closed {
+		t.Fatal("runtime config manager was not closed after shutdown")
+	}
 }
 
 func TestHealthLifecycle(t *testing.T) {
@@ -214,7 +255,35 @@ func TestHealthLifecycle(t *testing.T) {
 	check(healthcheck.LivenessPath, http.StatusOK)
 	atomic.StoreInt32(&app.started, 1)
 	check(healthcheck.StartupPath, http.StatusOK)
-	check(healthcheck.ReadinessPath, http.StatusOK)
+	check(healthcheck.ReadinessPath, http.StatusServiceUnavailable)
+
+	previous := global.Client()
+	t.Cleanup(func() {
+		global.SetClient(previous)
+	})
+	client, err := global.Init(t.Context(), rtconfig.Config{
+		Endpoints:       []string{"http://127.0.0.1:" + availablePort(t)},
+		Prefix:          "/test/runtime/",
+		SchemaPath:      "../config/rtconfig.yaml",
+		StartupTimeout:  5 * time.Millisecond,
+		ShutdownTimeout: time.Second,
+	}, runtimeconfig.SchemaHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := client.Close(context.Background()); err != nil {
+			t.Error(err)
+		}
+	})
+	app.runtimeConfig.Store(client)
+	check(healthcheck.ReadinessPath, http.StatusServiceUnavailable)
+	check(healthcheck.StartupPath, http.StatusOK)
+	check(healthcheck.LivenessPath, http.StatusOK)
+	if err := client.Close(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	check(healthcheck.ReadinessPath, http.StatusServiceUnavailable)
 	atomic.StoreInt32(&app.terminated, 1)
 	check(healthcheck.ReadinessPath, http.StatusServiceUnavailable)
 	check(healthcheck.LivenessPath, http.StatusOK)

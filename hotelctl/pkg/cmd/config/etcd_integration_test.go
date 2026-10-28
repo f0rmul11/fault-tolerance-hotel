@@ -41,7 +41,7 @@ func runConfig(t *testing.T, f localFactory, endpoint string, args ...string) (s
 func TestConfigEtcdIntegration(t *testing.T) {
 	server := startEtcd(t)
 	f := fixture(t)
-	catalogPath := filepath.Join(f.config.Root, "services/api-gateway/config/rtconfig.yaml")
+	catalogPath := filepath.Join(f.config.Root, "services/hotels/config/rtconfig.yaml")
 	data, err := os.ReadFile(catalogPath)
 	if err != nil {
 		t.Fatal(err)
@@ -53,12 +53,12 @@ func TestConfigEtcdIntegration(t *testing.T) {
 	if err := os.WriteFile(catalogPath, data, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	out, err := runConfig(t, f, server.endpoint, "get", "api-gateway", "flag")
+	out, err := runConfig(t, f, server.endpoint, "get", "hotels", "flag")
 	if err != nil || !strings.Contains(out, "false (source=default revision=0") {
 		t.Fatalf("missing override: %s %v", out, err)
 	}
 
-	const prefix = "/hotelflow/dev/services/api-gateway/rtconfig/v1/values/"
+	const prefix = "/hotelflow/dev/services/hotels/rtconfig/v1/values/"
 	for _, tt := range []struct {
 		name  string
 		input string
@@ -90,7 +90,7 @@ func TestConfigEtcdIntegration(t *testing.T) {
 			wire:  `"degraded"`,
 		},
 	} {
-		out, err := runConfig(t, f, server.endpoint, "set", "api-gateway", tt.name, tt.input, "--expect-revision=0")
+		out, err := runConfig(t, f, server.endpoint, "set", "hotels", tt.name, tt.input, "--expect-revision=0")
 		if err != nil || !strings.Contains(out, "revision=") {
 			t.Fatalf("set %s: %s %v", tt.name, out, err)
 		}
@@ -104,7 +104,7 @@ func TestConfigEtcdIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 	revision := current.Kvs[0].ModRevision
-	out, err = runConfig(t, f, server.endpoint, "set", "api-gateway", "flag", "false", "--expect-revision=0")
+	out, err = runConfig(t, f, server.endpoint, "set", "hotels", "flag", "false", "--expect-revision=0")
 	if err == nil || !strings.Contains(err.Error(), "expected revision 0") || out != "" {
 		t.Fatalf("stale CAS must fail without success output: %s %v", out, err)
 	}
@@ -112,7 +112,7 @@ func TestConfigEtcdIntegration(t *testing.T) {
 	if err != nil || current.Kvs[0].ModRevision != revision || string(current.Kvs[0].Value) != "true" {
 		t.Fatalf("conflict changed value: %v %v", current, err)
 	}
-	out, err = runConfig(t, f, server.endpoint, "set", "api-gateway", "flag", "false", "--expect-revision="+strconv.FormatInt(revision, 10))
+	out, err = runConfig(t, f, server.endpoint, "set", "hotels", "flag", "false", "--expect-revision="+strconv.FormatInt(revision, 10))
 	if err != nil || !strings.Contains(out, "= false") {
 		t.Fatalf("valid CAS: %s %v", out, err)
 	}
@@ -128,14 +128,14 @@ func TestConfigEtcdIntegration(t *testing.T) {
 	if _, err := runConfig(t, f, server.endpoint, "set", "review", "flag", "true"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := runConfig(t, f, server.endpoint, "set", "api-gateway", "flag", "true", "--env=other"); err != nil {
+	if _, err := runConfig(t, f, server.endpoint, "set", "hotels", "flag", "true", "--env=other"); err != nil {
 		t.Fatal(err)
 	}
-	out, err = runConfig(t, f, server.endpoint, "get", "api-gateway", "flag")
+	out, err = runConfig(t, f, server.endpoint, "get", "hotels", "flag")
 	if err != nil || !strings.Contains(out, "= false (source=etcd") {
 		t.Fatalf("service/env isolation lost: %s %v", out, err)
 	}
-	if _, err := runConfig(t, f, server.endpoint, "set", "api-gateway", "readonly", "false"); err == nil {
+	if _, err := runConfig(t, f, server.endpoint, "set", "hotels", "readonly", "false"); err == nil {
 		t.Fatal("readonly update accepted")
 	}
 	response, err := server.client.Get(t.Context(), prefix+"readonly")
@@ -145,7 +145,7 @@ func TestConfigEtcdIntegration(t *testing.T) {
 
 	server.stop()
 	started := time.Now()
-	out, err = runConfig(t, f, server.endpoint, "set", "api-gateway", "flag", "true", "--timeout=100ms")
+	out, err = runConfig(t, f, server.endpoint, "set", "hotels", "flag", "true", "--timeout=100ms")
 	if err == nil || out != "" || time.Since(started) > 2*time.Second {
 		t.Fatalf("offline command must fail within budget: %s %v", out, err)
 	}
@@ -157,7 +157,7 @@ func TestConfigEtcdAuthenticationIntegration(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
 	const password = "isolated-etcd-test-password"
-	const prefix = "/hotelflow/dev/services/api-gateway/rtconfig/v1/values/"
+	const prefix = "/hotelflow/dev/services/hotels/rtconfig/v1/values/"
 	if _, err := server.client.UserAdd(ctx, "root", password); err != nil {
 		t.Fatal(err)
 	}
@@ -180,7 +180,7 @@ func TestConfigEtcdAuthenticationIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("HOTELCTL_INTEGRATION_PASSWORD", password)
-	args := []string{"set", "api-gateway", "flag", "true", "--user=operator", "--password-env=HOTELCTL_INTEGRATION_PASSWORD"}
+	args := []string{"set", "hotels", "flag", "true", "--user=operator", "--password-env=HOTELCTL_INTEGRATION_PASSWORD"}
 	out, err := runConfig(t, f, server.endpoint, args...)
 	if err != nil || !strings.Contains(out, "= true") {
 		t.Fatalf("authenticated writer: %s %v", out, err)
@@ -319,7 +319,7 @@ func TestConfigUnconfirmedWriteIsNotRetried(t *testing.T) {
 		<-done
 	})
 	out, err := runConfig(t, fixture(t), "http://"+listener.Addr().String(),
-		"set", "api-gateway", "flag", "true", "--expect-revision=0")
+		"set", "hotels", "flag", "true", "--expect-revision=0")
 	if err == nil || !strings.Contains(err.Error(), "did not confirm") || out != "" {
 		t.Fatalf("unconfirmed write must report error without success: %s %v", out, err)
 	}

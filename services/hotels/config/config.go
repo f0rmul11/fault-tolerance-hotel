@@ -6,6 +6,7 @@ import (
 	"os"
 	"sync"
 
+	"hotels/internal/pkg/rtconfig"
 	"hotels/internal/pkg/telemetry"
 
 	"github.com/ilyakaznacheev/cleanenv"
@@ -28,13 +29,14 @@ func Instance() *Config {
 }
 
 type Config struct {
-	Telemetry   telemetry.Config  `yaml:"telemetry"`
-	Postgres    Postgres          `yaml:"postgres"`
-	PostgresDSN string            `yaml:"postgres_dsn" env:"POSTGRES_DSN"`
-	Targets     map[string]string `yaml:"service" env:"SERVICE_TARGETS"`
-	GrpcServer  GrpcServer        `yaml:"grpc_server"`
-	HttpServer  HttpServer        `yaml:"http_server"`
-	Graceful    Graceful          `yaml:"graceful"`
+	RuntimeConfig rtconfig.Config   `yaml:"runtime_config"`
+	Telemetry     telemetry.Config  `yaml:"telemetry"`
+	Postgres      Postgres          `yaml:"postgres"`
+	PostgresDSN   string            `yaml:"postgres_dsn" env:"POSTGRES_DSN"`
+	Targets       map[string]string `yaml:"service" env:"SERVICE_TARGETS"`
+	GrpcServer    GrpcServer        `yaml:"grpc_server"`
+	HttpServer    HttpServer        `yaml:"http_server"`
+	Graceful      Graceful          `yaml:"graceful"`
 }
 
 // Read загружает конфигурацию из YAML и применяет переменные окружения.
@@ -48,6 +50,7 @@ func Read() (*Config, error) {
 	if err := cleanenv.ReadConfig(path, cfg); err != nil {
 		return nil, fmt.Errorf("read config %s: %w", path, err)
 	}
+	cfg.RuntimeConfig.ResolveSchemaPath(path)
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -69,6 +72,9 @@ func (c *Config) Validate() error {
 	}
 	if c.HttpServer.AdminPort == c.HttpServer.Port || c.HttpServer.AdminPort == c.GrpcServer.Port {
 		return fmt.Errorf("ADMIN_HTTP_PORT must differ from HTTP_PORT and GRPC_PORT")
+	}
+	if err := c.RuntimeConfig.Validate(); err != nil {
+		return err
 	}
 	if c.Graceful.Timeout <= 0 {
 		return fmt.Errorf("graceful timeout must be positive")

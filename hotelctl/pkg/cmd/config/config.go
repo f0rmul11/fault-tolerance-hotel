@@ -68,9 +68,9 @@ func newCommand(f util.Factory, streams iostreams.IOStreams, set bool) *cobra.Co
 		},
 	}
 	if set {
-		command.Example = "  hotelctl config set api-gateway hotels_list_enabled true\n  hotelctl config set api-gateway hotels_list_enabled false --expect-revision 42"
+		command.Example = "  hotelctl config set hotels rooms_list_enabled true\n  hotelctl config set hotels rooms_list_enabled false --expect-revision 42"
 	} else {
-		command.Example = "  hotelctl config get api-gateway hotels_list_enabled"
+		command.Example = "  hotelctl config get hotels rooms_list_enabled"
 	}
 	flags := command.Flags()
 	o.AddFlags(flags)

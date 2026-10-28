@@ -6,7 +6,7 @@ import (
 	"sync"
 	"testing"
 
-	"api-gateway/internal/pkg/rtconfig"
+	"hotels/internal/pkg/rtconfig"
 )
 
 func TestClientBeforeInstallation(t *testing.T) {
@@ -17,7 +17,7 @@ func TestClientBeforeInstallation(t *testing.T) {
 	runtimeClient.Store(nil)
 
 	c := Client()
-	v, err := c.Value(context.Background(), "hotels_list_enabled")
+	v, err := c.Value(context.Background(), "rooms_list_enabled")
 	if !errors.Is(err, rtconfig.ErrNotInitialized) || v.Bool() || !errors.Is(v.Err(), rtconfig.ErrNotInitialized) {
 		t.Fatalf("uninitialized value: value=%v, error=%v", v, err)
 	}

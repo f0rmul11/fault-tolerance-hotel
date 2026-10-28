@@ -41,8 +41,8 @@ make config-etcd-deploy
 make config-etcd-health
 
 # После hotelctl up доступ уже открыт; отдельный терминал не нужен:
-./bin/hotelctl config get api-gateway hotels_list_enabled
-./bin/hotelctl config set api-gateway hotels_list_enabled true
+./bin/hotelctl config get hotels rooms_list_enabled
+./bin/hotelctl config set hotels rooms_list_enabled true
 ```
 
 `HOTEL_KUBECONFIG` по умолчанию равен `.local/hotelctl/kubeconfig` и нужен только Makefile-командам,
@@ -51,7 +51,7 @@ make config-etcd-health
 
 Startup/readiness используют `/readyz`, liveness — `/livez`. Backend quota — 128 MiB, история revisions автоматически compact-ится с retention 1 час; отставший watch должен выполнить полный resync. Compaction не заменяет defrag и резервные копии. Параметры: [официальная документация etcd](https://etcd.io/docs/v3.6/op-guide/configuration/), [семантика probes](https://etcd.io/docs/v3.6/op-guide/monitoring/).
 
-Reader запускается в API Gateway автоматически; Deployment задаёт внутренний endpoint etcd и префикс сервиса. `GET http://127.0.0.1:8081/healthcheck/ready` содержит проверку `runtime_config` — готовность локального клиента, без проверки доступности etcd или конкретной revision. При недоступном etcd доступны defaults или последнее валидное состояние в памяти. Проверка флага в HTTP/gRPC обработчиках пока не добавлена: успешный `hotelctl config set` подтверждает запись в etcd, reader применяет её асинхронно.
+Reader запускается в Hotels автоматически; Deployment задаёт внутренний endpoint etcd и префикс Hotels. Admin `/healthcheck/ready` содержит проверку `runtime_config`: требуется первая успешная загрузка валидного snapshot. После неё потеря etcd не отменяет готовность последнего валидного состояния. ListRooms проверяет `rooms_list_enabled` перед чтением собственной БД, без обращения в Review. Успешный `hotelctl config set` подтверждает запись в etcd, reader каждого Pod применяет её асинхронно.
 
 ### Обновление старого стенда
 

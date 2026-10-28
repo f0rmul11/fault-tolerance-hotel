@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"api-gateway/internal/pkg/rtconfig"
+	"hotels/internal/pkg/rtconfig"
 )
 
 func TestRegistryCopiesAndFreeze(t *testing.T) {

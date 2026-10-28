@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"api-gateway/internal/pkg/rtconfig"
+	"hotels/internal/pkg/rtconfig"
 )
 
 // Options задаёт входной каталог и расположение generated facade пакета config.

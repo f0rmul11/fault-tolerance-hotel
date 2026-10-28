@@ -15,7 +15,6 @@ import (
 	"api-gateway/config"
 	"api-gateway/internal/pkg/closer"
 	"api-gateway/internal/pkg/healthcheck"
-	"api-gateway/internal/pkg/rtconfig"
 	"api-gateway/internal/pkg/telemetry"
 
 	"github.com/go-chi/chi/v5"
@@ -26,9 +25,8 @@ import (
 
 // App application
 type App struct {
-	telemetry     *telemetry.Telemetry
-	runtimeConfig atomic.Pointer[rtconfig.Manager]
-	mainServer    *server.Server
+	telemetry  *telemetry.Telemetry
+	mainServer *server.Server
 
 	adminListener net.Listener
 	adminMux      *chi.Mux
@@ -49,8 +47,7 @@ type App struct {
 	adminCloser *closer.Closer
 }
 
-// New создаёт приложение и запускает rtconfig до инициализации обработчиков.
-// Готовность и закрытие клиента подключаются автоматически.
+// New создаёт приложение.
 func New(ctx context.Context) *App {
 	app := &App{
 		grpcConn:     make(map[string]grpc.ClientConnInterface),
@@ -128,14 +125,11 @@ func (a *App) Run(ctx context.Context) {
 	)
 
 	a.publicCloser.Wait()
-
-	// Watch живёт до окончания drain публичного сервера.
 }
 
 func (a *App) init(ctx context.Context) error {
 	initFuncs := []func(context.Context) error{
 		a.initTelemetry,
-		a.initRuntimeConfig,
 		a.initMainServer,
 		a.initGrpcConn,
 		a.initControllers,

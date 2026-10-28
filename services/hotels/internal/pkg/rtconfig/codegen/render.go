@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"api-gateway/internal/pkg/rtconfig"
+	"hotels/internal/pkg/rtconfig"
 )
 
 func render(schema *rtconfig.Schema) ([]byte, error) {
@@ -45,8 +45,8 @@ package config
 import (
 	"context"
 
-	"api-gateway/internal/pkg/rtconfig"
-	"api-gateway/internal/pkg/rtconfig/global"
+	"hotels/internal/pkg/rtconfig"
+	"hotels/internal/pkg/rtconfig/global"
 )
 
 type configKey string

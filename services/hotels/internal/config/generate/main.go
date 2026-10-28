@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"api-gateway/internal/pkg/rtconfig/codegen"
-	"api-gateway/internal/pkg/rtconfig/system"
+	"hotels/internal/pkg/rtconfig/codegen"
+	"hotels/internal/pkg/rtconfig/system"
 )
 
 func main() {

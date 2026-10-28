@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"api-gateway/internal/pkg/rtconfig"
+	"hotels/internal/pkg/rtconfig"
 )
 
 type valueClient struct {
@@ -31,10 +31,10 @@ func TestInjectedFacadePreservesValueAndContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	if actual := client.GetValue(ctx, HotelsListEnabled); actual != value {
+	if actual := client.GetValue(ctx, RoomsListEnabled); actual != value {
 		t.Fatal("facade replaced successful backend Value")
 	}
-	if backend.ctx != ctx || backend.key != "hotels_list_enabled" {
+	if backend.ctx != ctx || backend.key != "rooms_list_enabled" {
 		t.Fatalf("facade changed call: ctx=%v, key=%q", backend.ctx, backend.key)
 	}
 }
@@ -44,7 +44,7 @@ func TestInjectedFacadeReturnsSafeErrorValue(t *testing.T) {
 	backend := &valueClient{err: rtconfig.ErrVariableNotFound}
 	client := NewClient(backend)
 
-	value := client.GetValue(context.Background(), HotelsListEnabled)
+	value := client.GetValue(context.Background(), RoomsListEnabled)
 	if value == nil || !errors.Is(value.Err(), rtconfig.ErrVariableNotFound) || value.Bool() {
 		t.Fatalf("expected safe missing-key value, got %v", value)
 	}

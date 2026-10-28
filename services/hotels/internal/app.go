@@ -25,21 +25,26 @@ import (
 	"hotels/internal/infrastructure/storage"
 	"hotels/internal/pkg/closer"
 	"hotels/internal/pkg/healthcheck"
+	"hotels/internal/pkg/rtconfig"
 	"hotels/internal/pkg/telemetry"
 )
 
 // App application
 type App struct {
-	telemetry  *telemetry.Telemetry
-	gateway    *gateway.Registry
-	services   *service.Registry
-	pool       *pgxpool.Pool
-	storage    *storage.Registry
-	usecases   *usecase.Registry
+	gateway  *gateway.Registry
+	services *service.Registry
+
+	storage  *storage.Registry
+	usecases *usecase.Registry
+
 	mainServer *server.Server
 
 	adminListener net.Listener
 	adminMux      *chi.Mux
+
+	pool          *pgxpool.Pool
+	runtimeConfig atomic.Pointer[rtconfig.Manager]
+	telemetry     *telemetry.Telemetry
 
 	controllers []transport.ServiceDesc
 
@@ -57,7 +62,8 @@ type App struct {
 	adminCloser *closer.Closer
 }
 
-// New конструктор
+// New создаёт приложение и запускает rtconfig до инициализации обработчиков.
+// Готовность и закрытие клиента подключаются автоматически.
 func New(ctx context.Context) *App {
 	app := &App{
 		grpcConn:     make(map[string]grpc.ClientConnInterface),
@@ -74,6 +80,8 @@ func New(ctx context.Context) *App {
 	app.runAdminServer(ctx)
 
 	if err := app.init(ctx); err != nil {
+		closer.CloseAll()
+		app.adminCloser.CloseAll()
 		_ = app.telemetry.Shutdown(ctx)
 		log.Fatalf("[APP] Не удалось инициализировать приложение: %s", err.Error())
 	}
@@ -140,6 +148,7 @@ func (a *App) Run(ctx context.Context) {
 func (a *App) init(ctx context.Context) error {
 	initFuncs := []func(context.Context) error{
 		a.initTelemetry,
+		a.initRuntimeConfig,
 		a.initMainServer,
 		a.initGrpcConn,
 		a.initPostgres,

@@ -8,9 +8,9 @@ import (
 	"slices"
 	"time"
 
-	"api-gateway/internal/pkg/closer"
-	"api-gateway/internal/pkg/rtconfig"
-	"api-gateway/internal/pkg/rtconfig/system"
+	"hotels/internal/pkg/closer"
+	"hotels/internal/pkg/rtconfig"
+	"hotels/internal/pkg/rtconfig/system"
 )
 
 // Init явно создаёт общий клиент до запуска обработчиков приложения.

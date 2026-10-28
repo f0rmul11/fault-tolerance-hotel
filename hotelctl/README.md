@@ -119,14 +119,14 @@ Reset не применяет изменённые inplace-миграции к �
 ## Runtime-конфигурация в etcd
 
 ```bash
-./bin/hotelctl config get api-gateway hotels_list_enabled
-./bin/hotelctl config set api-gateway hotels_list_enabled true
-./bin/hotelctl config set api-gateway hotels_list_enabled false
+./bin/hotelctl config get hotels rooms_list_enabled
+./bin/hotelctl config set hotels rooms_list_enabled true
+./bin/hotelctl config set hotels rooms_list_enabled false
 ```
 
 CLI выбирает сервис из `hotel.yaml`, читает `<service.context>/config/rtconfig.yaml`
 и проверяет имя, тип, `writable` и string enum выбранной переменной до подключения к etcd.
-Сейчас сервисный каталог есть у API Gateway; для другого сервиса нужно сначала добавить его каталог.
+Сейчас сервисный каталог есть у Hotels; для другого сервиса нужно сначала добавить его каталог.
 Ключи из Go registry `rtconfig/system` этой командой не редактируются.
 CLI не импортирует внутренние пакеты сервисов: границей служат YAML-каталог и JSON-скаляры в etcd.
 При чтении сервис независимо проверяет весь snapshot, поэтому CLI не заменяет reader validation.
@@ -136,17 +136,19 @@ CLI не импортирует внутренние пакеты сервисо
 стандартное имя стенда — `hotelflow`. `--prefix` явно заменяет весь префикс выбранного сервиса.
 
 ```bash
-./bin/hotelctl config set api-gateway hotels_list_enabled true \
+./bin/hotelctl config set hotels rooms_list_enabled true \
   --endpoints=http://127.0.0.1:12379 --env=dev --timeout=5s
 ```
 
 Отдельный `config-etcd` с постоянным PVC разворачивается через `hotelctl up/deploy`.
 Порт `127.0.0.1:2379` постоянно публикуется при `up`; туннель и отдельный терминал не нужны.
 Внутри кластера адрес — `http://config-etcd.hotelflow.svc.cluster.local:2379`.
-Reader в API Gateway запускается автоматически. Успешный `set` подтверждает запись в хранилище;
-обновление reader асинхронное. Его локальная готовность включена в admin `/healthcheck/ready`
-(`runtime_config=success`). Readiness не подтверждает применение конкретной revision или доступность etcd.
-Проверка флага в HTTP/gRPC обработчиках пока не добавлена.
+Reader в Hotels запускается автоматически. Успешный `set` подтверждает запись в хранилище;
+обновление reader асинхронное. Readiness Hotels (`runtime_config=success`) требует первого
+валидного snapshot из etcd, но не подтверждает применение конкретной revision. После загрузки
+потеря etcd не отменяет готовность последнего валидного состояния. `rooms_list_enabled=false`
+запрещает ListRooms с gRPC FailedPrecondition / HTTP 409; true разрешает чтение номеров из БД
+Hotels без Review. Значение флага не влияет на readiness. Defaults остаётся false.
 `get` показывает значение из etcd; если ключ отсутствует — YAML default с `source=default revision=0`.
 Он не опрашивает локальный snapshot сервиса и не показывает его last-known-good состояние.
 
@@ -171,9 +173,9 @@ Reader в API Gateway запускается автоматически. Усп�
 Для защиты ранее прочитанного значения передайте revision из `get` явно:
 
 ```bash
-./bin/hotelctl config set api-gateway hotels_list_enabled false --expect-revision=42
+./bin/hotelctl config set hotels rooms_list_enabled false --expect-revision=42
 # Создать override только если ключ ещё отсутствует:
-./bin/hotelctl config set api-gateway hotels_list_enabled true --expect-revision=0
+./bin/hotelctl config set hotels rooms_list_enabled true --expect-revision=0
 ```
 
 При потере ответа команда возвращает ошибку без сообщения об успехе. Сначала выполните `get`
@@ -184,7 +186,7 @@ Reader в API Gateway запускается автоматически. Усп�
 
 ```bash
 # HOTELCTL_ETCD_PASSWORD задаётся в окружении вне аргументов команды.
-./bin/hotelctl config set api-gateway hotels_list_enabled false \
+./bin/hotelctl config set hotels rooms_list_enabled false \
   --endpoints=https://config-etcd.example:2379 \
   --user=config-writer --cacert=/path/to/ca.pem
 ```

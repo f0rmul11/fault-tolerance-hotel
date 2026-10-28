@@ -19,11 +19,8 @@ import (
 	"testing"
 	"time"
 
-	runtimeconfig "api-gateway/internal/config"
 	"api-gateway/internal/pkg/closer"
 	"api-gateway/internal/pkg/healthcheck"
-	"api-gateway/internal/pkg/rtconfig"
-	"api-gateway/internal/pkg/rtconfig/global"
 
 	echoV1 "api-gateway/internal/pkg/pb/api-gateway/echo/v1"
 
@@ -54,8 +51,6 @@ func TestAppTransportsAndShutdown(t *testing.T) {
 	t.Setenv("ADMIN_HTTP_PORT", adminPort)
 	t.Setenv("GRACEFUL_TIMEOUT", "2s")
 	// Тест не зависит от локального стенда: запускаемся с defaults без etcd.
-	t.Setenv("RTCONFIG_ENDPOINTS", "http://127.0.0.1:"+availablePort(t))
-	t.Setenv("RTCONFIG_STARTUP_TIMEOUT", "50ms")
 	process := exec.Command(os.Args[0], "-test.run=^TestGatewayProcess$")
 	process.Env = append(os.Environ(), "HOTEL_GATEWAY_HELPER=1")
 	var logs bytes.Buffer
@@ -106,25 +101,6 @@ func TestAppTransportsAndShutdown(t *testing.T) {
 			t.Fatal("app did not become ready")
 		}
 		time.Sleep(20 * time.Millisecond)
-	}
-
-	response, err := client.Get("http://127.0.0.1:" + adminPort + "/healthcheck/ready")
-	if err != nil {
-		t.Fatal(err)
-	}
-	var checks map[string]string
-	decodeErr := json.NewDecoder(response.Body).Decode(&checks)
-	response.Body.Close()
-	if decodeErr != nil || response.StatusCode != http.StatusOK || checks["runtime_config"] != "success" {
-		t.Fatalf("offline startup readiness: %v, %v", checks, decodeErr)
-	}
-	response, err = client.Get("http://127.0.0.1:" + adminPort + "/runtime-config/status")
-	if err != nil {
-		t.Fatal(err)
-	}
-	response.Body.Close()
-	if response.StatusCode != http.StatusNotFound {
-		t.Fatalf("removed runtime endpoint still available: %d", response.StatusCode)
 	}
 
 	conn, err := grpc.NewClient("127.0.0.1:"+grpcPort, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -325,20 +301,7 @@ func TestGatewayProcess(t *testing.T) {
 	}
 	ctx := context.Background()
 	app := New(ctx)
-	value := runtimeconfig.GetValue(ctx, runtimeconfig.HotelsListEnabled)
-	if value.Err() != nil || value.Type() != rtconfig.BoolType {
-		t.Fatalf("runtime facade not initialized before serving: %v", value.Err())
-	}
-	app.publicCloser.Add(func() error {
-		if err := app.runtimeConfig.Load().CheckReady(); err != nil {
-			t.Errorf("runtime config stopped before public drain completed: %v", err)
-		}
-		return nil
-	})
 	app.Run(ctx)
-	if !app.runtimeConfig.Load().Status().Closed {
-		t.Fatal("runtime config manager was not closed after shutdown")
-	}
 }
 
 func TestHealthLifecycle(t *testing.T) {
@@ -361,33 +324,7 @@ func TestHealthLifecycle(t *testing.T) {
 	check(healthcheck.LivenessPath, http.StatusOK)
 	atomic.StoreInt32(&app.started, 1)
 	check(healthcheck.StartupPath, http.StatusOK)
-	check(healthcheck.ReadinessPath, http.StatusServiceUnavailable)
-
-	previous := global.Client()
-	t.Cleanup(func() {
-		global.SetClient(previous)
-	})
-	client, err := global.Init(t.Context(), rtconfig.Config{
-		Endpoints:       []string{"http://127.0.0.1:" + availablePort(t)},
-		Prefix:          "/test/runtime/",
-		SchemaPath:      "../config/rtconfig.yaml",
-		StartupTimeout:  5 * time.Millisecond,
-		ShutdownTimeout: time.Second,
-	}, runtimeconfig.SchemaHash)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		if err := client.Close(context.Background()); err != nil {
-			t.Error(err)
-		}
-	})
-	app.runtimeConfig.Store(client)
 	check(healthcheck.ReadinessPath, http.StatusOK)
-	if err := client.Close(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	check(healthcheck.ReadinessPath, http.StatusServiceUnavailable)
 	atomic.StoreInt32(&app.terminated, 1)
 	check(healthcheck.ReadinessPath, http.StatusServiceUnavailable)
 	check(healthcheck.LivenessPath, http.StatusOK)

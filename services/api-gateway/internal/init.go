@@ -24,7 +24,6 @@ import (
 	checkin "api-gateway/internal/app/checkin/v1"
 	"api-gateway/internal/app/echo/v1"
 	hotels "api-gateway/internal/app/hotels/v1"
-	runtimeconfig "api-gateway/internal/config"
 	"api-gateway/internal/pkg/auth"
 	"api-gateway/internal/pkg/closer"
 	"api-gateway/internal/pkg/grpc/intercept"
@@ -39,7 +38,6 @@ import (
 	externalHotelsV1 "api-gateway/internal/pkg/pb/external/hotels/hotels/v1"
 	"api-gateway/internal/pkg/requestid"
 	"api-gateway/internal/pkg/requesttimeout"
-	"api-gateway/internal/pkg/rtconfig/global"
 	"api-gateway/internal/pkg/telemetry"
 	"api-gateway/internal/pkg/telemetry/traces"
 )
@@ -154,15 +152,6 @@ func (a *App) initMainServer(ctx context.Context) error {
 	return nil
 }
 
-func (a *App) initRuntimeConfig(ctx context.Context) error {
-	client, err := global.Init(ctx, config.Instance().RuntimeConfig, runtimeconfig.SchemaHash)
-	if err != nil {
-		return err
-	}
-	a.runtimeConfig.Store(client)
-	return nil
-}
-
 func (a *App) initAdminServer(ctx context.Context) error {
 	// init admin listener
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%v", config.Instance().HttpServer.AdminPort))
@@ -215,9 +204,6 @@ func (a *App) initGrpcConn(_ context.Context) error {
 
 func (a *App) initHealthCheck(_ context.Context) error {
 	a.healthCheck = healthcheck.NewHandler()
-	a.healthCheck.AddReadinessCheck("runtime_config", func() error {
-		return a.runtimeConfig.Load().CheckReady()
-	})
 
 	// поверяю, что нет утечки горутин на старте (как пример)
 	a.healthCheck.AddLivenessCheck("goroutines", func() error {

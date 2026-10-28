@@ -3,16 +3,16 @@
 `rtconfig` хранит проверенную конфигурацию в immutable snapshot. `Value` читает atomic pointer и map без mutex, парсинга, логов и сетевых вызовов. Один manager владеет etcd client, одной watch-подпиской и последовательным dispatcher callbacks.
 
 ```go
-import config "api-gateway/internal/config"
+import config "hotels/internal/config"
 
-enabled := config.GetValue(ctx, config.HotelsListEnabled).Bool()
+enabled := config.GetValue(ctx, config.RoomsListEnabled).Bool()
 
 // Независимый клиент для DI и параллельных тестов.
 cfg := config.NewClient(manager)
-enabled = cfg.GetValue(ctx, config.HotelsListEnabled).Bool()
+enabled = cfg.GetValue(ctx, config.RoomsListEnabled).Bool()
 ```
 
-Клиент подключён к lifecycle API Gateway и устанавливается до начала serving. Writer доступен через `hotelctl config get/set` — см. [инструкцию CLI](../../../../../hotelctl/README.md#runtime-конфигурация-в-etcd). Отдельный `config-etcd` с PVC разворачивается вместе со стендом; endpoint внутри k3s — `http://config-etcd.hotelflow.svc.cluster.local:2379`. Локальная готовность reader включена в admin `/healthcheck/ready` как `runtime_config`. HTTP/gRPC gate пока не подключён. Флаг `hotels_list_enabled` пока служит примером каталога и сам по себе не меняет обработку запросов.
+Клиент подключён к lifecycle Hotels и устанавливается до начала serving. Writer доступен через `hotelctl config get/set` — см. [инструкцию CLI](../../../../../hotelctl/README.md#runtime-конфигурация-в-etcd). Отдельный `config-etcd` с PVC разворачивается вместе со стендом; endpoint внутри k3s — `http://config-etcd.hotelflow.svc.cluster.local:2379`. Первичная синхронизация reader проверяется в admin `/healthcheck/ready` как `runtime_config`. Флаг `rooms_list_enabled` проверяется use case `ListRooms` перед чтением БД: false запрещает операцию с FailedPrecondition (HTTP 409). Review не вызывается; остальные методы не используют этот флаг.
 
 ## Структура
 
@@ -37,8 +37,8 @@ enabled = cfg.GetValue(ctx, config.HotelsListEnabled).Bool()
 
 ```yaml
 realtimeConfig:
-  hotels_list_enabled:
-    usage: Разрешает получение списка отелей через API Gateway
+  rooms_list_enabled:
+    usage: Разрешает получение списка отелей через Hotels
     group: features
     value: "false"
     type: bool
@@ -65,7 +65,7 @@ go generate ./internal/config
 
 Общие настройки встраиваются в статический конфиг сервиса как `RuntimeConfig rtconfig.Config`. Prefix выбирает сам сервис в YAML или `RTCONFIG_PREFIX`, в библиотеке нет имени сервиса или окружения. `ResolveSchemaPath(configPath)` разрешает путь к каталогу рядом со статическим YAML; `Validate()` проверяет настройки.
 
-В API Gateway всё подключено внутри `internal.New(ctx)`: сначала запускается rtconfig, затем создаются основной сервер и обработчики. В `main` достаточно обычного запуска приложения:
+В Hotels всё подключено внутри `internal.New(ctx)`: сначала запускается rtconfig, затем создаются основной сервер и обработчики. В `main` достаточно обычного запуска приложения:
 
 ```go
 internal.New(ctx).Run(ctx)
@@ -84,7 +84,7 @@ a.runtimeConfig.Store(client)
 return nil
 ```
 
-Возвращается обычный `*rtconfig.Manager`, без дополнительной обёртки. Его `CheckReady()` возвращает ошибку до запуска и после закрытия; валидные defaults или последний snapshot достаточны для готовности. В Gateway указатель публикуется после успешного `Init`, проверка входит в `/healthcheck/ready`. Отдельного HTTP status endpoint нет. Readiness не проверяет свежесть или соединение с etcd.
+Возвращается обычный `*rtconfig.Manager`, без дополнительной обёртки. Его `CheckReady()` возвращает ошибку до запуска и после закрытия; валидные defaults или последний snapshot достаточны для готовности. В Hotels указатель публикуется после успешного `Init`. Для `/healthcheck/ready` используется более строгая `CheckInitialSync()`: требуется первый успешно применённый snapshot из etcd, включая валидный пустой snapshot с подтверждёнными defaults. Невалидная первая загрузка не допускает трафик. После синхронизации свежесть, соединение с etcd и значения флагов на готовность не влияют; последнее валидное состояние сохраняется. До запуска и после закрытия клиента проверка возвращает ошибку. Отдельного HTTP status endpoint нет.
 
 `global.Init` вызывается один раз при старте приложения. `global.Client()` только возвращает установленный клиент; чтение не запускает сеть. Для независимых клиентов используйте `rtconfig.New`/`Manager.Start`/`Manager.Close` и самостоятельно управляйте их lifecycle.
 
@@ -95,12 +95,12 @@ return nil
 ```go
 opts := rtconfig.Options{
     Endpoints: []string{"http://127.0.0.1:2379"},
-    Prefix:    "/hotelflow/dev/services/api-gateway/rtconfig/v1/values/",
-    ProjectID: "api-gateway/dev",
+    Prefix:    "/hotelflow/dev/services/hotels/rtconfig/v1/values/",
+    ProjectID: "hotels/dev",
 }
 ```
 
-Пакет поддерживает статические `TLS`, `Username`, `Password`; endpoint не содержит credentials. Для защищённого etcd reader следует выдать только read-доступ к своему prefix, writer — отдельную identity. Текущая инициализация Gateway подключается к доверенному HTTP etcd стенда без авторизации. При включённой авторизации недоступный etcd во время создания client также оставляет defaults и повторяется в фоне.
+Пакет поддерживает статические `TLS`, `Username`, `Password`; endpoint не содержит credentials. Для защищённого etcd reader следует выдать только read-доступ к своему prefix, writer — отдельную identity. Текущая инициализация Hotels подключается к доверенному HTTP etcd стенда без авторизации. При включённой авторизации недоступный etcd во время создания client также оставляет defaults и повторяется в фоне.
 
 | Budget | Default |
 |---|---|

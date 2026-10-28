@@ -24,6 +24,7 @@ import (
 	hotelsapp "hotels/internal/app/hotels/v1"
 	"hotels/internal/application/service"
 	"hotels/internal/application/usecase"
+	runtimeconfig "hotels/internal/config"
 	"hotels/internal/infrastructure/gateway"
 	"hotels/internal/infrastructure/storage"
 	"hotels/internal/pkg/closer"
@@ -33,6 +34,7 @@ import (
 	"hotels/internal/pkg/healthcheck"
 	echoV1 "hotels/internal/pkg/pb/hotels/echo/v1"
 	businessV1 "hotels/internal/pkg/pb/hotels/hotels/v1"
+	"hotels/internal/pkg/rtconfig/global"
 	"hotels/internal/pkg/telemetry"
 	"hotels/internal/pkg/telemetry/traces"
 )
@@ -130,6 +132,15 @@ func (a *App) initMainServer(ctx context.Context) error {
 	return nil
 }
 
+func (a *App) initRuntimeConfig(ctx context.Context) error {
+	client, err := global.Init(ctx, config.Instance().RuntimeConfig, runtimeconfig.SchemaHash)
+	if err != nil {
+		return err
+	}
+	a.runtimeConfig.Store(client)
+	return nil
+}
+
 func (a *App) initAdminServer(ctx context.Context) error {
 	// init admin listener
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%v", config.Instance().HttpServer.AdminPort))
@@ -180,6 +191,9 @@ func (a *App) initGrpcConn(_ context.Context) error {
 
 func (a *App) initHealthCheck(_ context.Context) error {
 	a.healthCheck = healthcheck.NewHandler()
+	a.healthCheck.AddReadinessCheck("runtime_config", func() error {
+		return a.runtimeConfig.Load().CheckInitialSync()
+	})
 
 	// поверяю, что нет утечки горутин на старте (как пример)
 	a.healthCheck.AddLivenessCheck("goroutines", func() error {
@@ -241,7 +255,12 @@ func (a *App) initStorage(context.Context) error {
 }
 
 func (a *App) initUsecases(context.Context) error {
-	a.usecases = usecase.NewRegistry(a.storage, a.services, a.gateway)
+	a.usecases = usecase.NewRegistry(
+		a.storage,
+		a.services,
+		a.gateway,
+		runtimeconfig.NewClient(a.runtimeConfig.Load()),
+	)
 	return nil
 }
 

@@ -564,3 +564,35 @@ func (p *integrationProxy) forward(client net.Conn) {
 	_ = client.Close()
 	<-done
 }
+
+// Only freshly started readers wait for recovery; an already synchronized
+// reader keeps serving from its last valid snapshot during an etcd outage.
+func TestInitialSyncReadinessEtcdIntegration(t *testing.T) {
+	server := newIntegrationEtcd(t)
+	prefix := integrationPrefix(t)
+	writer := newIntegrationClient(t, server.endpoint)
+	integrationPut(t, writer, prefix+"a", "true")
+	old := newIntegrationManager(t, server.endpoint, prefix)
+	if err := old.CheckInitialSync(); err != nil {
+		t.Fatal(err)
+	}
+	server.stop(t)
+	fresh := newIntegrationManager(t, server.endpoint, prefix, func(opts *Options) {
+		opts.StartupTimeout = 100 * time.Millisecond
+	})
+	if !errors.Is(fresh.CheckInitialSync(), ErrNotSynced) {
+		t.Fatal("new reader admitted before initial sync")
+	}
+	if err := old.CheckInitialSync(); err != nil || !integrationFlag(t, old, "a") {
+		t.Fatalf("old reader lost readiness or snapshot: %v", err)
+	}
+	server.start(t)
+	integrationEventually(t, func() bool {
+		return fresh.CheckInitialSync() == nil && integrationFlag(t, fresh, "a")
+	}, "new reader loads snapshot and becomes ready")
+	integrationPut(t, writer, prefix+"a", "false")
+	integrationWaitFlag(t, fresh, "a", false)
+	if err := fresh.CheckInitialSync(); err != nil {
+		t.Fatalf("disabling a flag must not change readiness: %v", err)
+	}
+}

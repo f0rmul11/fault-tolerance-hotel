@@ -25,6 +25,7 @@ var (
 	ErrVariableNotFound = errors.New("rtconfig: variable not found")
 	ErrNoPreviousValue  = errors.New("rtconfig: no previous value")
 	ErrNotInitialized   = errors.New("rtconfig: client is not initialized")
+	ErrNotSynced        = errors.New("rtconfig: initial configuration has not been loaded")
 	ErrNotStarted       = errors.New("rtconfig: manager is not started")
 	ErrAlreadyStarted   = errors.New("rtconfig: manager is already started")
 	ErrClosed           = errors.New("rtconfig: manager is closed")

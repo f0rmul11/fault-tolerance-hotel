@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"api-gateway/internal/pkg/rtconfig"
+	"hotels/internal/pkg/rtconfig"
 )
 
 func fixture(t *testing.T) (rtconfig.Config, string) {

@@ -186,6 +186,28 @@ func (m *Manager) CheckReady() error {
 	return nil
 }
 
+// CheckInitialSync допускает трафик после первого применённого snapshot из etcd.
+// Потеря соединения или невалидное обновление не отменяют последний валидный snapshot.
+// Значения флагов не влияют на готовность. Проверка не выполняет сетевых запросов.
+func (m *Manager) CheckInitialSync() error {
+	if m == nil {
+		return ErrNotInitialized
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.closed {
+		return ErrClosed
+	}
+	if !m.started {
+		return ErrNotInitialized
+	}
+	if m.status.Source != "etcd" {
+		return ErrNotSynced
+	}
+	return nil
+}
+
 // Value reads only memory. Request cancellation does not invalidate a ready
 // snapshot, and closing Manager does not invalidate already published values.
 func (m *Manager) Value(_ context.Context, name string) (Value, error) {

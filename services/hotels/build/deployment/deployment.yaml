@@ -6,7 +6,7 @@ metadata:
     app.kubernetes.io/name: hotels
     app.kubernetes.io/part-of: hotelflow
 spec:
-  replicas: 1
+  replicas: 3
   revisionHistoryLimit: 3
   strategy:
     type: RollingUpdate
@@ -90,6 +90,10 @@ spec:
               value: "1000"
             - name: OTEL_BSP_EXPORT_TIMEOUT
               value: "3000"
+            - name: RTCONFIG_ENDPOINTS
+              value: "http://config-etcd.hotelflow.svc.cluster.local:2379"
+            - name: RTCONFIG_PREFIX
+              value: "/hotelflow/dev/services/hotels/rtconfig/v1/values/"
             - name: GRPC_PORT
               value: "9090"
             - name: ADMIN_HTTP_PORT

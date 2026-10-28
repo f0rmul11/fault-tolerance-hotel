@@ -5,20 +5,20 @@ package config
 import (
 	"context"
 
-	"api-gateway/internal/pkg/rtconfig"
-	"api-gateway/internal/pkg/rtconfig/global"
+	"hotels/internal/pkg/rtconfig"
+	"hotels/internal/pkg/rtconfig/global"
 )
 
 type configKey string
 
 const (
-	// Разрешает получение списка отелей через API Gateway
-	HotelsListEnabled = configKey("hotels_list_enabled")
+	// Разрешает получение списка номеров выбранного отеля
+	RoomsListEnabled = configKey("rooms_list_enabled")
 )
 
 // SchemaHash соответствует объединённому service/system каталогу генерации.
 // Bootstrap сверяет его с schema.Hash() до установки клиента и serving.
-const SchemaHash = "06c9e4ed0c5cd9f5bb2a74d329b6d03db11c0dcf77cfdaf3175cad00db491676"
+const SchemaHash = "ea249d268cf8b3d3018df4e6da2829de5860a3b64a6a4bcb527e5c858cb96f10"
 
 // GetValue читает явно установленный global client, без I/O или логов.
 // global.SetClient нельзя подменять в parallel tests; используйте NewClient.

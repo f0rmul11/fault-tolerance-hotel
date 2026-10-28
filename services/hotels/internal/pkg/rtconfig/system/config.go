@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"api-gateway/internal/pkg/rtconfig"
+	"hotels/internal/pkg/rtconfig"
 
 	"gopkg.in/yaml.v3"
 )

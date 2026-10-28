@@ -9,12 +9,12 @@ import (
 	"strings"
 	"testing"
 
-	"api-gateway/internal/pkg/rtconfig"
+	"hotels/internal/pkg/rtconfig"
 )
 
 func TestGenerateDeterministicAndCompatible(t *testing.T) {
 	schema, err := mergedSchema([]byte(`realtimeConfig:
-  hotels_list_enabled:
+  rooms_list_enabled:
     usage: Разрешает получение списка отелей
     value: "false"
     type: bool
@@ -35,7 +35,7 @@ func TestGenerateDeterministicAndCompatible(t *testing.T) {
 		t.Fatalf("generated invalid Go: %v", err)
 	}
 	for _, fragment := range []string{
-		`HotelsListEnabled = configKey("hotels_list_enabled")`,
+		`RoomsListEnabled = configKey("rooms_list_enabled")`,
 		`func GetValue(ctx context.Context, key configKey) rtconfig.Value`,
 		`func NewClient(c rtconfig.Client) *Client`,
 		`func (c *Client) GetValue(ctx context.Context, key configKey) rtconfig.Value`,

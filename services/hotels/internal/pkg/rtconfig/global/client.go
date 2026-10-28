@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"sync/atomic"
 
-	"api-gateway/internal/pkg/rtconfig"
+	"hotels/internal/pkg/rtconfig"
 )
 
 type clientHolder struct {

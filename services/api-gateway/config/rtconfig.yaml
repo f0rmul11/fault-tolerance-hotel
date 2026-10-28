@@ -1,7 +1,0 @@
-realtimeConfig:
-  hotels_list_enabled:
-    usage: Разрешает получение списка отелей через API Gateway
-    group: features
-    value: "false"
-    type: bool
-    writable: true

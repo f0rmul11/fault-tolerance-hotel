@@ -1,0 +1,7 @@
+realtimeConfig:
+  rooms_list_enabled:
+    usage: Разрешает получение списка номеров выбранного отеля
+    group: features
+    value: "false"
+    type: bool
+    writable: true

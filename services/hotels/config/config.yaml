@@ -22,6 +22,14 @@ postgres:
   max_idle_connections: 0
   max_conn_lifetime: 1h
 
+# Для локального запуска через make config-etcd. В k3s endpoint задан в Deployment.
+runtime_config:
+  endpoints: ["http://127.0.0.1:2379"]
+  prefix: /hotelflow/dev/services/hotels/rtconfig/v1/values/
+  schema_path: rtconfig.yaml
+  startup_timeout: 5s
+  shutdown_timeout: 3s
+
 telemetry:
   metrics_enabled: true
   metrics_interval: 15s

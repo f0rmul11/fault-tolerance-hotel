@@ -30,10 +30,10 @@ func (localFactory) NewStand(projectconfig.Config, iostreams.IOStreams) (stand.I
 func fixture(t *testing.T) localFactory {
 	t.Helper()
 	root := t.TempDir()
-	if err := os.WriteFile(filepath.Join(root, "hotel.yaml"), []byte("services: [api-gateway, review]\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(root, "hotel.yaml"), []byte("services: [hotels, review, api-gateway]\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	path := filepath.Join(root, "services", "api-gateway", "config")
+	path := filepath.Join(root, "services", "hotels", "config")
 	if err := os.MkdirAll(path, 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -54,17 +54,19 @@ func fixture(t *testing.T) localFactory {
 func TestInvalidConfigInputFailsBeforeConnection(t *testing.T) {
 	f := fixture(t)
 	for _, args := range [][]string{
-		{"set", "api-gateway", "flag"},
+		{"set", "hotels", "flag"},
 		{"set", "missing", "flag", "true"},
 		{"set", "review", "flag", "true"},
-		{"set", "api-gateway", "unknown", "true"},
-		{"set", "api-gateway", "readonly", "false"},
-		{"set", "api-gateway", "flag", "yes"},
-		{"set", "api-gateway", "mode", "bad"},
-		{"set", "api-gateway", "flag", "true", "--expect-revision=-1"},
-		{"set", "api-gateway", "flag", "true", "--env=../prod"},
-		{"set", "api-gateway", "flag", "true", "--prefix=/wrong/../prefix/"},
-		{"set", "api-gateway", "flag", "true", "--timeout=0"},
+		{"set", "api-gateway", "flag", "true"},
+		{"get", "api-gateway", "flag"},
+		{"set", "hotels", "unknown", "true"},
+		{"set", "hotels", "readonly", "false"},
+		{"set", "hotels", "flag", "yes"},
+		{"set", "hotels", "mode", "bad"},
+		{"set", "hotels", "flag", "true", "--expect-revision=-1"},
+		{"set", "hotels", "flag", "true", "--env=../prod"},
+		{"set", "hotels", "flag", "true", "--prefix=/wrong/../prefix/"},
+		{"set", "hotels", "flag", "true", "--timeout=0"},
 	} {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
 			var output bytes.Buffer
@@ -96,24 +98,24 @@ func TestDefaultKeyAndCustomServiceContext(t *testing.T) {
 		set:         true,
 	}
 	o.Connection.Endpoints = []string{"http://127.0.0.1:2379"}
-	if err := o.Complete(f, []string{"api-gateway", "flag", "true"}); err != nil {
+	if err := o.Complete(f, []string{"hotels", "flag", "true"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := o.Validate(); err != nil {
 		t.Fatal(err)
 	}
-	if o.Key != "/hotelflow/dev/services/api-gateway/rtconfig/v1/values/flag" || o.Value != "true" {
+	if o.Key != "/hotelflow/dev/services/hotels/rtconfig/v1/values/flag" || o.Value != "true" {
 		t.Fatalf("wrong target: %s %s", o.Key, o.Value)
 	}
 
-	old := filepath.Join(f.config.Root, "services/api-gateway")
+	old := filepath.Join(f.config.Root, "services/hotels")
 	newPath := filepath.Join(f.config.Root, "alternate")
 	if err := os.Rename(old, newPath); err != nil {
 		t.Fatal(err)
 	}
 	f.config.Services[0].Context = "alternate"
 	o.Prefix = "/custom/service/"
-	if err := o.Complete(f, []string{"api-gateway", "flag", "false"}); err != nil {
+	if err := o.Complete(f, []string{"hotels", "flag", "false"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := o.Validate(); err != nil {
