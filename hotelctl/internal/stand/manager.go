@@ -34,6 +34,8 @@ type Interface interface {
 	Build(context.Context, []config.Service) error
 	Deploy(context.Context, []config.Service) error
 	Status(context.Context, string) error
+	PodStatus(context.Context, config.Service, string) error
+	RolloutRestart(context.Context, config.Service) error
 	Doctor(context.Context) error
 	Smoke(context.Context) error
 	BusinessSmoke(context.Context) error

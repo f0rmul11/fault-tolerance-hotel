@@ -232,3 +232,53 @@ ETCD_BIN=/absolute/path/to/etcd go test -race -tags=integration ./pkg/cmd/config
 host/NodePort конфликты проверяются до остановки работающего кластера. `destroy/reset` для этого не нужны.
 Jaeger не сохраняет историю после остановки/рестарта. Loki/Grafana используют PVC; Prometheus также использует PVC; метрики registry поступают через OTLP без scrape.
 Подробнее: [трейсы, логи и метрики](../deploy/observability/README.md).
+
+## Rolling restart и состояние Pod
+
+```bash
+./bin/hotelctl rollout restart hotels
+./bin/hotelctl status hotels
+./bin/hotelctl status hotels --watch
+```
+
+`rollout restart` запускает замену Pod по текущей стратегии Deployment. Образ и количество
+реплик сохраняются. Команда возвращается после запуска обновления; прогресс виден в `status`.
+Приостановленный или остановленный Deployment команда не изменяет.
+
+`status SERVICE` показывает Pod, ревизию, статус, Ready, проверку `runtime_config` и число
+перезапусков. `--watch` обновляет таблицу до Ctrl+C. `--output json` выводит JSON;
+в watch-режиме — отдельный массив на каждое обновление. Без SERVICE сохраняется общий статус стенда.
+
+## gRPC-нагрузка через Framer
+
+```bash
+./bin/hotelctl load \
+  --addr 127.0.0.1:9090 \
+  --method api_gateway.hotels.v1.HotelsService/ListRooms \
+  --data '{"hotel_id":"cdd4685e-c610-4e7e-95ee-c51fb6807400"}' \
+  --rps 50 --duration 2m
+```
+
+Замените `hotel_id` на существующий ID вашего стенда. Метод и тело произвольные:
+утилита повторяет заданный unary gRPC-запрос с постоянным общим RPS.
+
+| Параметр | Назначение |
+| --- | --- |
+| `--addr` | gRPC endpoint `host:port` |
+| `--method` | Полное имя `package.Service/Method` |
+| `--data` / `--data-file` | JSON-тело или путь к файлу; по умолчанию `{}` |
+| `--rps`, `--duration` | Частота запросов и длительность подачи нагрузки |
+| `--clients` | Количество соединений, по умолчанию 1; RPS общий |
+| `-H 'key:value'` | Metadata; параметр можно повторять |
+| `--proto`, `--import-path` | Proto-файлы и каталоги импорта, если reflection недоступна |
+| `--report-dir` | Каталог запусков вместо `.local/hotelctl/load` |
+
+При первом запуске закреплённая версия Framer собирается автоматически: нужны Git, Go
+и доступ к GitHub/Go modules. Далее используется локальная копия.
+В терминале отображаются отправка, успешные ответы и ошибки; в конце — коды результатов.
+Подробный отчёт каждого запуска сохраняется в `phout.tsv`.
+
+Поддерживается plaintext gRPC без TLS и streaming. Timeout запроса в Framer — 11 секунд;
+после окончания подачи нагрузки утилита дожидается ответов. Ctrl+C останавливает нагрузку,
+при этом отчёт может быть неполным. Framer не восстанавливает потерянные соединения автоматически:
+для тестирования релизов backend используйте стабильную входную точку Gateway.

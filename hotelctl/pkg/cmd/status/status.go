@@ -3,6 +3,10 @@ package status
 import (
 	"context"
 	"fmt"
+	"os"
+	"time"
+
+	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/internal/config"
 
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/internal/iostreams"
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/pkg/cmd/util"
@@ -11,7 +15,9 @@ import (
 
 type StatusOptions struct {
 	util.Options
-	Output string
+	Output  string
+	Watch   bool
+	Service *config.Service
 }
 
 func NewStatusOptions(streams iostreams.IOStreams) *StatusOptions {
@@ -24,9 +30,9 @@ func NewStatusOptions(streams iostreams.IOStreams) *StatusOptions {
 func NewCmdStatus(f util.Factory, streams iostreams.IOStreams) *cobra.Command {
 	o := NewStatusOptions(streams)
 	command := &cobra.Command{
-		Use:   "status",
+		Use:   "status [SERVICE]",
 		Short: "Show the node and service status",
-		Args:  cobra.NoArgs,
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := o.Complete(f); err != nil {
 				return err
@@ -34,10 +40,18 @@ func NewCmdStatus(f util.Factory, streams iostreams.IOStreams) *cobra.Command {
 			if err := o.Validate(); err != nil {
 				return err
 			}
+			if len(args) == 1 {
+				services, err := o.Config.Select(args)
+				if err != nil {
+					return err
+				}
+				o.Service = &services[0]
+			}
 			return o.Run(cmd.Context())
 		},
 	}
 	o.AddFlags(command.Flags())
+	command.Flags().BoolVarP(&o.Watch, "watch", "w", false, "Обновлять состояние каждую секунду до Ctrl+C")
 	command.Flags().StringVarP(&o.Output, "output", "o", o.Output, "Output format: table or json")
 	return command
 }
@@ -59,7 +73,41 @@ func (o *StatusOptions) Run(ctx context.Context) error {
 		return err
 	}
 	defer runner.Close()
-	ctx, cancel := o.Context(ctx)
-	defer cancel()
-	return runner.Status(ctx, o.Output)
+	if !o.Watch {
+		var cancel context.CancelFunc
+		ctx, cancel = o.Context(ctx)
+		defer cancel()
+	}
+	for {
+		if o.Watch && o.Output == "table" {
+			if file, ok := o.Out.(*os.File); ok {
+				if info, err := file.Stat(); err == nil && info.Mode()&os.ModeCharDevice != 0 {
+					fmt.Fprint(o.Out, "\033[H\033[2J")
+				}
+			}
+		}
+		var err error
+		if o.Service != nil {
+			err = runner.PodStatus(ctx, *o.Service, o.Output)
+		} else {
+			err = runner.Status(ctx, o.Output)
+		}
+		if ctx.Err() != nil && o.Watch {
+			return nil
+		}
+		if err != nil {
+			if !o.Watch {
+				return err
+			}
+			fmt.Fprintf(o.ErrOut, "Не удалось обновить состояние: %v\n", err)
+		}
+		if !o.Watch {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-time.After(time.Second):
+		}
+	}
 }

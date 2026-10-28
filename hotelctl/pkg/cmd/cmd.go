@@ -11,8 +11,10 @@ import (
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/pkg/cmd/doctor"
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/pkg/cmd/fault"
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/pkg/cmd/kubectl"
+	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/pkg/cmd/load"
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/pkg/cmd/logs"
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/pkg/cmd/reset"
+	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/pkg/cmd/rollout"
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/pkg/cmd/smoke"
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/pkg/cmd/status"
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/pkg/cmd/stop"
@@ -57,6 +59,8 @@ func NewHotelctlCommand(f util.Factory, streams iostreams.IOStreams, version str
 	command.AddCommand(reset.NewCmdReset(f, streams))
 	command.AddCommand(doctor.NewCmdDoctor(f, streams))
 	command.AddCommand(status.NewCmdStatus(f, streams))
+	command.AddCommand(rollout.NewCmdRollout(f, streams))
+	command.AddCommand(load.NewCmdLoad(f, streams))
 	command.AddCommand(logs.NewCmdLogs(f, streams))
 	command.AddCommand(kubectl.NewCmdKubectl(f, streams))
 	return command
