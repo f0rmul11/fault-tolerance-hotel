@@ -29,6 +29,7 @@ import (
 	"notification/internal/pkg/closer"
 	"notification/internal/pkg/grpcdesc"
 	"notification/internal/pkg/telemetry"
+	"notification/internal/pkg/telemetry/metrics"
 	"notification/internal/pkg/telemetry/traces"
 
 	echoV1 "notification/internal/pkg/pb/notification/echo/v1"
@@ -71,6 +72,8 @@ func (a *App) initMainServer(ctx context.Context) error {
 		}),
 		server.WithGRPCOpts(
 			grpc.StatsHandler(traces.ServerHandler()),
+			grpc.StatsHandler(metrics.ServerHandler()),
+			grpc.InTapHandle(metrics.TapHandler),
 			grpc.ChainUnaryInterceptor(intercept.ErrorInterceptor()),
 			grpc.KeepaliveParams(keepalive.ServerParameters{
 				MaxConnectionIdle: config.Instance().GrpcServer.MaxConnectionIdle,

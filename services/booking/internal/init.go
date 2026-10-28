@@ -42,6 +42,7 @@ import (
 	pb "booking/internal/pkg/pb/booking/booking/v1"
 	echoV1 "booking/internal/pkg/pb/booking/echo/v1"
 	"booking/internal/pkg/telemetry"
+	"booking/internal/pkg/telemetry/metrics"
 	"booking/internal/pkg/telemetry/traces"
 	"booking/internal/pkg/worker"
 )
@@ -78,6 +79,8 @@ func (a *App) initMainServer(ctx context.Context) error {
 		}),
 		server.WithGRPCOpts(
 			grpc.StatsHandler(traces.ServerHandler()),
+			grpc.StatsHandler(metrics.ServerHandler()),
+			grpc.InTapHandle(metrics.TapHandler),
 			grpc.ChainUnaryInterceptor(intercept.ErrorInterceptor(), intercept.AuthInterceptor()),
 			grpc.KeepaliveParams(keepalive.ServerParameters{
 				MaxConnectionIdle: config.Instance().GrpcServer.MaxConnectionIdle,

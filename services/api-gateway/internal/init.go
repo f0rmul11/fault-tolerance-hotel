@@ -39,6 +39,7 @@ import (
 	"api-gateway/internal/pkg/requestid"
 	"api-gateway/internal/pkg/requesttimeout"
 	"api-gateway/internal/pkg/telemetry"
+	"api-gateway/internal/pkg/telemetry/metrics"
 	"api-gateway/internal/pkg/telemetry/traces"
 )
 
@@ -63,6 +64,7 @@ func (a *App) initMainServer(ctx context.Context) error {
 		config.Instance().GrpcServer.Port,
 		server.WithHTTPPort(config.Instance().HttpServer.Port),
 		server.WithHTTPMiddlewares(
+			metrics.HTTP,
 			requesttimeout.Middleware,
 			traces.HTTP,
 			func(next http.Handler) http.Handler {
@@ -83,6 +85,8 @@ func (a *App) initMainServer(ctx context.Context) error {
 		),
 		server.WithGRPCOpts(
 			grpc.StatsHandler(traces.ServerHandler()),
+			grpc.StatsHandler(metrics.ServerHandler()),
+			grpc.InTapHandle(metrics.TapHandler),
 			grpc.KeepaliveParams(keepalive.ServerParameters{
 				MaxConnectionIdle: config.Instance().GrpcServer.MaxConnectionIdle,
 				MaxConnectionAge:  config.Instance().GrpcServer.MaxConnectionAge,

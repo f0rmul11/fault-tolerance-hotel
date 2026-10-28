@@ -134,3 +134,5 @@ OpenTelemetry Collector, Jaeger, Loki, Prometheus и Grafana включены в
 Адреса Jaeger и Grafana, а также получение пароля приведены в [общей таблице](#все-адреса-для-локального-запуска). Трейсы, логи и метрики глобального Prometheus registry проходят через единый OTel Collector. Стандартные Go/process-метрики включены; собственные метрики регистрируются через prometheus/promauto.
 Первый `up` с новыми портами перезапускает контейнер k3s с сохранением его тома.
 [Устройство, команды и ограничения](deploy/observability/README.md).
+
+[Service Overview](http://localhost:3000/d/hotelflow-service-overview) — готовый дашборд в папке **HotelFlow**. В поле **Service** можно искать и выбирать сервис; **Protocol** переключает HTTP/gRPC. Раскрывающийся ряд **Errors** показывает доли ответов, технические ошибки и клиентские отказы по обработчикам. [Как читать графики и провести демонстрацию сбоя](deploy/observability/service-overview.md).

@@ -36,6 +36,7 @@ import (
 	businessV1 "hotels/internal/pkg/pb/hotels/hotels/v1"
 	"hotels/internal/pkg/rtconfig/global"
 	"hotels/internal/pkg/telemetry"
+	"hotels/internal/pkg/telemetry/metrics"
 	"hotels/internal/pkg/telemetry/traces"
 )
 
@@ -68,6 +69,8 @@ func (a *App) initMainServer(_ context.Context) error {
 		}),
 		server.WithGRPCOpts(
 			grpc.StatsHandler(traces.ServerHandler()),
+			grpc.StatsHandler(metrics.ServerHandler()),
+			grpc.InTapHandle(metrics.TapHandler),
 			grpc.ChainUnaryInterceptor(intercept.ErrorInterceptor()),
 			grpc.KeepaliveParams(keepalive.ServerParameters{
 				MaxConnectionIdle: config.Instance().GrpcServer.MaxConnectionIdle,

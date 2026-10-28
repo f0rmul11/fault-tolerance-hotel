@@ -39,6 +39,7 @@ import (
 	"check-in/internal/pkg/closer"
 	"check-in/internal/pkg/grpcdesc"
 	"check-in/internal/pkg/telemetry"
+	"check-in/internal/pkg/telemetry/metrics"
 	"check-in/internal/pkg/telemetry/traces"
 
 	echoV1 "check-in/internal/pkg/pb/check-in/echo/v1"
@@ -85,6 +86,8 @@ func (a *App) initMainServer(ctx context.Context) error {
 		}),
 		server.WithGRPCOpts(
 			grpc.StatsHandler(traces.ServerHandler()),
+			grpc.StatsHandler(metrics.ServerHandler()),
+			grpc.InTapHandle(metrics.TapHandler),
 			grpc.ChainUnaryInterceptor(intercept.ErrorInterceptor(), intercept.AuthInterceptor()),
 			grpc.KeepaliveParams(keepalive.ServerParameters{
 				MaxConnectionIdle: config.Instance().GrpcServer.MaxConnectionIdle,
