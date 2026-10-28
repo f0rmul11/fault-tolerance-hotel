@@ -45,6 +45,7 @@ func TestAppTransportsAndShutdown(t *testing.T) {
 	t.Setenv("HTTP_PORT", httpPort)
 	t.Setenv("ADMIN_HTTP_PORT", adminPort)
 	t.Setenv("GRACEFUL_TIMEOUT", "2s")
+	t.Setenv("GRACEFUL_DELAY", "100ms")
 	process := exec.Command(os.Args[0], "-test.run=^TestServiceProcess$")
 	process.Env = append(os.Environ(), "HOTEL_SERVICE_HELPER=1")
 	var logs bytes.Buffer

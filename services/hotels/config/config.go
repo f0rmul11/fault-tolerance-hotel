@@ -76,6 +76,9 @@ func (c *Config) Validate() error {
 	if err := c.RuntimeConfig.Validate(); err != nil {
 		return err
 	}
+	if c.Graceful.Delay < 0 || c.Graceful.Delay >= c.Graceful.Timeout {
+		return fmt.Errorf("graceful delay must be non-negative and less than timeout")
+	}
 	if c.Graceful.Timeout <= 0 {
 		return fmt.Errorf("graceful timeout must be positive")
 	}

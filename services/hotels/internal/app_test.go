@@ -49,6 +49,7 @@ func TestAppTransportsAndShutdown(t *testing.T) {
 	t.Setenv("HTTP_PORT", httpPort)
 	t.Setenv("ADMIN_HTTP_PORT", adminPort)
 	t.Setenv("GRACEFUL_TIMEOUT", "2s")
+	t.Setenv("GRACEFUL_DELAY", "100ms")
 	t.Setenv("RTCONFIG_ENDPOINTS", "http://127.0.0.1:"+availablePort(t))
 	t.Setenv("RTCONFIG_STARTUP_TIMEOUT", "50ms")
 	process := exec.Command(os.Args[0], "-test.run=^TestServiceProcess$")

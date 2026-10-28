@@ -50,6 +50,7 @@ func TestAppTransportsAndShutdown(t *testing.T) {
 	t.Setenv("GRPC_PORT", grpcPort)
 	t.Setenv("ADMIN_HTTP_PORT", adminPort)
 	t.Setenv("GRACEFUL_TIMEOUT", "2s")
+	t.Setenv("GRACEFUL_DELAY", "100ms")
 	// Тест не зависит от локального стенда: запускаемся с defaults без etcd.
 	process := exec.Command(os.Args[0], "-test.run=^TestGatewayProcess$")
 	process.Env = append(os.Environ(), "HOTEL_GATEWAY_HELPER=1")
