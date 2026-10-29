@@ -114,6 +114,9 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("ADMIN_HTTP_PORT must differ from HTTP_PORT and GRPC_PORT")
 	}
 
+	if c.Graceful.Delay < 0 || c.Graceful.Delay >= c.Graceful.Timeout {
+		return fmt.Errorf("graceful delay must be non-negative and less than timeout")
+	}
 	if c.Graceful.Timeout <= 0 {
 		return fmt.Errorf("graceful timeout must be positive")
 	}

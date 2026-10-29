@@ -144,11 +144,11 @@ CLI не импортирует внутренние пакеты сервисо
 Порт `127.0.0.1:2379` постоянно публикуется при `up`; туннель и отдельный терминал не нужны.
 Внутри кластера адрес — `http://config-etcd.hotelflow.svc.cluster.local:2379`.
 Reader в Hotels запускается автоматически. Успешный `set` подтверждает запись в хранилище;
-обновление reader асинхронное. В исходном варианте урока Hotels не подключает проверку
-начальной синхронизации RTConfig к readiness: новый Pod может стать Ready до загрузки
-конфигурации. Проверка `CheckInitialSync()` добавляется во время демонстрации.
-`rooms_list_enabled=false` запрещает ListRooms с gRPC FailedPrecondition / HTTP 409;
-true разрешает чтение номеров из БД Hotels без Review. Default остаётся false.
+обновление reader асинхронное. Readiness Hotels (`runtime_config=success`) требует первого
+валидного snapshot из etcd, но не подтверждает применение конкретной revision. После загрузки
+потеря etcd не отменяет готовность последнего валидного состояния. `rooms_list_enabled=false`
+запрещает ListRooms с gRPC FailedPrecondition / HTTP 409; true разрешает чтение номеров из БД
+Hotels без Review. Значение флага не влияет на readiness. Defaults остаётся false.
 `get` показывает значение из etcd; если ключ отсутствует — YAML default с `source=default revision=0`.
 Он не опрашивает локальный snapshot сервиса и не показывает его last-known-good состояние.
 

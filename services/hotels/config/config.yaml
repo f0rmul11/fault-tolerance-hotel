@@ -1,4 +1,5 @@
 graceful:
+  delay: 3s
   timeout: 10s
 
 grpc_server:

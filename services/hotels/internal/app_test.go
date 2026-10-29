@@ -49,6 +49,7 @@ func TestAppTransportsAndShutdown(t *testing.T) {
 	t.Setenv("HTTP_PORT", httpPort)
 	t.Setenv("ADMIN_HTTP_PORT", adminPort)
 	t.Setenv("GRACEFUL_TIMEOUT", "2s")
+	t.Setenv("GRACEFUL_DELAY", "100ms")
 	t.Setenv("RTCONFIG_ENDPOINTS", "http://127.0.0.1:"+availablePort(t))
 	t.Setenv("RTCONFIG_STARTUP_TIMEOUT", "50ms")
 	process := exec.Command(os.Args[0], "-test.run=^TestServiceProcess$")
@@ -103,8 +104,7 @@ func TestAppTransportsAndShutdown(t *testing.T) {
 	var checks map[string]string
 	decodeErr := json.NewDecoder(response.Body).Decode(&checks)
 	response.Body.Close()
-	// Исходный вариант урока: readiness ещё не учитывает первую загрузку RTConfig.
-	if decodeErr != nil || response.StatusCode != http.StatusOK || checks["started"] != "success" {
+	if decodeErr != nil || response.StatusCode != http.StatusServiceUnavailable || checks["runtime_config"] != rtconfig.ErrNotSynced.Error() {
 		t.Fatalf("offline startup readiness: %v, %v", checks, decodeErr)
 	}
 	response, err = client.Get("http://127.0.0.1:" + adminPort + "/runtime-config/status")
@@ -256,7 +256,7 @@ func TestHealthLifecycle(t *testing.T) {
 	check(healthcheck.LivenessPath, http.StatusOK)
 	atomic.StoreInt32(&app.started, 1)
 	check(healthcheck.StartupPath, http.StatusOK)
-	check(healthcheck.ReadinessPath, http.StatusOK)
+	check(healthcheck.ReadinessPath, http.StatusServiceUnavailable)
 
 	previous := global.Client()
 	t.Cleanup(func() {
@@ -278,13 +278,13 @@ func TestHealthLifecycle(t *testing.T) {
 		}
 	})
 	app.runtimeConfig.Store(client)
-	check(healthcheck.ReadinessPath, http.StatusOK)
+	check(healthcheck.ReadinessPath, http.StatusServiceUnavailable)
 	check(healthcheck.StartupPath, http.StatusOK)
 	check(healthcheck.LivenessPath, http.StatusOK)
 	if err := client.Close(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	check(healthcheck.ReadinessPath, http.StatusOK)
+	check(healthcheck.ReadinessPath, http.StatusServiceUnavailable)
 	atomic.StoreInt32(&app.terminated, 1)
 	check(healthcheck.ReadinessPath, http.StatusServiceUnavailable)
 	check(healthcheck.LivenessPath, http.StatusOK)

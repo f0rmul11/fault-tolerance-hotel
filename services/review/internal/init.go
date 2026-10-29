@@ -32,6 +32,7 @@ import (
 	echoV1 "review/internal/pkg/pb/review/echo/v1"
 	businessV1 "review/internal/pkg/pb/review/review/v1"
 	"review/internal/pkg/telemetry"
+	"review/internal/pkg/telemetry/metrics"
 	"review/internal/pkg/telemetry/traces"
 )
 
@@ -64,6 +65,8 @@ func (a *App) initMainServer(ctx context.Context) error {
 		}),
 		server.WithGRPCOpts(
 			grpc.StatsHandler(traces.ServerHandler()),
+			grpc.StatsHandler(metrics.ServerHandler()),
+			grpc.InTapHandle(metrics.TapHandler),
 			grpc.ChainUnaryInterceptor(intercept.ErrorInterceptor()),
 			grpc.KeepaliveParams(keepalive.ServerParameters{
 				MaxConnectionIdle: config.Instance().GrpcServer.MaxConnectionIdle,
@@ -75,8 +78,12 @@ func (a *App) initMainServer(ctx context.Context) error {
 	)
 
 	a.publicCloser.Add(func() error {
+		atomic.StoreInt32(&a.terminated, 1)
 		gracefulCtx, cancel := context.WithTimeout(context.Background(), config.Instance().Graceful.Timeout)
 		defer cancel()
+
+		slog.Info("Ожидание прекращения нового трафика", "delay", config.Instance().Graceful.Delay)
+		time.Sleep(config.Instance().Graceful.Delay)
 
 		// Synchronize Stop with Clay initialization, including a shutdown before
 		// the first external request. The admin listener starts independently.

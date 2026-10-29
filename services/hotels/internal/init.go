@@ -35,6 +35,7 @@ import (
 	businessV1 "hotels/internal/pkg/pb/hotels/hotels/v1"
 	"hotels/internal/pkg/rtconfig/global"
 	"hotels/internal/pkg/telemetry"
+	"hotels/internal/pkg/telemetry/metrics"
 	"hotels/internal/pkg/telemetry/traces"
 )
 
@@ -67,6 +68,8 @@ func (a *App) initMainServer(_ context.Context) error {
 		}),
 		server.WithGRPCOpts(
 			grpc.StatsHandler(traces.ServerHandler()),
+			grpc.StatsHandler(metrics.ServerHandler()),
+			grpc.InTapHandle(metrics.TapHandler),
 			grpc.ChainUnaryInterceptor(intercept.ErrorInterceptor()),
 			grpc.KeepaliveParams(keepalive.ServerParameters{
 				MaxConnectionIdle: config.Instance().GrpcServer.MaxConnectionIdle,
@@ -139,6 +142,9 @@ func (a *App) initGrpcConn(_ context.Context) error {
 
 func (a *App) initHealthCheck(_ context.Context) error {
 	a.healthCheck = healthcheck.NewHandler()
+	a.healthCheck.AddReadinessCheck("runtime_config", func() error {
+		return a.runtimeConfig.Load().CheckInitialSync()
+	})
 
 	// поверяю, что нет утечки горутин на старте (как пример)
 	a.healthCheck.AddLivenessCheck("goroutines", func() error {

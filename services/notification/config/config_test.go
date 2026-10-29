@@ -49,3 +49,24 @@ func TestKafkaConfiguration(t *testing.T) {
 		t.Fatal("missing brokers accepted")
 	}
 }
+
+func TestGracefulDelay(t *testing.T) {
+	t.Setenv("CONFIG_PATH", "config.yaml")
+	t.Setenv("GRACEFUL_TIMEOUT", "10s")
+	for _, delay := range []string{"0s", "3s", "-1s", "10s", "11s"} {
+		t.Run(delay, func(t *testing.T) {
+			t.Setenv("GRACEFUL_DELAY", delay)
+			cfg, err := Read()
+			valid := delay == "0s" || delay == "3s"
+			if valid && err != nil {
+				t.Fatal(err)
+			}
+			if !valid && err == nil {
+				t.Fatal("invalid graceful delay accepted")
+			}
+			if valid && cfg.Graceful.Delay.String() != delay {
+				t.Fatalf("delay override not applied: %v", cfg.Graceful.Delay)
+			}
+		})
+	}
+}
