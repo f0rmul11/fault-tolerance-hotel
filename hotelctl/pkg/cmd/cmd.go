@@ -4,6 +4,7 @@ import (
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/internal/iostreams"
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/pkg/cmd/access"
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/pkg/cmd/build"
+	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/pkg/cmd/canary"
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/pkg/cmd/component"
 	configcmd "github.com/f0rmul11/fault-tolerance-hotel/hotelctl/pkg/cmd/config"
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/pkg/cmd/deploy"
@@ -45,6 +46,7 @@ func NewHotelctlCommand(f util.Factory, streams iostreams.IOStreams, version str
 	command.SetErr(streams.ErrOut)
 	command.AddCommand(up.NewCmdUp(f, streams))
 	command.AddCommand(build.NewCmdBuild(f, streams))
+	command.AddCommand(canary.NewCmdCanary(f, streams))
 	command.AddCommand(configcmd.NewCmdConfig(f, streams))
 	command.AddCommand(deploy.NewCmdDeploy(f, streams))
 	command.AddCommand(stop.NewCmdStop(f, streams))

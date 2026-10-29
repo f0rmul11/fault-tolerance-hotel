@@ -10,22 +10,24 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/internal/canary"
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/internal/config"
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/internal/iostreams"
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/internal/stand"
 )
 
 type fakeFactory struct {
-	c          config.Config
-	calls      int
-	built      []config.Service
-	block      bool
-	smoke      bool
-	business   bool
-	action     string
-	components []config.Service
-	wholeStop  bool
-	reset      bool
+	canaryInput canary.Options
+	c           config.Config
+	calls       int
+	built       []config.Service
+	block       bool
+	smoke       bool
+	business    bool
+	action      string
+	components  []config.Service
+	wholeStop   bool
+	reset       bool
 }
 
 func (f *fakeFactory) Config() (config.Config, error) {

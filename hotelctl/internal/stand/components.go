@@ -31,6 +31,14 @@ func (m *Manager) Control(ctx context.Context, action string, components []confi
 	if err != nil {
 		return err
 	}
+	for _, component := range components {
+		if component.Name == "review" || component.Name == "hotels" {
+			if err := client.GuardReviewCanary(ctx); err != nil {
+				return err
+			}
+			break
+		}
+	}
 	return m.control(ctx, state, client, action, components)
 }
 

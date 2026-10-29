@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: review-rollout
+spec:
+  selector:
+    app.kubernetes.io/name: review-rollout
+  ports:
+    - name: grpc
+      appProtocol: grpc
+      port: 9090
+      targetPort: grpc
+---
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: review-canary
+spec:
+  hosts: [review-rollout.hotelflow.svc.cluster.local]
+  gateways: [mesh]
+  http:
+    - name: primary
+      retries: {attempts: 0}
+      route:
+        - destination:
+            host: review-rollout.hotelflow.svc.cluster.local
+            subset: stable
+            port: {number: 9090}
+          weight: 100
+        - destination:
+            host: review-rollout.hotelflow.svc.cluster.local
+            subset: canary
+            port: {number: 9090}
+          weight: 0
+---
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: review-canary
+spec:
+  host: review-rollout.hotelflow.svc.cluster.local
+  trafficPolicy:
+    loadBalancer: {simple: ROUND_ROBIN}
+  subsets:
+    - name: stable
+      labels:
+        app.kubernetes.io/name: review-rollout
+    - name: canary
+      labels:
+        app.kubernetes.io/name: review-rollout

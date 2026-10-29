@@ -11,6 +11,7 @@ import (
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/internal/config"
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/internal/kube"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -31,6 +32,11 @@ func (m *Manager) RolloutRestart(ctx context.Context, service config.Service) er
 	c, err := kube.New(m.Config.Kubeconfig())
 	if err != nil {
 		return err
+	}
+	if service.Name == "review" || service.Name == "hotels" {
+		if err := c.GuardReviewCanary(ctx); err != nil {
+			return err
+		}
 	}
 	if err := restartDeployment(ctx, c, service); err != nil {
 		return err
@@ -91,6 +97,16 @@ func (m *Manager) PodStatus(ctx context.Context, service config.Service, format 
 	c, err := kube.New(m.Config.Kubeconfig())
 	if err != nil {
 		return err
+	}
+	if service.Name == "review" {
+		if r, err := c.ReviewRollout(ctx); err == nil {
+			if format == "json" {
+				return json.NewEncoder(m.Streams.Out).Encode(r.Object)
+			}
+			return m.printCanaryStatus(ctx, c, r)
+		} else if !apierrors.IsNotFound(err) {
+			return err
+		}
 	}
 	d, err := c.Typed.AppsV1().Deployments(service.Namespace).Get(ctx, service.Deployment, metav1.GetOptions{})
 	if err != nil {

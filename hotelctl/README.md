@@ -282,3 +282,23 @@ Jaeger не сохраняет историю после остановки/ре
 после окончания подачи нагрузки утилита дожидается ответов. Ctrl+C останавливает нагрузку,
 при этом отчёт может быть неполным. Framer не восстанавливает потерянные соединения автоматически:
 для тестирования релизов backend используйте стабильную входную точку Gateway.
+
+## Канареечный релиз Review
+
+```bash
+./bin/hotelctl canary setup review        # подключить Argo Rollouts + Istio
+./bin/hotelctl build review              # собрать изменённый сервис
+./bin/hotelctl canary deploy review      # новая ревизия, 0% трафика
+./bin/hotelctl canary status review -w   # ревизии, Ready и веса
+./bin/hotelctl canary step review 10     # далее 25, 50, 100 — по порядку
+./bin/hotelctl canary promote review     # завершить после проверки на 100%
+./bin/hotelctl canary abort review       # при ошибках вернуть трафик на stable
+./bin/hotelctl canary disable review     # вернуть обычный Deployment
+```
+
+Тренировочный релиз того же образа: `canary deploy review --restart`.
+Шаги ручные, без автоматического анализа метрик. Нагрузку направляйте через Gateway
+на `ListHotels` или `GetHotel`. `status review` в этом режиме показывает Rollout;
+`status review -o json` возвращает объект Rollout.
+
+[Устройство, порядок действий и ограничения режима](../deploy/canary/README.md).

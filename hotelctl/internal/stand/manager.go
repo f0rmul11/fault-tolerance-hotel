@@ -6,6 +6,7 @@ import (
 	"io"
 	"slices"
 
+	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/internal/canary"
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/internal/config"
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/internal/fault"
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/internal/iostreams"
@@ -29,6 +30,7 @@ type Runtime interface {
 
 // Interface is consumed by commands; implementations never depend on Cobra.
 type Interface interface {
+	Canary(context.Context, canary.Options) error
 	Close() error
 	Up(context.Context, []config.Service) error
 	Build(context.Context, []config.Service) error
