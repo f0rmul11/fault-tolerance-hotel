@@ -142,9 +142,6 @@ func (a *App) initGrpcConn(_ context.Context) error {
 
 func (a *App) initHealthCheck(_ context.Context) error {
 	a.healthCheck = healthcheck.NewHandler()
-	a.healthCheck.AddReadinessCheck("runtime_config", func() error {
-		return a.runtimeConfig.Load().CheckInitialSync()
-	})
 
 	// поверяю, что нет утечки горутин на старте (как пример)
 	a.healthCheck.AddLivenessCheck("goroutines", func() error {
