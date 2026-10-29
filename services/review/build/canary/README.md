@@ -9,7 +9,7 @@ go build -o bin/hotelctl ./hotelctl/cmd/hotelctl
 ./bin/hotelctl canary setup review
 ```
 
-Команда устанавливает Istio 1.31.3 (`minimal`) и Argo Rollouts v1.10.1, создаёт стабильную ревизию из **уже работающего образа Review** и переводит Hotels на новый адрес. Нужны Docker, работающий k3s, `kubectl`, `curl`, `tar`, `shasum` и интернет при первой установке. Повторный `setup` сохраняет текущий релиз и веса.
+Команда устанавливает Istio 1.31.3 (`minimal`) и Argo Rollouts v1.10.1, создаёт стабильную ревизию по `rollout.yaml`, используя **уже работающий образ Review** и переводит Hotels на новый адрес. Нужны Docker и работающий k3s. hotelctl применяет локальные YAML через Kubernetes API; интернет нужен для загрузки контейнерных образов. Повторный `setup` сохраняет текущий релиз и веса.
 
 Istio sidecar добавляется только в Hotels и Review. Захватывается gRPC-порт 9090; PostgreSQL, etcd, телеметрия и остальные связи через существующий Envoy сохраняют свои маршруты. Argo CD, ingress gateway и дополнительные системы наблюдаемости не устанавливаются.
 
@@ -71,10 +71,11 @@ API Gateway → существующий Envoy → Hotels
                                     └─ canary: 10% → Review, новая ревизия
 ```
 
-- `strategy.yaml` — фрагмент Rollout: три реплики, ручные шаги, сроки удаления старых Pod. `hotelctl` дополняет его действующим шаблоном Review с образом, probes, ресурсами и конфигурацией.
-- `routing.yaml` — Service `review-rollout`, VirtualService с весами и DestinationRule с двумя subsets. Argo добавляет к subsets метку `rollouts-pod-template-hash` соответствующего ReplicaSet и меняет веса при переходах.
+- `rollout.yaml` — полный Rollout: образ, probes, ресурсы, конфигурация, три реплики и ручные шаги. `setup` подставляет работающий образ, `deploy` — результат `hotelctl build review`. Изменения шаблона Pod из YAML также применяются при `deploy`; шаблон больше не копируется из Deployment.
+- `service.yaml`, `virtual-service.yaml`, `destination-rule.yaml` — Service `review-rollout` и правила маршрутизации с двумя subsets. Argo добавляет к subsets метку `rollouts-pod-template-hash` соответствующего ReplicaSet и меняет веса при переходах.
+- `deploy/istio` и `deploy/argo-rollouts` содержат локальные манифесты инфраструктуры. hotelctl сначала применяет CRD, ждёт их регистрации, затем запускает контроллеры.
 - Обычный Deployment `review` остаётся с нулём реплик для обратимого переключения. Его Service и прямой NodePort во время канарейки не используются. Проверяйте трафик через Gateway, а состояние — через `canary status`; `logs review` относится к обычному Deployment.
 - Сбой на связи Hotels → Review через прежние `hotelctl fault` в этом режиме не применяется: эта связь переведена в Istio. Другие связи остаются в существующем Envoy.
-- Не применяйте `routing.yaml` повторно во время релиза: весами и метками subsets управляет Argo. Kubernetes-команды вручную могут обойти защиту hotelctl.
+- Не применяйте весь каталог `canary` повторно во время релиза: весами и метками subsets управляет Argo. Kubernetes-команды вручную могут обойти защиту hotelctl.
 
 Основа: [Argo Rollouts — Istio, subset-level splitting](https://argoproj.github.io/argo-rollouts/features/traffic-management/istio/), [Istio — управление перехватом трафика](https://istio.io/latest/docs/reference/config/annotations/).

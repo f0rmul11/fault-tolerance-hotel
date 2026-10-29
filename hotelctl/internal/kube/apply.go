@@ -72,6 +72,10 @@ func replaceImage(value any, repository, image string) {
 }
 
 func (c *Client) Apply(ctx context.Context, objects []*unstructured.Unstructured, out io.Writer) error {
+	return c.apply(ctx, objects, out, false)
+}
+
+func (c *Client) apply(ctx context.Context, objects []*unstructured.Unstructured, out io.Writer, takeOwnership bool) error {
 	dc, err := discovery.NewDiscoveryClientForConfig(c.REST)
 	if err != nil {
 		return err
@@ -94,6 +98,9 @@ func (c *Client) Apply(ctx context.Context, objects []*unstructured.Unstructured
 		options := metav1.PatchOptions{
 			FieldManager:    "hotelctl",
 			FieldValidation: "Strict",
+		}
+		if takeOwnership {
+			options.Force = &takeOwnership
 		}
 		if mapping.Scope.Name() == meta.RESTScopeNameNamespace {
 			_, err = resource.Namespace(object.GetNamespace()).Patch(ctx, object.GetName(), types.ApplyPatchType, data, options)

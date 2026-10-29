@@ -3,6 +3,7 @@ package kube
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -76,6 +77,11 @@ func TestReviewRolloutPreservesApplicationAndSeparatesSelectors(t *testing.T) {
 	var template corev1.PodTemplateSpec
 	if err := json.Unmarshal(data, &template); err != nil {
 		t.Fatal(err)
+	}
+	for i := range review.Spec.Template.Spec.Containers {
+		for j := range review.Spec.Template.Spec.Containers[i].Ports {
+			review.Spec.Template.Spec.Containers[i].Ports[j].Protocol = corev1.ProtocolTCP
+		}
 	}
 	if !reflect.DeepEqual(template.Spec.Containers, review.Spec.Template.Spec.Containers) {
 		t.Fatal("migration changed app image, probes, resources or database configuration")
@@ -195,5 +201,93 @@ func TestExistingRolloutBlocksOrdinaryDeployment(t *testing.T) {
 	}
 	if err := c.GuardReviewCanary(t.Context()); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestReviewRolloutUsesLocalTemplateInsteadOfLiveDeployment(t *testing.T) {
+	_, review, hotels := canaryFixture(t)
+	root, err := filepath.Abs("../../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := config.Load(root, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.Root = t.TempDir()
+	path := filepath.Join(cfg.Root, "services/review/build/canary")
+	if err := os.CopyFS(path, os.DirFS(filepath.Join(root, "services/review/build/canary"))); err != nil {
+		t.Fatal(err)
+	}
+	filename := filepath.Join(path, "rollout.yaml")
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data = []byte(strings.Replace(string(data), "periodSeconds: 2", "periodSeconds: 7", 1))
+	if err := os.WriteFile(filename, data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	review.Spec.Template.Spec.Containers[0].ReadinessProbe.PeriodSeconds = 99
+	cfg.Observability.Enabled = false
+	rollout, err := RenderReviewRollout(cfg, review, hotels)
+	if err != nil {
+		t.Fatal(err)
+	}
+	containers, _, _ := unstructured.NestedSlice(rollout.Object, "spec", "template", "spec", "containers")
+	container := containers[0].(map[string]any)
+	period, _, _ := unstructured.NestedInt64(container, "readinessProbe", "periodSeconds")
+	if period != 7 {
+		t.Fatalf("local readiness period lost: %d", period)
+	}
+	if container["image"] != review.Spec.Template.Spec.Containers[0].Image {
+		t.Fatal("setup did not preserve stable image")
+	}
+	env, _, _ := unstructured.NestedSlice(container, "env")
+	for _, raw := range env {
+		entry := raw.(map[string]any)
+		if entry["name"] == "TELEMETRY_ENABLED" && entry["value"] != "false" {
+			t.Fatal("stand telemetry setting ignored")
+		}
+	}
+}
+
+func TestCanaryInfrastructureRendersOffline(t *testing.T) {
+	root, err := filepath.Abs("../../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, component := range []struct{ path, namespace, image string }{
+		{path: "deploy/istio", namespace: "istio-system", image: "docker.io/istio/pilot:1.31.3"},
+		{path: "deploy/argo-rollouts", namespace: "argo-rollouts", image: "quay.io/argoproj/argo-rollouts:v1.10.1"},
+	} {
+		for _, stage := range []string{"crds", "controller"} {
+			objects, err := Render(root, config.Service{Manifests: component.path + "/" + stage}, "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			deployments := 0
+			for _, object := range objects {
+				if stage == "crds" && object.GetKind() != "Namespace" && object.GetKind() != "CustomResourceDefinition" {
+					t.Fatal("controller resource applied before CRDs")
+				}
+				if object.GetKind() == "Deployment" {
+					deployments++
+					if object.GetNamespace() != component.namespace {
+						t.Fatal("wrong controller namespace")
+					}
+					containers, _, _ := unstructured.NestedSlice(object.Object, "spec", "template", "spec", "containers")
+					if containers[0].(map[string]any)["image"] != component.image {
+						t.Fatal("controller image is not pinned")
+					}
+				}
+				if object.GetKind() == "IstioOperator" {
+					t.Fatal("runtime must not depend on Istio operator")
+				}
+			}
+			if stage == "controller" && deployments != 1 {
+				t.Fatalf("expected one controller, got %d", deployments)
+			}
+		}
 	}
 }

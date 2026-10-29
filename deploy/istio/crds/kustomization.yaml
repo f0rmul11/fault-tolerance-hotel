@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- namespace.yaml
+- customresourcedefinition-authorizationpolicies.security.istio.io.yaml
+- customresourcedefinition-destinationrules.networking.istio.io.yaml
+- customresourcedefinition-envoyfilters.networking.istio.io.yaml
+- customresourcedefinition-gateways.networking.istio.io.yaml
+- customresourcedefinition-peerauthentications.security.istio.io.yaml
+- customresourcedefinition-proxyconfigs.networking.istio.io.yaml
+- customresourcedefinition-requestauthentications.security.istio.io.yaml
+- customresourcedefinition-serviceentries.networking.istio.io.yaml
+- customresourcedefinition-sidecars.networking.istio.io.yaml
+- customresourcedefinition-telemetries.telemetry.istio.io.yaml
+- customresourcedefinition-trafficextensions.extensions.istio.io.yaml
+- customresourcedefinition-virtualservices.networking.istio.io.yaml
+- customresourcedefinition-wasmplugins.extensions.istio.io.yaml
+- customresourcedefinition-workloadentries.networking.istio.io.yaml
+- customresourcedefinition-workloadgroups.networking.istio.io.yaml

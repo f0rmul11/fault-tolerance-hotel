@@ -1,0 +1,16 @@
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: review-canary
+spec:
+  host: review-rollout.hotelflow.svc.cluster.local
+  subsets:
+  - labels:
+      app.kubernetes.io/name: review-rollout
+    name: stable
+  - labels:
+      app.kubernetes.io/name: review-rollout
+    name: canary
+  trafficPolicy:
+    loadBalancer:
+      simple: ROUND_ROBIN

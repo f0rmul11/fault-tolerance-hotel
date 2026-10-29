@@ -301,4 +301,4 @@ Jaeger не сохраняет историю после остановки/ре
 на `ListHotels` или `GetHotel`. `status review` в этом режиме показывает Rollout;
 `status review -o json` возвращает объект Rollout.
 
-[Устройство, порядок действий и ограничения режима](../deploy/canary/README.md).
+[Устройство, порядок действий и ограничения режима](../services/review/build/canary/README.md).

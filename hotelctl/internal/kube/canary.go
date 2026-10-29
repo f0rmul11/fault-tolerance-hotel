@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/internal/canary"
@@ -15,11 +13,8 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	kjson "k8s.io/apimachinery/pkg/util/json"
-	"sigs.k8s.io/yaml"
 )
 
 var RolloutResource = schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "rollouts"}
@@ -73,31 +68,23 @@ func ImageOf(containers []corev1.Container, name string) (string, error) {
 }
 
 func RenderReviewRollout(c config.Config, stable *appsv1.Deployment, hotels *appsv1.Deployment) (*unstructured.Unstructured, error) {
-	// Use the live stable template so bootstrap cannot accidentally deploy a new local build.
-	template := stable.Spec.Template.DeepCopy()
-	if template.Labels == nil {
-		template.Labels = map[string]string{}
-	}
-	template.Labels["app.kubernetes.io/name"] = canary.Service
-	enableMesh(template)
-	podObject, err := runtime.DefaultUnstructuredConverter.ToUnstructured(template)
+	image, err := ImageOf(stable.Spec.Template.Spec.Containers, "review")
 	if err != nil {
 		return nil, err
 	}
-	body, err := os.ReadFile(filepath.Join(c.Root, "deploy/canary/strategy.yaml"))
+	objects, err := RenderReviewCanary(c, image)
 	if err != nil {
 		return nil, err
 	}
-	data, err := yaml.YAMLToJSON(body)
-	if err != nil {
-		return nil, err
+	var rollout *unstructured.Unstructured
+	for _, object := range objects {
+		if object.GetKind() == "Rollout" && object.GetName() == canary.Name {
+			rollout = object
+		}
 	}
-	spec := map[string]any{}
-	if err := kjson.Unmarshal(data, &spec); err != nil {
-		return nil, err
+	if rollout == nil {
+		return nil, fmt.Errorf("не найден Rollout review в services/review/build/canary")
 	}
-	spec["selector"] = map[string]any{"matchLabels": map[string]any{"app.kubernetes.io/name": canary.Service}}
-	spec["template"] = podObject
 	replicas := int32(1)
 	if stable.Spec.Replicas != nil {
 		replicas = *stable.Spec.Replicas
@@ -106,16 +93,36 @@ func RenderReviewRollout(c config.Config, stable *appsv1.Deployment, hotels *app
 	if err != nil {
 		return nil, err
 	}
-	return &unstructured.Unstructured{Object: map[string]any{
-		"apiVersion": "argoproj.io/v1alpha1",
-		"kind":       "Rollout",
-		"metadata": map[string]any{
-			"name":        canary.Name,
-			"namespace":   canary.Namespace,
-			"annotations": map[string]any{backupAnnotation: string(backup)},
-		},
-		"spec": spec,
-	}}, nil
+	annotations := rollout.GetAnnotations()
+	if annotations == nil {
+		annotations = map[string]string{}
+	}
+	annotations[backupAnnotation] = string(backup)
+	rollout.SetAnnotations(annotations)
+	return rollout, nil
+}
+
+func RenderReviewCanary(c config.Config, image string) ([]*unstructured.Unstructured, error) {
+	services, err := c.Select([]string{"review"})
+	if err != nil {
+		return nil, err
+	}
+	service := services[0]
+	service.Manifests = "services/review/build/canary"
+	objects, err := RenderService(c, service, image)
+	if err != nil {
+		return nil, err
+	}
+	for _, object := range objects {
+		data, err := object.MarshalJSON()
+		if err != nil {
+			return nil, err
+		}
+		if err := object.UnmarshalJSON(data); err != nil {
+			return nil, err
+		}
+	}
+	return objects, nil
 }
 
 func enableMesh(template *corev1.PodTemplateSpec) {

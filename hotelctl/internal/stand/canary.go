@@ -2,9 +2,9 @@ package stand
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"os/exec"
-	"path/filepath"
+	"reflect"
 	"text/tabwriter"
 	"time"
 
@@ -15,6 +15,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 func (m *Manager) Canary(ctx context.Context, options canary.Options) error {
@@ -85,7 +86,7 @@ func (m *Manager) Canary(ctx context.Context, options canary.Options) error {
 		}); err != nil {
 			return err
 		}
-		fmt.Fprintln(m.Streams.Out, "Релиз отменён. Spec сохраняет отклонённую версию; следующий deploy должен содержать исправленный образ.")
+		fmt.Fprintln(m.Streams.Out, "Релиз отменён. Spec сохраняет отклонённую версию; следующий deploy должен содержать исправленный образ или шаблон Pod.")
 	case "promote":
 		if err := requireFinalPause(r); err != nil {
 			return err
@@ -124,10 +125,8 @@ func (m *Manager) setupReviewCanary(ctx context.Context, c *kube.Client, service
 			}
 		}
 		fmt.Fprintln(m.Streams.Out, "Установка Istio 1.31.3 (minimal) и Argo Rollouts v1.10.1")
-		install := exec.CommandContext(ctx, "bash", filepath.Join(m.Config.Root, "deploy/canary/install.sh"), m.Config.Kubeconfig(), filepath.Join(m.Config.StateDir(), "tools"))
-		install.Stdout, install.Stderr = m.Streams.Out, m.Streams.ErrOut
-		if err := install.Run(); err != nil {
-			return fmt.Errorf("установка контроллеров: %w", err)
+		if err := c.InstallCanaryInfrastructure(ctx, m.Config, m.Streams.Out); err != nil {
+			return err
 		}
 		review, err := c.Typed.AppsV1().Deployments(canary.Namespace).Get(ctx, "review", metav1.GetOptions{})
 		if err != nil {
@@ -144,11 +143,17 @@ func (m *Manager) setupReviewCanary(ctx context.Context, c *kube.Client, service
 		if err != nil {
 			return err
 		}
-		routes, err := kube.Render(m.Config.Root, config.Service{Manifests: "deploy/canary"}, "")
+		routes, err := kube.RenderReviewCanary(m.Config, "")
 		if err != nil {
 			return err
 		}
-		if err := c.Apply(ctx, append(routes, r), m.Streams.Out); err != nil {
+		var objects []*unstructured.Unstructured
+		for _, route := range routes {
+			if route.GetKind() != "Rollout" {
+				objects = append(objects, route)
+			}
+		}
+		if err := c.Apply(ctx, append(objects, r), m.Streams.Out); err != nil {
 			return err
 		}
 	}
@@ -197,30 +202,42 @@ func (m *Manager) deployReviewCanary(ctx context.Context, c *kube.Client, state 
 	if image == "" {
 		return fmt.Errorf("сначала выполните hotelctl build review")
 	}
-	containers, _, _ := unstructured.NestedSlice(r.Object, "spec", "template", "spec", "containers")
-	found := false
-	for _, raw := range containers {
-		container, ok := raw.(map[string]any)
-		if !ok || container["name"] != "review" {
-			continue
-		}
-		if container["image"] == image && !restart {
-			return fmt.Errorf("образ не изменился; соберите новый или укажите --restart для повторного релиза того же образа")
-		}
-		container["image"] = image
-		found = true
+	objects, err := kube.RenderReviewCanary(m.Config, image)
+	if err != nil {
+		return err
 	}
-	if !found {
-		return fmt.Errorf("Rollout не содержит контейнер review")
+	var desired *unstructured.Unstructured
+	for _, object := range objects {
+		if object.GetKind() == "Rollout" {
+			desired = object
+		}
+	}
+	if desired == nil {
+		return fmt.Errorf("не найден манифест Rollout review")
+	}
+	desiredTemplate, _, _ := unstructured.NestedMap(desired.Object, "spec", "template")
+	currentTemplate, _, _ := unstructured.NestedMap(r.Object, "spec", "template")
+	// A previous training restart is not an application change.
+	unstructured.RemoveNestedField(currentTemplate, "metadata", "annotations", "hotelflow/canary-restart")
+	if reflect.DeepEqual(currentTemplate, desiredTemplate) && !restart {
+		return fmt.Errorf("образ и шаблон Pod не изменились; используйте --restart для учебного релиза")
 	}
 	if err := m.Runtime.Import(ctx, state, image, m.Config.StateDir(), m.Streams.Out); err != nil {
 		return err
 	}
-	template := map[string]any{"spec": map[string]any{"containers": containers}}
 	if restart {
-		template["metadata"] = map[string]any{"annotations": map[string]string{"hotelflow/canary-restart": time.Now().UTC().Format(time.RFC3339Nano)}}
+		if err := unstructured.SetNestedField(desired.Object, time.Now().UTC().Format(time.RFC3339Nano), "spec", "template", "metadata", "annotations", "hotelflow/canary-restart"); err != nil {
+			return err
+		}
 	}
-	if err := c.PatchReviewRollout(ctx, r, map[string]any{"spec": map[string]any{"template": template}}, false); err != nil {
+	patch, err := json.Marshal([]map[string]any{
+		{"op": "test", "path": "/metadata/resourceVersion", "value": r.GetResourceVersion()},
+		{"op": "replace", "path": "/spec", "value": desired.Object["spec"]},
+	})
+	if err != nil {
+		return err
+	}
+	if _, err := c.Dynamic.Resource(kube.RolloutResource).Namespace(canary.Namespace).Patch(ctx, canary.Name, types.JSONPatchType, patch, metav1.PatchOptions{}); err != nil {
 		return err
 	}
 	if err := waitCanaryPause(ctx, c, 0); err != nil {

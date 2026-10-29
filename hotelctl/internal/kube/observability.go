@@ -41,7 +41,7 @@ func RenderService(c config.Config, service config.Service, image string) ([]*un
 		{name: "TELEMETRY_LOGS_ENABLED", value: strconv.FormatBool(c.Observability.Enabled)},
 	}
 	for _, object := range objects {
-		if object.GetKind() != "Deployment" || object.GetName() != service.Deployment {
+		if (object.GetKind() != "Deployment" && object.GetKind() != "Rollout") || object.GetName() != service.Deployment {
 			continue
 		}
 		containers, _, err := unstructured.NestedSlice(object.Object, "spec", "template", "spec", "containers")

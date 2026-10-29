@@ -1,0 +1,26 @@
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: review-canary
+spec:
+  gateways:
+  - mesh
+  hosts:
+  - review-rollout.hotelflow.svc.cluster.local
+  http:
+  - name: primary
+    retries:
+      attempts: 0
+    route:
+    - destination:
+        host: review-rollout.hotelflow.svc.cluster.local
+        port:
+          number: 9090
+        subset: stable
+      weight: 100
+    - destination:
+        host: review-rollout.hotelflow.svc.cluster.local
+        port:
+          number: 9090
+        subset: canary
+      weight: 0
