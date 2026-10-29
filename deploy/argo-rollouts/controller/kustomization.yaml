@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- serviceaccount-argo-rollouts.yaml
+- clusterrole-argo-rollouts.yaml
+- clusterrole-argo-rollouts-aggregate-to-admin.yaml
+- clusterrole-argo-rollouts-aggregate-to-edit.yaml
+- clusterrole-argo-rollouts-aggregate-to-view.yaml
+- clusterrolebinding-argo-rollouts.yaml
+- configmap-argo-rollouts-config.yaml
+- secret-argo-rollouts-notification-secret.yaml
+- service-argo-rollouts-metrics.yaml
+- deployment-argo-rollouts.yaml

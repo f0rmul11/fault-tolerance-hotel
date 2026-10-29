@@ -1,0 +1,20 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- serviceaccount-istio-reader-service-account.yaml
+- serviceaccount-istiod.yaml
+- clusterrole-istio-reader-clusterrole-istio-system.yaml
+- clusterrole-istiod-clusterrole-istio-system.yaml
+- clusterrole-istiod-gateway-controller-istio-system.yaml
+- clusterrolebinding-istio-reader-clusterrole-istio-system.yaml
+- clusterrolebinding-istiod-clusterrole-istio-system.yaml
+- clusterrolebinding-istiod-gateway-controller-istio-system.yaml
+- validatingwebhookconfiguration-istio-validator-istio-system.yaml
+- configmap-istio.yaml
+- configmap-istio-sidecar-injector.yaml
+- configmap-values.yaml
+- mutatingwebhookconfiguration-istio-sidecar-injector.yaml
+- deployment-istiod.yaml
+- role-istiod.yaml
+- rolebinding-istiod.yaml
+- service-istiod.yaml

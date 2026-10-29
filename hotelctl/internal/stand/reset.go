@@ -37,6 +37,9 @@ func (m *Manager) Reset(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	if err := client.GuardReviewCanary(ctx); err != nil {
+		return err
+	}
 	if err := m.reset(ctx, state, client); err != nil {
 		return fmt.Errorf("сброс не завершён: %w; после устранения причины повторите hotelctl reset --yes", err)
 	}

@@ -143,6 +143,14 @@ func (m *Manager) deploy(
 	services []config.Service,
 	client *kube.Client,
 ) error {
+	for _, service := range services {
+		if service.Name == "review" || service.Name == "hotels" {
+			if err := client.GuardReviewCanary(ctx); err != nil {
+				return err
+			}
+			break
+		}
+	}
 	// Validate/render all selected manifests before mutating Kubernetes resources.
 	for _, service := range services {
 		image := state.Images[service.Name]
