@@ -6,6 +6,9 @@ option go_package = "booking/internal/pkg/pb/booking/booking/v1;bookingV1";
 
 // Создание и чтение броней, проверка занятости номеров.
 service BookingService {
+  // Список всех броней текущего гостя, включая отменённые, и его версия.
+  rpc ListBookings(ListBookingsRequest) returns (ListBookingsResponse);
+
   // Атомарно создаёт подтверждённую бронь; повтор ключа возвращает результат операции.
   rpc CreateBooking(CreateBookingRequest) returns (CreateBookingResponse);
 
@@ -32,6 +35,10 @@ message CreateBookingRequest {
 
   // UUID операции. Повторяйте неизменным с теми же данными при потере ответа.
   string idempotency_key = 5;
+
+  // Версия списка из ListBookings. Для нового запроса должна совпадать; 0 — начальная.
+  // Повтор сохранённого ключа возвращает бронь независимо от устаревшей версии.
+  int64 bookings_version = 6;
 }
 
 // Идентификатор запрашиваемой брони.
@@ -155,4 +162,19 @@ message CheckAvailabilityRequest {
 message CheckAvailabilityResponse {
   // Системные ID свободных номеров — положительные числа в строках.
   repeated string room_ids = 1;
+}
+
+// Чтение списка текущего гостя; чужой guest_id клиент не передаёт.
+message ListBookingsRequest {
+  // Контекст гостя; проверяется interceptor сервиса.
+  RequestContext context = 1;
+}
+
+// Брони и версия прочитаны из одного снимка БД. Пустой список тоже имеет версию.
+message ListBookingsResponse {
+  // Все брони гостя, включая отменённые, по времени создания и UUID.
+  repeated BookingView bookings = 1;
+
+  // Версия списка: меняется при создании, активации и отмене, но не при повторе.
+  int64 bookings_version = 2;
 }

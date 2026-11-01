@@ -68,8 +68,6 @@ spec:
               value: "true"
             - name: TELEMETRY_LOGS_ENABLED
               value: "true"
-            - name: LOG_LEVEL
-              value: info
             - name: OTEL_BLRP_MAX_QUEUE_SIZE
               value: "2048"
             - name: OTEL_BLRP_MAX_EXPORT_BATCH_SIZE

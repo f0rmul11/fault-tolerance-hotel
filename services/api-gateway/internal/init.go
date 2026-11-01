@@ -38,6 +38,7 @@ import (
 	externalHotelsV1 "api-gateway/internal/pkg/pb/external/hotels/hotels/v1"
 	"api-gateway/internal/pkg/requestid"
 	"api-gateway/internal/pkg/requesttimeout"
+	"api-gateway/internal/pkg/retry"
 	"api-gateway/internal/pkg/telemetry"
 	"api-gateway/internal/pkg/telemetry/metrics"
 	"api-gateway/internal/pkg/telemetry/traces"
@@ -188,22 +189,18 @@ func (a *App) initAdminServer(ctx context.Context) error {
 
 func (a *App) initGrpcConn(_ context.Context) error {
 	for srv, address := range config.Instance().Targets {
-		var err error
-
 		conn, err := grpc.NewClient(address,
 			grpc.WithStatsHandler(traces.ClientHandler()),
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
-			grpc.WithUnaryInterceptor(intercept.ProxyMetadata()),
+			grpc.WithDisableRetry(),
+			grpc.WithChainUnaryInterceptor(
+				intercept.ProxyMetadata(),
+				retry.NewRetry(config.Instance().Retry).UnaryClientInterceptor(),
+			),
 		)
-
 		if err != nil {
-			return fmt.Errorf(
-				"не удалось инициализировать grpc соединение к %s : %s",
-				srv,
-				err.Error(),
-			)
+			return fmt.Errorf("не удалось инициализировать grpc соединение к %s: %w", srv, err)
 		}
-
 		a.grpcConn[srv] = conn
 		closer.Add(conn.Close)
 	}

@@ -22,7 +22,7 @@ type Rooms interface {
 }
 
 type Confirmer interface {
-	Confirm(context.Context, *entity.Booking, uuid.UUID, vo.Limits) (*entity.Booking, error)
+	Confirm(context.Context, *entity.Booking, uuid.UUID, vo.Limits, int64) (*entity.Booking, error)
 }
 
 type UseCase struct {
@@ -74,5 +74,5 @@ func (s *UseCase) Execute(ctx context.Context, input Input) (*entity.Booking, er
 
 	booking.SetRoomDetails(room.Number, room.RoomType)
 
-	return s.confirmer.Confirm(ctx, booking, input.IdempotencyKey, room.Limits)
+	return s.confirmer.Confirm(ctx, booking, input.IdempotencyKey, room.Limits, input.BookingsVersion)
 }

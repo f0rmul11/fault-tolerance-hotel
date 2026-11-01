@@ -27,7 +27,7 @@ func Interceptor() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, request any, info *grpc.UnaryServerInfo, next grpc.UnaryHandler) (any, error) {
 		var roles []externalV1.RequestContext_DemoRole
 		switch info.FullMethod {
-		case bookingV1.BookingService_CreateBooking_FullMethodName:
+		case bookingV1.BookingService_CreateBooking_FullMethodName, bookingV1.BookingService_ListBookings_FullMethodName:
 			roles = []externalV1.RequestContext_DemoRole{externalV1.RequestContext_GUEST}
 		case bookingV1.BookingService_GetBooking_FullMethodName,
 			bookingV1.BookingService_CheckAvailability_FullMethodName:

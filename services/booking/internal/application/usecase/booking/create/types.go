@@ -8,8 +8,9 @@ import (
 )
 
 type Input struct {
-	IdempotencyKey uuid.UUID
-	Context        bookingdto.Context
-	RoomID         int64
-	Period         vo.Period
+	BookingsVersion int64
+	IdempotencyKey  uuid.UUID
+	Context         bookingdto.Context
+	RoomID          int64
+	Period          vo.Period
 }

@@ -44,7 +44,7 @@ type confirmerFake struct {
 	err   error
 }
 
-func (s *confirmerFake) Confirm(_ context.Context, booking *entity.Booking, _ uuid.UUID, _ vo.Limits) (*entity.Booking, error) {
+func (s *confirmerFake) Confirm(_ context.Context, booking *entity.Booking, _ uuid.UUID, _ vo.Limits, _ int64) (*entity.Booking, error) {
 	s.calls++
 	if s.err != nil {
 		return nil, s.err
@@ -146,5 +146,29 @@ func TestCreate(t *testing.T) {
 	)
 	if !app.IsCode(err, app.InvalidArgument) {
 		t.Fatal("missing idempotency key accepted")
+	}
+}
+
+func TestReplayIgnoresOldListVersion(t *testing.T) {
+	at := time.Now().UTC()
+	period, _ := vo.NewPeriod(at, at.Add(24*time.Hour))
+	guest := uuid.Must(uuid.NewV4())
+	original, _ := entity.NewBooking(uuid.Must(uuid.NewV4()), guest, 1, uuid.Must(uuid.NewV4()), period, at)
+	rooms := &roomsFake{err: errors.New("must not call hotels")}
+	confirmer := &confirmerFake{err: app.NewConflictErr("Список изменился")}
+	input := Input{
+		Context:         bookingdto.Context{ActorID: guest, RequestID: uuid.Must(uuid.NewV4()), Role: entity.RoleGuest},
+		RoomID:          1,
+		Period:          period,
+		IdempotencyKey:  uuid.Must(uuid.NewV4()),
+		BookingsVersion: 0,
+	}
+	result, err := New(&storageFake{row: original}, rooms, confirmer).Execute(t.Context(), input)
+	if err != nil || result.ID() != original.ID() || rooms.calls != 0 || confirmer.calls != 0 {
+		t.Fatalf("replay must bypass precondition and side effects: %v", err)
+	}
+	input.RoomID = 2
+	if _, err := New(&storageFake{row: original}, rooms, confirmer).Execute(t.Context(), input); !app.IsCode(err, app.Conflict) {
+		t.Fatalf("same key with another body accepted: %v", err)
 	}
 }

@@ -47,10 +47,11 @@ type scenarioRoom struct {
 }
 
 type createBookingRequest struct {
-	RoomID         string `json:"room_id"`
-	IdempotencyKey string `json:"idempotency_key"`
-	StartsAt       string `json:"starts_at"`
-	EndsAt         string `json:"ends_at"`
+	BookingsVersion int64  `json:"bookings_version"`
+	RoomID          string `json:"room_id"`
+	IdempotencyKey  string `json:"idempotency_key"`
+	StartsAt        string `json:"starts_at"`
+	EndsAt          string `json:"ends_at"`
 }
 
 type businessScenario struct {
@@ -172,4 +173,14 @@ func (s *businessScenario) available(ctx context.Context, room scenarioRoom, inp
 		}
 	}
 	return false, nil
+}
+
+func (s *businessScenario) bookingsVersion(ctx context.Context) (int64, error) {
+	var response struct {
+		Version json.Number `json:"bookings_version"`
+	}
+	if err := s.request(ctx, http.MethodGet, "/v1/bookings", "GUEST", nil, &response, http.StatusOK); err != nil {
+		return 0, err
+	}
+	return response.Version.Int64()
 }

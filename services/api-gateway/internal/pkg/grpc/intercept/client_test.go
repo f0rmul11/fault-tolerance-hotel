@@ -2,6 +2,7 @@ package intercept
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -65,5 +66,28 @@ func TestTransportFailuresHaveRussianMessages(t *testing.T) {
 				t.Fatalf("transport error = %v", err)
 			}
 		})
+	}
+}
+
+func TestProxyDoesNotMutateSharedCallOptions(t *testing.T) {
+	opts := make([]grpc.CallOption, 1, 8)
+	opts[0] = grpc.WaitForReady(false)
+	var wg sync.WaitGroup
+	for range 32 {
+		wg.Go(func() {
+			err := ProxyMetadata()(context.Background(), "/test/Create", nil, nil, nil,
+				func(context.Context, string, any, any, *grpc.ClientConn, ...grpc.CallOption) error {
+					return nil
+				}, opts...)
+			if err != nil {
+				t.Error(err)
+			}
+		})
+	}
+	wg.Wait()
+	for _, opt := range opts[:cap(opts)][1:] {
+		if opt != nil {
+			t.Fatal("caller backing array modified")
+		}
 	}
 }

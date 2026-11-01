@@ -74,6 +74,10 @@ func (s *businessScenario) run(ctx context.Context) (bookingID string, err error
 	}
 	fmt.Fprintf(s.out, "OK справочник Hotels/Review и доступность: room_id=%s, номер=%s, тип=%s\n", room.ID, room.Number, room.RoomType)
 	fmt.Fprintf(s.out, "Проверка: actor_id=%s, idempotency_key=%s\n", s.actor, input.IdempotencyKey)
+	input.BookingsVersion, err = s.bookingsVersion(ctx)
+	if err != nil {
+		return "", err
+	}
 	var created bookingResponse
 	if err := s.request(ctx, http.MethodPost, "/v1/bookings", "GUEST", input, &created, http.StatusOK); err != nil {
 		return "", err
@@ -114,6 +118,10 @@ func (s *businessScenario) run(ctx context.Context) (bookingID string, err error
 		return bookingID, err
 	}
 	overlap.IdempotencyKey = overlapKey.String()
+	overlap.BookingsVersion, err = s.bookingsVersion(ctx)
+	if err != nil {
+		return bookingID, err
+	}
 	var businessError struct {
 		Code int `json:"code"`
 	}

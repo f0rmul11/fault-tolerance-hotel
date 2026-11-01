@@ -17,6 +17,43 @@
   ],
   "paths": {
     "/v1/bookings": {
+      "get": {
+        "summary": "Согласованный список всех броней текущего гостя, включая отменённые, и его версия.",
+        "operationId": "BookingService_ListBookings",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/api_gateway.booking.v1.ListBookingsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/google.rpc.Status"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-Demo-Role",
+            "description": "Роль пользователя: GUEST.",
+            "in": "header",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "X-Demo-Actor",
+            "description": "UUID гостя, чей список броней запрашивается.",
+            "in": "header",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "BookingService"
+        ]
+      },
       "post": {
         "summary": "Атомарно создаёт подтверждённую бронь; повтор ключа возвращает результат операции.",
         "operationId": "BookingService_CreateBooking",
@@ -264,6 +301,11 @@
         "idempotencyKey": {
           "type": "string",
           "description": "UUID операции. Повторяйте неизменным с теми же данными при потере ответа."
+        },
+        "bookingsVersion": {
+          "type": "string",
+          "format": "int64",
+          "description": "Версия списка из ListBookings. Для нового запроса должна совпадать; 0 — начальная.\nПовтор сохранённого ключа возвращает бронь независимо от устаревшей версии."
         }
       },
       "description": "Параметры бронирования конкретного номера на непрерывный период."
@@ -287,6 +329,25 @@
         }
       },
       "description": "Текущее состояние брони."
+    },
+    "api_gateway.booking.v1.ListBookingsResponse": {
+      "type": "object",
+      "properties": {
+        "bookings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/api_gateway.booking.v1.BookingView"
+          },
+          "description": "Все брони гостя, включая отменённые, по времени создания и UUID."
+        },
+        "bookingsVersion": {
+          "type": "string",
+          "format": "int64",
+          "description": "Версия списка: меняется при создании, активации и отмене, но не при повторе."
+        }
+      },
+      "description": "Брони и версия прочитаны из одного снимка БД. Пустой список тоже имеет версию."
     },
     "google.protobuf.Any": {
       "type": "object",

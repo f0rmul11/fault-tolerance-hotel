@@ -13,7 +13,8 @@ import (
 
 type Options struct {
 	util.Options
-	Fault faultctl.Options
+	Fault      faultctl.Options
+	pushbackMS int32
 }
 
 func NewCmdFault(f util.Factory, streams iostreams.IOStreams) *cobra.Command {
@@ -29,10 +30,15 @@ func NewCmdFault(f util.Factory, streams iostreams.IOStreams) *cobra.Command {
 			"После SIGKILL/сбоя CLI используйте --clear.",
 		Example: "  hotelctl fault api-gateway booking --slowdown 8s --duration 10s\n" +
 			"  hotelctl fault api-gateway booking --direction response --slowdown 8s --duration 10s\n" +
-			"  hotelctl fault hotels review --unavailable --duration 10s",
+			"  hotelctl fault hotels review --unavailable --duration 10s\n" +
+			"  hotelctl fault api-gateway booking --unavailable --pushback-ms 1500 --duration 1m\n" +
+			"  hotelctl fault api-gateway booking --unavailable --pushback-ms=-1 --duration 1m",
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			o.Fault.From, o.Fault.To = args[0], args[1]
+			if cmd.Flags().Changed("pushback-ms") {
+				o.Fault.PushbackMS = &o.pushbackMS
+			}
 			if err := o.Complete(f); err != nil {
 				return err
 			}
@@ -43,6 +49,7 @@ func NewCmdFault(f util.Factory, streams iostreams.IOStreams) *cobra.Command {
 		},
 	}
 	o.AddFlags(command.Flags())
+	command.Flags().Int32Var(&o.pushbackMS, "pushback-ms", 0, "С --unavailable: gRPC pushback в мс; -1 запрещает retry, 0 разрешает без паузы")
 	command.Flags().DurationVar(&o.Fault.Slowdown, "slowdown", 0, "Дополнительная задержка от 1ms до 1m")
 	command.Flags().DurationVar(&o.Fault.Duration, "duration", 0, "Окно действия сбоя от 1ms до 1h")
 	command.Flags().StringVar(&o.Fault.Direction, "direction", "request", "Что задержать: request или response")
@@ -50,6 +57,7 @@ func NewCmdFault(f util.Factory, streams iostreams.IOStreams) *cobra.Command {
 	command.Flags().BoolVar(&o.Fault.Clear, "clear", false, "Снять инъекции на выбранной связи после прерванного запуска")
 	command.MarkFlagsMutuallyExclusive("slowdown", "unavailable")
 	command.MarkFlagsMutuallyExclusive("clear", "slowdown", "unavailable")
+	command.MarkFlagsMutuallyExclusive("clear", "pushback-ms")
 	return command
 }
 

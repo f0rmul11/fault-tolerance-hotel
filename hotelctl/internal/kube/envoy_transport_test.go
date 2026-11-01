@@ -3,6 +3,7 @@ package kube
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net"
 	"os"
 	"os/exec"
@@ -83,7 +84,7 @@ func TestEnvoyTransport(t *testing.T) {
 	}
 	for _, raw := range bootstrap["static_resources"].(map[string]any)["clusters"].([]any) {
 		cluster := raw.(map[string]any)
-		if strings.HasPrefix(cluster["name"].(string), "delay-") {
+		if strings.HasPrefix(cluster["name"].(string), "delay-") || cluster["name"] == "fault-runtime" {
 			continue
 		}
 		cluster["type"] = "STATIC"
@@ -214,4 +215,63 @@ func TestEnvoyTransport(t *testing.T) {
 			}
 		}
 	}
+	// Verify actual wire semantics: trailers-only, no upstream call, no cross-edge leak.
+	for _, value := range []int32{150, 0, -1} {
+		options := fault.Options{
+			From:        "api-gateway",
+			To:          "booking",
+			Direction:   "request",
+			Unavailable: true,
+			PushbackMS:  &value,
+		}
+		if err := runtime.Modify(t.Context(), options.Values()); err != nil {
+			t.Fatal(err)
+		}
+		before := calls.Load()
+		ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+		var headers, trailers metadata.MD
+		err := booking.Invoke(ctx, "/test.Booking/Create", wrapperspb.String("pushback"), &wrapperspb.StringValue{}, grpc.Header(&headers), grpc.Trailer(&trailers))
+		cancel()
+		if status.Code(err) != codes.Unavailable || len(headers) != 0 || strings.Join(trailers.Get("grpc-retry-pushback-ms"), ",") != fmt.Sprint(value) || calls.Load() != before {
+			t.Fatalf("pushback %d: err=%v headers=%v trailers=%v upstream=%d", value, err, headers, trailers, calls.Load()-before)
+		}
+		if _, err := invoke(hotels, 2*time.Second); err != nil {
+			t.Fatal(err)
+		}
+		if err := fault.ClearRuntime(t.Context(), runtime, options); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// grpc-go must actually consume pushback, rather than commit on ordinary headers.
+	native, err := grpc.NewClient("127.0.0.1:10001",
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultServiceConfig(`{"methodConfig":[{"name":[{"service":"test.Booking"}],"retryPolicy":{"maxAttempts":2,"initialBackoff":"0.001s","maxBackoff":"0.001s","backoffMultiplier":1,"retryableStatusCodes":["UNAVAILABLE"]}}]}`),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer native.Close()
+	value := int32(150)
+	options := fault.Options{
+		From:        "api-gateway",
+		To:          "booking",
+		Direction:   "request",
+		Unavailable: true,
+		PushbackMS:  &value,
+	}
+	if err := runtime.Modify(t.Context(), options.Values()); err != nil {
+		t.Fatal(err)
+	}
+	elapsed, err := invoke(native, 3*time.Second)
+	if status.Code(err) != codes.Unavailable || elapsed < 150*time.Millisecond {
+		t.Fatalf("native retry ignored pushback: elapsed=%v err=%v", elapsed, err)
+	}
+	if err := fault.ClearRuntime(t.Context(), runtime, options); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := invoke(booking, 2*time.Second); err != nil {
+		t.Fatalf("pushback cleanup: %v", err)
+	}
+
 }

@@ -7,6 +7,7 @@ import (
 	"booking/internal/application/usecase/booking/cancel"
 	"booking/internal/application/usecase/booking/create"
 	"booking/internal/application/usecase/booking/get"
+	"booking/internal/application/usecase/booking/list"
 	"booking/internal/infrastructure/gateway/hotels"
 	"booking/internal/infrastructure/storage/booking"
 	"booking/internal/pkg/event"
@@ -17,6 +18,7 @@ type Registry struct {
 	CancelBooking     *cancel.UseCase
 	CreateBooking     *create.UseCase
 	GetBooking        *get.UseCase
+	ListBookings      *list.UseCase
 	CheckAvailability *available.UseCase
 }
 
@@ -26,6 +28,7 @@ func NewRegistry(storage *booking.Storage, rooms *hotels.Client, services *servi
 		CancelBooking:     cancel.New(storage, flusher),
 		CreateBooking:     create.New(storage, rooms, services.BookingConfirm),
 		GetBooking:        get.New(storage),
+		ListBookings:      list.New(storage),
 		CheckAvailability: available.New(rooms, storage),
 	}
 }

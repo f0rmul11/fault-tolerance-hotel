@@ -1,0 +1,7 @@
+{
+  "room_id": "1",
+  "starts_at": "2027-06-01T12:00:00Z",
+  "ends_at": "2027-06-02T12:00:00Z",
+  "idempotency_key": "281cb155-a727-4e56-b63d-ad1a97716166",
+  "bookings_version": "0"
+}

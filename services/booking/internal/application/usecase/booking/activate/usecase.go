@@ -6,6 +6,7 @@ import (
 	"github.com/gofrs/uuid"
 
 	"booking/internal/domain/entity"
+	"booking/internal/domain/vo"
 	"booking/internal/events/booking_activated"
 	"booking/internal/events/checkin_rejected"
 	app "booking/internal/pkg/bookingerror"
@@ -17,6 +18,8 @@ import (
 type Storage interface {
 	Get(context.Context, uuid.UUID) (*entity.Booking, error)
 	Save(context.Context, ...*entity.Booking) error
+	GetBookingsVersion(context.Context, uuid.UUID) (vo.Version, error)
+	UpdateBookingsVersion(context.Context, uuid.UUID, vo.Version) error
 }
 
 type UseCase struct {
@@ -52,6 +55,14 @@ func (s *UseCase) Execute(ctx context.Context, input Input) error {
 			return buffer.Flush(txCtx)
 		}
 		if changed {
+			version, err := s.storage.GetBookingsVersion(txCtx, booking.GuestID())
+			if err != nil {
+				return err
+			}
+			version.Inc()
+			if err := s.storage.UpdateBookingsVersion(txCtx, booking.GuestID(), version); err != nil {
+				return err
+			}
 			if err = s.storage.Save(txCtx, booking); err != nil {
 				return err
 			}

@@ -282,3 +282,31 @@ Jaeger не сохраняет историю после остановки/ре
 после окончания подачи нагрузки утилита дожидается ответов. Ctrl+C останавливает нагрузку,
 при этом отчёт может быть неполным. Framer не восстанавливает потерянные соединения автоматически:
 для тестирования релизов backend используйте стабильную входную точку Gateway.
+
+
+## Pushback для retry-демо
+
+```bash
+./bin/hotelctl fault api-gateway booking --unavailable --pushback-ms 1500 --duration 1m
+./bin/hotelctl fault api-gateway booking --unavailable --pushback-ms=-1 --duration 1m
+./bin/hotelctl fault api-gateway booking --clear
+```
+
+Запускайте по одной команде; дождитесь `ACTIVE` и отправьте запрос из UI или через `load --data-file`.
+`--pushback-ms` дополняет `--unavailable`: запрос отклоняется до обработки сервисом,
+клиент получает gRPC `Unavailable` и trailer `grpc-retry-pushback-ms`. Неотрицательное
+значение задаёт паузу в миллисекундах (0 — без паузы), -1 запрещает retry. Без флага
+pushback отсутствует. Допустимый диапазон: -1…2147483647; сочетание с задержкой ответа
+или `--clear` отклоняется. Правило действует на выбранной связи, reflection исключена.
+
+Таймер, Ctrl+C и `--clear` снимают и отказ, и pushback. После SIGKILL нужен `--clear`.
+Клиентский backoff и бюджет настраиваются YAML библиотеки в Gateway. Для нагрузки
+достаточно `--data-file`: Framer повторяет одно тело, не генерирует новые брони и ключи.
+
+После обновления исходников пересоберите CLI (`make build`) и примените инфраструктурный
+шаблон через `./bin/hotelctl deploy api-gateway` на запущенном стенде. Старую инфраструктуру
+команда с pushback распознаёт и возвращает инструкцию обновления, не включая неполный сбой.
+
+Шпаргалки урока 3: [ретраи](../demo/module-3/lesson-03-1-retry-demo-cheatsheet.md), [бюджет](../demo/module-3/lesson-03-2-budget-demo-cheatsheet.md), [pushback](../demo/module-3/lesson-03-3-pushback-demo-cheatsheet.md), [идемпотентность и версия списка](../demo/module-3/lesson-03-4-idempotency-demo-cheatsheet.md).
+
+`deploy` ждёт готовности новой ревизии и исчезновения завершающихся Pod выбранного Deployment. Это позволяет начинать следующий нагрузочный прогон после возврата команды, не смешивая старую и новую конфигурации.

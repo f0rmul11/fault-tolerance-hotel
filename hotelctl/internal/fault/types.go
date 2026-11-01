@@ -49,6 +49,7 @@ type Options struct {
 	Slowdown    time.Duration
 	Duration    time.Duration
 	Unavailable bool
+	PushbackMS  *int32
 	Clear       bool
 }
 
@@ -57,10 +58,18 @@ func (o Options) Validate() error {
 		return err
 	}
 	if o.Clear {
-		if o.Slowdown != 0 || o.Duration != 0 || o.Unavailable || o.Direction != "request" {
+		if o.Slowdown != 0 || o.Duration != 0 || o.Unavailable || o.Direction != "request" || o.PushbackMS != nil {
 			return fmt.Errorf("--clear не совмещается с настройками сбоя")
 		}
 		return nil
+	}
+	if o.PushbackMS != nil {
+		if !o.Unavailable {
+			return fmt.Errorf("--pushback-ms требует --unavailable")
+		}
+		if *o.PushbackMS < -1 {
+			return fmt.Errorf("--pushback-ms должен быть -1 или неотрицательным int32")
+		}
 	}
 	if o.Direction != "request" && o.Direction != "response" {
 		return fmt.Errorf("--direction должен быть request или response")

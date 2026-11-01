@@ -4,6 +4,9 @@ admin:
     socket_address: {address: 127.0.0.1, port_value: 9901}
 layered_runtime:
   layers:
+    - name: capabilities
+      static_layer:
+        demo.pushback_supported: "1"
     - name: admin
       admin_layer: {}
 static_resources:
@@ -21,6 +24,13 @@ static_resources:
                 stat_prefix: {{.From}}_{{.To}}
                 codec_type: AUTO
                 stream_idle_timeout: 120s
+                local_reply_config:
+                  mappers:
+                    - filter:
+                        response_flag_filter: {flags: [FI]}
+                      headers_to_add:
+                        - header: {key: x-hotelflow-injected-abort, value: "1"}
+                          append_action: OVERWRITE_IF_EXISTS_OR_ADD
                 route_config:
                   name: {{.From}}-{{.To}}
                   virtual_hosts:
@@ -52,6 +62,41 @@ static_resources:
                           grpc_status: "%GRPC_STATUS%"
                           response_flags: "%RESPONSE_FLAGS%"
                 http_filters:
+                  - name: envoy.filters.http.lua
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+                      default_source_code:
+                        inline_string: |
+                          function envoy_on_response(handle)
+                            local injected = handle:headers():get("x-hotelflow-injected-abort")
+                            handle:headers():remove("x-hotelflow-injected-abort")
+                            if injected == "1" and handle:headers():get("grpc-status") == "14" then
+                              -- Only injected failures query the loopback admin endpoint.
+                              -- /runtime's final_value is a string; CLI writes only int32 or "disabled".
+                              local response, body = handle:httpCall("fault-runtime", {
+                                [":method"] = "GET", [":path"] = "/runtime", [":authority"] = "localhost"
+                              }, "", 1000)
+                              if response ~= nil and response[":status"] == "200" and body ~= nil then
+                                local key = string.gsub("demo.{{.From}}.{{.To}}.request.pushback_ms", "(%W)", "%%%1")
+                                local value = string.match(body, '"' .. key .. '"%s*:%s*{.-"final_value"%s*:%s*"([^"}]+)"')
+                                if value ~= nil and string.match(value, "^%-?%d+$") then
+                                  -- Fault's local gRPC reply is trailers-only (END_STREAM).
+                                  handle:headers():replace("grpc-retry-pushback-ms", value)
+                                end
+                              else
+                                handle:logErr("Could not read fault pushback runtime")
+                              end
+                              return
+                            end
+                            -- Unary result is complete upstream, but still buffered here.
+                            handle:body()
+                            local headers = handle:httpCall("delay-{{.From}}-{{.To}}", {
+                              [":method"] = "GET", [":path"] = "/", [":authority"] = "delay"
+                            }, "", 61000)
+                            if headers == nil or headers[":status"] ~= "204" then
+                              handle:logErr("Envoy response delay listener failed")
+                            end
+                          end
                   - name: envoy.filters.http.fault
                     typed_config:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
@@ -64,21 +109,6 @@ static_resources:
                       delay_percent_runtime: demo.{{.From}}.{{.To}}.request.delay_percent
                       delay_duration_runtime: demo.{{.From}}.{{.To}}.request.delay_ms
                       abort_percent_runtime: demo.{{.From}}.{{.To}}.request.abort_percent
-                  - name: envoy.filters.http.lua
-                    typed_config:
-                      "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
-                      default_source_code:
-                        inline_string: |
-                          function envoy_on_response(handle)
-                            -- Unary result is complete upstream, but still buffered here.
-                            handle:body()
-                            local headers = handle:httpCall("delay-{{.From}}-{{.To}}", {
-                              [":method"] = "GET", [":path"] = "/", [":authority"] = "delay"
-                            }, "", 61000)
-                            if headers == nil or headers[":status"] ~= "204" then
-                              handle:logErr("Envoy response delay listener failed")
-                            end
-                          end
                   - name: envoy.filters.http.router
                     typed_config:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
@@ -113,6 +143,16 @@ static_resources:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 {{end}}
   clusters:
+    - name: fault-runtime
+      type: STATIC
+      connect_timeout: 1s
+      load_assignment:
+        cluster_name: fault-runtime
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address: {address: 127.0.0.1, port_value: 9901}
 {{range .Edges}}
     - name: delay-{{.From}}-{{.To}}
       type: STATIC

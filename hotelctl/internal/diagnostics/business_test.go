@@ -75,6 +75,14 @@ func TestBusinessScenario(t *testing.T) {
 					}
 					io.WriteString(w, `{"room_ids":["7"]}`)
 				case "/v1/bookings":
+					if r.Method == http.MethodGet {
+						version := "0"
+						if key != "" {
+							version = "1"
+						}
+						io.WriteString(w, `{"bookings_version":"`+version+`"}`)
+						return
+					}
 					var input createBookingRequest
 					if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 						t.Error(err)

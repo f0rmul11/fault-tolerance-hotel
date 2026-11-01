@@ -6,6 +6,7 @@ import (
 	"os"
 	"sync"
 
+	"api-gateway/internal/pkg/retry"
 	"api-gateway/internal/pkg/telemetry"
 
 	"github.com/ilyakaznacheev/cleanenv"
@@ -28,6 +29,7 @@ func Instance() *Config {
 }
 
 type Config struct {
+	Retry      retry.Config      `yaml:"retry"`
 	Telemetry  telemetry.Config  `yaml:"telemetry"`
 	Targets    map[string]string `yaml:"service" env:"SERVICE_TARGETS"`
 	GrpcServer GrpcServer        `yaml:"grpc_server"`

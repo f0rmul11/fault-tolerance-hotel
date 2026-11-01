@@ -148,8 +148,11 @@ type CreateBookingRequest struct {
 	EndsAt string `protobuf:"bytes,4,opt,name=ends_at,json=endsAt,proto3" json:"ends_at,omitempty"`
 	// UUID операции. Повторяйте неизменным с теми же данными при потере ответа.
 	IdempotencyKey string `protobuf:"bytes,5,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// Версия списка из ListBookings. Для нового запроса должна совпадать; 0 — начальная.
+	// Повтор сохранённого ключа возвращает бронь независимо от устаревшей версии.
+	BookingsVersion int64 `protobuf:"varint,6,opt,name=bookings_version,json=bookingsVersion,proto3" json:"bookings_version,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *CreateBookingRequest) Reset() {
@@ -215,6 +218,13 @@ func (x *CreateBookingRequest) GetIdempotencyKey() string {
 		return x.IdempotencyKey
 	}
 	return ""
+}
+
+func (x *CreateBookingRequest) GetBookingsVersion() int64 {
+	if x != nil {
+		return x.BookingsVersion
+	}
+	return 0
 }
 
 // Идентификатор запрашиваемой брони.
@@ -692,17 +702,119 @@ func (x *CheckAvailabilityResponse) GetRoomIds() []string {
 	return nil
 }
 
+// Чтение списка текущего гостя; чужой guest_id клиент не передаёт.
+type ListBookingsRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Контекст гостя; проверяется interceptor сервиса.
+	Context       *RequestContext `protobuf:"bytes,1,opt,name=context,proto3" json:"context,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListBookingsRequest) Reset() {
+	*x = ListBookingsRequest{}
+	mi := &file_booking_booking_v1_booking_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListBookingsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListBookingsRequest) ProtoMessage() {}
+
+func (x *ListBookingsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_booking_booking_v1_booking_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListBookingsRequest.ProtoReflect.Descriptor instead.
+func (*ListBookingsRequest) Descriptor() ([]byte, []int) {
+	return file_booking_booking_v1_booking_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *ListBookingsRequest) GetContext() *RequestContext {
+	if x != nil {
+		return x.Context
+	}
+	return nil
+}
+
+// Брони и версия прочитаны из одного снимка БД. Пустой список тоже имеет версию.
+type ListBookingsResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Все брони гостя, включая отменённые, по времени создания и UUID.
+	Bookings []*BookingView `protobuf:"bytes,1,rep,name=bookings,proto3" json:"bookings,omitempty"`
+	// Версия списка: меняется при создании, активации и отмене, но не при повторе.
+	BookingsVersion int64 `protobuf:"varint,2,opt,name=bookings_version,json=bookingsVersion,proto3" json:"bookings_version,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *ListBookingsResponse) Reset() {
+	*x = ListBookingsResponse{}
+	mi := &file_booking_booking_v1_booking_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListBookingsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListBookingsResponse) ProtoMessage() {}
+
+func (x *ListBookingsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_booking_booking_v1_booking_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListBookingsResponse.ProtoReflect.Descriptor instead.
+func (*ListBookingsResponse) Descriptor() ([]byte, []int) {
+	return file_booking_booking_v1_booking_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *ListBookingsResponse) GetBookings() []*BookingView {
+	if x != nil {
+		return x.Bookings
+	}
+	return nil
+}
+
+func (x *ListBookingsResponse) GetBookingsVersion() int64 {
+	if x != nil {
+		return x.BookingsVersion
+	}
+	return 0
+}
+
 var File_booking_booking_v1_booking_proto protoreflect.FileDescriptor
 
 const file_booking_booking_v1_booking_proto_rawDesc = "" +
 	"\n" +
-	" booking/booking/v1/booking.proto\x12\x12booking.booking.v1\"\xcc\x01\n" +
+	" booking/booking/v1/booking.proto\x12\x12booking.booking.v1\"\xf7\x01\n" +
 	"\x14CreateBookingRequest\x12<\n" +
 	"\acontext\x18\x01 \x01(\v2\".booking.booking.v1.RequestContextR\acontext\x12\x17\n" +
 	"\aroom_id\x18\x02 \x01(\tR\x06roomId\x12\x1b\n" +
 	"\tstarts_at\x18\x03 \x01(\tR\bstartsAt\x12\x17\n" +
 	"\aends_at\x18\x04 \x01(\tR\x06endsAt\x12'\n" +
-	"\x0fidempotency_key\x18\x05 \x01(\tR\x0eidempotencyKey\"p\n" +
+	"\x0fidempotency_key\x18\x05 \x01(\tR\x0eidempotencyKey\x12)\n" +
+	"\x10bookings_version\x18\x06 \x01(\x03R\x0fbookingsVersion\"p\n" +
 	"\x11GetBookingRequest\x12<\n" +
 	"\acontext\x18\x01 \x01(\v2\".booking.booking.v1.RequestContextR\acontext\x12\x1d\n" +
 	"\n" +
@@ -755,8 +867,14 @@ const file_booking_booking_v1_booking_proto_rawDesc = "" +
 	"\tstarts_at\x18\x03 \x01(\tR\bstartsAt\x12\x17\n" +
 	"\aends_at\x18\x04 \x01(\tR\x06endsAt\"6\n" +
 	"\x19CheckAvailabilityResponse\x12\x19\n" +
-	"\broom_ids\x18\x01 \x03(\tR\aroomIds2\xc5\x02\n" +
-	"\x0eBookingService\x12d\n" +
+	"\broom_ids\x18\x01 \x03(\tR\aroomIds\"S\n" +
+	"\x13ListBookingsRequest\x12<\n" +
+	"\acontext\x18\x01 \x01(\v2\".booking.booking.v1.RequestContextR\acontext\"~\n" +
+	"\x14ListBookingsResponse\x12;\n" +
+	"\bbookings\x18\x01 \x03(\v2\x1f.booking.booking.v1.BookingViewR\bbookings\x12)\n" +
+	"\x10bookings_version\x18\x02 \x01(\x03R\x0fbookingsVersion2\xa8\x03\n" +
+	"\x0eBookingService\x12a\n" +
+	"\fListBookings\x12'.booking.booking.v1.ListBookingsRequest\x1a(.booking.booking.v1.ListBookingsResponse\x12d\n" +
 	"\rCreateBooking\x12(.booking.booking.v1.CreateBookingRequest\x1a).booking.booking.v1.CreateBookingResponse\x12[\n" +
 	"\n" +
 	"GetBooking\x12%.booking.booking.v1.GetBookingRequest\x1a&.booking.booking.v1.GetBookingResponse\x12p\n" +
@@ -775,7 +893,7 @@ func file_booking_booking_v1_booking_proto_rawDescGZIP() []byte {
 }
 
 var file_booking_booking_v1_booking_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_booking_booking_v1_booking_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_booking_booking_v1_booking_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_booking_booking_v1_booking_proto_goTypes = []any{
 	(BookingView_Status)(0),           // 0: booking.booking.v1.BookingView.Status
 	(RequestContext_DemoRole)(0),      // 1: booking.booking.v1.RequestContext.DemoRole
@@ -787,6 +905,8 @@ var file_booking_booking_v1_booking_proto_goTypes = []any{
 	(*RequestContext)(nil),            // 7: booking.booking.v1.RequestContext
 	(*CheckAvailabilityRequest)(nil),  // 8: booking.booking.v1.CheckAvailabilityRequest
 	(*CheckAvailabilityResponse)(nil), // 9: booking.booking.v1.CheckAvailabilityResponse
+	(*ListBookingsRequest)(nil),       // 10: booking.booking.v1.ListBookingsRequest
+	(*ListBookingsResponse)(nil),      // 11: booking.booking.v1.ListBookingsResponse
 }
 var file_booking_booking_v1_booking_proto_depIdxs = []int32{
 	7,  // 0: booking.booking.v1.CreateBookingRequest.context:type_name -> booking.booking.v1.RequestContext
@@ -796,17 +916,21 @@ var file_booking_booking_v1_booking_proto_depIdxs = []int32{
 	0,  // 4: booking.booking.v1.BookingView.status:type_name -> booking.booking.v1.BookingView.Status
 	1,  // 5: booking.booking.v1.RequestContext.demo_role:type_name -> booking.booking.v1.RequestContext.DemoRole
 	7,  // 6: booking.booking.v1.CheckAvailabilityRequest.context:type_name -> booking.booking.v1.RequestContext
-	2,  // 7: booking.booking.v1.BookingService.CreateBooking:input_type -> booking.booking.v1.CreateBookingRequest
-	3,  // 8: booking.booking.v1.BookingService.GetBooking:input_type -> booking.booking.v1.GetBookingRequest
-	8,  // 9: booking.booking.v1.BookingService.CheckAvailability:input_type -> booking.booking.v1.CheckAvailabilityRequest
-	4,  // 10: booking.booking.v1.BookingService.CreateBooking:output_type -> booking.booking.v1.CreateBookingResponse
-	5,  // 11: booking.booking.v1.BookingService.GetBooking:output_type -> booking.booking.v1.GetBookingResponse
-	9,  // 12: booking.booking.v1.BookingService.CheckAvailability:output_type -> booking.booking.v1.CheckAvailabilityResponse
-	10, // [10:13] is the sub-list for method output_type
-	7,  // [7:10] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	7,  // 7: booking.booking.v1.ListBookingsRequest.context:type_name -> booking.booking.v1.RequestContext
+	6,  // 8: booking.booking.v1.ListBookingsResponse.bookings:type_name -> booking.booking.v1.BookingView
+	10, // 9: booking.booking.v1.BookingService.ListBookings:input_type -> booking.booking.v1.ListBookingsRequest
+	2,  // 10: booking.booking.v1.BookingService.CreateBooking:input_type -> booking.booking.v1.CreateBookingRequest
+	3,  // 11: booking.booking.v1.BookingService.GetBooking:input_type -> booking.booking.v1.GetBookingRequest
+	8,  // 12: booking.booking.v1.BookingService.CheckAvailability:input_type -> booking.booking.v1.CheckAvailabilityRequest
+	11, // 13: booking.booking.v1.BookingService.ListBookings:output_type -> booking.booking.v1.ListBookingsResponse
+	4,  // 14: booking.booking.v1.BookingService.CreateBooking:output_type -> booking.booking.v1.CreateBookingResponse
+	5,  // 15: booking.booking.v1.BookingService.GetBooking:output_type -> booking.booking.v1.GetBookingResponse
+	9,  // 16: booking.booking.v1.BookingService.CheckAvailability:output_type -> booking.booking.v1.CheckAvailabilityResponse
+	13, // [13:17] is the sub-list for method output_type
+	9,  // [9:13] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_booking_booking_v1_booking_proto_init() }
@@ -821,7 +945,7 @@ func file_booking_booking_v1_booking_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_booking_booking_v1_booking_proto_rawDesc), len(file_booking_booking_v1_booking_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   8,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

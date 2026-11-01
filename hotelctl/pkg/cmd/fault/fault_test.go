@@ -2,6 +2,7 @@ package fault
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"testing"
 	"time"
@@ -181,5 +182,33 @@ func TestFaultRequiresBothServicesInStandConfiguration(t *testing.T) {
 	}
 	if factory.runtimeCalls != 0 {
 		t.Fatal("missing downstream opened the stand runtime")
+	}
+}
+
+func TestPushbackFlag(t *testing.T) {
+	for _, value := range []int32{-1, 0, 1500, 2147483647} {
+		t.Run(fmt.Sprint(value), func(t *testing.T) {
+			factory := newFakeFactory()
+			err := execute(t, factory, []string{"api-gateway", "booking", "--unavailable", "--pushback-ms=" + fmt.Sprint(value), "--duration=1s"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if factory.received.PushbackMS == nil || *factory.received.PushbackMS != value {
+				t.Fatalf("pushback lost: %+v", factory.received)
+			}
+		})
+	}
+	for _, args := range [][]string{
+		{"--unavailable", "--pushback-ms=-2", "--duration=1s"},
+		{"--unavailable", "--pushback-ms=2147483648", "--duration=1s"},
+		{"--unavailable", "--pushback-ms=bad", "--duration=1s"},
+		{"--slowdown=1s", "--pushback-ms=0", "--duration=1s"},
+		{"--clear", "--pushback-ms=0"},
+		{"--unavailable", "--direction=response", "--pushback-ms=-1", "--duration=1s"},
+	} {
+		factory := newFakeFactory()
+		if err := execute(t, factory, append([]string{"api-gateway", "booking"}, args...)); err == nil || factory.runtimeCalls != 0 {
+			t.Fatalf("invalid pushback opened runtime: %v", args)
+		}
 	}
 }

@@ -28,3 +28,20 @@ telemetry:
   service_namespace: hotelflow
   otlp_endpoint: otel-collector:4317
   otlp_insecure: true
+
+retry:
+  __default__:
+    enabled: false
+    separate_retry_per_handler_enabled: false
+    max_attempts: 3
+    initial_backoff: 200ms
+    max_backoff: 1s
+    backoff_multiplier: 2
+    retryable_codes: [Unavailable]
+    throttler:
+      throttling_enabled: true
+      throttle_max_tokens: 10
+      throttle_token_ratio: 0.1
+  handlers:
+    - method: /booking.booking.v1.BookingService/CreateBooking
+      enabled: false # Для показа retry переключить на true.

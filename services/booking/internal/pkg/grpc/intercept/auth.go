@@ -22,6 +22,7 @@ var methodRoles = map[string][]entity.Role{
 		entity.RoleOperator,
 	},
 	pb.BookingService_CreateBooking_FullMethodName: {entity.RoleGuest},
+	pb.BookingService_ListBookings_FullMethodName:  {entity.RoleGuest},
 	pb.BookingService_GetBooking_FullMethodName: {
 		entity.RoleGuest,
 		entity.RoleReception,

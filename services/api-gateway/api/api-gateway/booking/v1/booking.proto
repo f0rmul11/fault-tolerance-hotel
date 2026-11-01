@@ -9,6 +9,27 @@ option go_package = "api-gateway/internal/pkg/pb/api-gateway/booking/v1;bookingV
 
 // Создание и чтение броней, проверка занятости номеров.
 service BookingService {
+  // Согласованный список всех броней текущего гостя, включая отменённые, и его версия.
+  rpc ListBookings(ListBookingsRequest) returns (ListBookingsResponse) {
+    option (google.api.http) = {get: "/v1/bookings"};
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      parameters: {
+        headers: {
+          name: "X-Demo-Role"
+          description: "Роль пользователя: GUEST."
+          type: STRING
+          required: true
+        }
+        headers: {
+          name: "X-Demo-Actor"
+          description: "UUID гостя, чей список броней запрашивается."
+          type: STRING
+          required: true
+        }
+      }
+    };
+  }
+
   // Атомарно создаёт подтверждённую бронь; повтор ключа возвращает результат операции.
   rpc CreateBooking(CreateBookingRequest) returns (CreateBookingResponse) {
     option (google.api.http) = {
@@ -95,6 +116,10 @@ message CreateBookingRequest {
 
   // UUID операции. Повторяйте неизменным с теми же данными при потере ответа.
   string idempotency_key = 4;
+
+  // Версия списка из ListBookings. Для нового запроса должна совпадать; 0 — начальная.
+  // Повтор сохранённого ключа возвращает бронь независимо от устаревшей версии.
+  int64 bookings_version = 5;
 }
 
 // Идентификатор запрашиваемой брони.
@@ -170,4 +195,17 @@ message CheckAvailabilityRequest {
 message CheckAvailabilityResponse {
   // Системные ID свободных номеров — положительные числа в строках.
   repeated string room_ids = 1;
+}
+
+// Чтение списка текущего гостя; чужой guest_id клиент не передаёт.
+message ListBookingsRequest {
+}
+
+// Брони и версия прочитаны из одного снимка БД. Пустой список тоже имеет версию.
+message ListBookingsResponse {
+  // Все брони гостя, включая отменённые, по времени создания и UUID.
+  repeated BookingView bookings = 1;
+
+  // Версия списка: меняется при создании, активации и отмене, но не при повторе.
+  int64 bookings_version = 2;
 }

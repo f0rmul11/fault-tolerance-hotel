@@ -34,8 +34,11 @@ type CreateBookingRequest struct {
 	EndsAt string `protobuf:"bytes,3,opt,name=ends_at,json=endsAt,proto3" json:"ends_at,omitempty"`
 	// UUID операции. Повторяйте неизменным с теми же данными при потере ответа.
 	IdempotencyKey string `protobuf:"bytes,4,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// Версия списка из ListBookings. Для нового запроса должна совпадать; 0 — начальная.
+	// Повтор сохранённого ключа возвращает бронь независимо от устаревшей версии.
+	BookingsVersion int64 `protobuf:"varint,5,opt,name=bookings_version,json=bookingsVersion,proto3" json:"bookings_version,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *CreateBookingRequest) Reset() {
@@ -94,6 +97,13 @@ func (x *CreateBookingRequest) GetIdempotencyKey() string {
 		return x.IdempotencyKey
 	}
 	return ""
+}
+
+func (x *CreateBookingRequest) GetBookingsVersion() int64 {
+	if x != nil {
+		return x.BookingsVersion
+	}
+	return 0
 }
 
 // Идентификатор запрашиваемой брони.
@@ -489,16 +499,109 @@ func (x *CheckAvailabilityResponse) GetRoomIds() []string {
 	return nil
 }
 
+// Чтение списка текущего гостя; чужой guest_id клиент не передаёт.
+type ListBookingsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListBookingsRequest) Reset() {
+	*x = ListBookingsRequest{}
+	mi := &file_api_gateway_booking_v1_booking_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListBookingsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListBookingsRequest) ProtoMessage() {}
+
+func (x *ListBookingsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_gateway_booking_v1_booking_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListBookingsRequest.ProtoReflect.Descriptor instead.
+func (*ListBookingsRequest) Descriptor() ([]byte, []int) {
+	return file_api_gateway_booking_v1_booking_proto_rawDescGZIP(), []int{7}
+}
+
+// Брони и версия прочитаны из одного снимка БД. Пустой список тоже имеет версию.
+type ListBookingsResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Все брони гостя, включая отменённые, по времени создания и UUID.
+	Bookings []*BookingView `protobuf:"bytes,1,rep,name=bookings,proto3" json:"bookings,omitempty"`
+	// Версия списка: меняется при создании, активации и отмене, но не при повторе.
+	BookingsVersion int64 `protobuf:"varint,2,opt,name=bookings_version,json=bookingsVersion,proto3" json:"bookings_version,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *ListBookingsResponse) Reset() {
+	*x = ListBookingsResponse{}
+	mi := &file_api_gateway_booking_v1_booking_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListBookingsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListBookingsResponse) ProtoMessage() {}
+
+func (x *ListBookingsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_gateway_booking_v1_booking_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListBookingsResponse.ProtoReflect.Descriptor instead.
+func (*ListBookingsResponse) Descriptor() ([]byte, []int) {
+	return file_api_gateway_booking_v1_booking_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *ListBookingsResponse) GetBookings() []*BookingView {
+	if x != nil {
+		return x.Bookings
+	}
+	return nil
+}
+
+func (x *ListBookingsResponse) GetBookingsVersion() int64 {
+	if x != nil {
+		return x.BookingsVersion
+	}
+	return 0
+}
+
 var File_api_gateway_booking_v1_booking_proto protoreflect.FileDescriptor
 
 const file_api_gateway_booking_v1_booking_proto_rawDesc = "" +
 	"\n" +
-	"$api-gateway/booking/v1/booking.proto\x12\x16api_gateway.booking.v1\x1a\x1cgoogle/api/annotations.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\x8e\x01\n" +
+	"$api-gateway/booking/v1/booking.proto\x12\x16api_gateway.booking.v1\x1a\x1cgoogle/api/annotations.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\xb9\x01\n" +
 	"\x14CreateBookingRequest\x12\x17\n" +
 	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x12\x1b\n" +
 	"\tstarts_at\x18\x02 \x01(\tR\bstartsAt\x12\x17\n" +
 	"\aends_at\x18\x03 \x01(\tR\x06endsAt\x12'\n" +
-	"\x0fidempotency_key\x18\x04 \x01(\tR\x0eidempotencyKey\"2\n" +
+	"\x0fidempotency_key\x18\x04 \x01(\tR\x0eidempotencyKey\x12)\n" +
+	"\x10bookings_version\x18\x05 \x01(\x03R\x0fbookingsVersion\"2\n" +
 	"\x11GetBookingRequest\x12\x1d\n" +
 	"\n" +
 	"booking_id\x18\x01 \x01(\tR\tbookingId\"V\n" +
@@ -529,8 +632,17 @@ const file_api_gateway_booking_v1_booking_proto_rawDesc = "" +
 	"\tstarts_at\x18\x02 \x01(\tR\bstartsAt\x12\x17\n" +
 	"\aends_at\x18\x03 \x01(\tR\x06endsAt\"6\n" +
 	"\x19CheckAvailabilityResponse\x12\x19\n" +
-	"\broom_ids\x18\x01 \x03(\tR\aroomIds2\xf0\b\n" +
-	"\x0eBookingService\x12\xaa\x02\n" +
+	"\broom_ids\x18\x01 \x03(\tR\aroomIds\"\x15\n" +
+	"\x13ListBookingsRequest\"\x82\x01\n" +
+	"\x14ListBookingsResponse\x12?\n" +
+	"\bbookings\x18\x01 \x03(\v2#.api_gateway.booking.v1.BookingViewR\bbookings\x12)\n" +
+	"\x10bookings_version\x18\x02 \x01(\x03R\x0fbookingsVersion2\x9b\v\n" +
+	"\x0eBookingService\x12\xa8\x02\n" +
+	"\fListBookings\x12+.api_gateway.booking.v1.ListBookingsRequest\x1a,.api_gateway.booking.v1.ListBookingsResponse\"\xbc\x01\x92A\xa4\x01r\xa1\x01\n" +
+	"<\n" +
+	"\vX-Demo-Role\x12)Роль пользователя: GUEST.\x18\x01(\x01\n" +
+	"a\n" +
+	"\fX-Demo-Actor\x12MUUID гостя, чей список броней запрашивается.\x18\x01(\x01\x82\xd3\xe4\x93\x02\x0e\x12\f/v1/bookings\x12\xaa\x02\n" +
 	"\rCreateBooking\x12,.api_gateway.booking.v1.CreateBookingRequest\x1a-.api_gateway.booking.v1.CreateBookingResponse\"\xbb\x01\x92A\xa0\x01r\x9d\x01\n" +
 	"<\n" +
 	"\vX-Demo-Role\x12)Роль пользователя: GUEST.\x18\x01(\x01\n" +
@@ -560,7 +672,7 @@ func file_api_gateway_booking_v1_booking_proto_rawDescGZIP() []byte {
 	return file_api_gateway_booking_v1_booking_proto_rawDescData
 }
 
-var file_api_gateway_booking_v1_booking_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_api_gateway_booking_v1_booking_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_api_gateway_booking_v1_booking_proto_goTypes = []any{
 	(*CreateBookingRequest)(nil),      // 0: api_gateway.booking.v1.CreateBookingRequest
 	(*GetBookingRequest)(nil),         // 1: api_gateway.booking.v1.GetBookingRequest
@@ -569,21 +681,26 @@ var file_api_gateway_booking_v1_booking_proto_goTypes = []any{
 	(*BookingView)(nil),               // 4: api_gateway.booking.v1.BookingView
 	(*CheckAvailabilityRequest)(nil),  // 5: api_gateway.booking.v1.CheckAvailabilityRequest
 	(*CheckAvailabilityResponse)(nil), // 6: api_gateway.booking.v1.CheckAvailabilityResponse
+	(*ListBookingsRequest)(nil),       // 7: api_gateway.booking.v1.ListBookingsRequest
+	(*ListBookingsResponse)(nil),      // 8: api_gateway.booking.v1.ListBookingsResponse
 }
 var file_api_gateway_booking_v1_booking_proto_depIdxs = []int32{
 	4, // 0: api_gateway.booking.v1.CreateBookingResponse.booking:type_name -> api_gateway.booking.v1.BookingView
 	4, // 1: api_gateway.booking.v1.GetBookingResponse.booking:type_name -> api_gateway.booking.v1.BookingView
-	0, // 2: api_gateway.booking.v1.BookingService.CreateBooking:input_type -> api_gateway.booking.v1.CreateBookingRequest
-	1, // 3: api_gateway.booking.v1.BookingService.GetBooking:input_type -> api_gateway.booking.v1.GetBookingRequest
-	5, // 4: api_gateway.booking.v1.BookingService.CheckAvailability:input_type -> api_gateway.booking.v1.CheckAvailabilityRequest
-	2, // 5: api_gateway.booking.v1.BookingService.CreateBooking:output_type -> api_gateway.booking.v1.CreateBookingResponse
-	3, // 6: api_gateway.booking.v1.BookingService.GetBooking:output_type -> api_gateway.booking.v1.GetBookingResponse
-	6, // 7: api_gateway.booking.v1.BookingService.CheckAvailability:output_type -> api_gateway.booking.v1.CheckAvailabilityResponse
-	5, // [5:8] is the sub-list for method output_type
-	2, // [2:5] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	4, // 2: api_gateway.booking.v1.ListBookingsResponse.bookings:type_name -> api_gateway.booking.v1.BookingView
+	7, // 3: api_gateway.booking.v1.BookingService.ListBookings:input_type -> api_gateway.booking.v1.ListBookingsRequest
+	0, // 4: api_gateway.booking.v1.BookingService.CreateBooking:input_type -> api_gateway.booking.v1.CreateBookingRequest
+	1, // 5: api_gateway.booking.v1.BookingService.GetBooking:input_type -> api_gateway.booking.v1.GetBookingRequest
+	5, // 6: api_gateway.booking.v1.BookingService.CheckAvailability:input_type -> api_gateway.booking.v1.CheckAvailabilityRequest
+	8, // 7: api_gateway.booking.v1.BookingService.ListBookings:output_type -> api_gateway.booking.v1.ListBookingsResponse
+	2, // 8: api_gateway.booking.v1.BookingService.CreateBooking:output_type -> api_gateway.booking.v1.CreateBookingResponse
+	3, // 9: api_gateway.booking.v1.BookingService.GetBooking:output_type -> api_gateway.booking.v1.GetBookingResponse
+	6, // 10: api_gateway.booking.v1.BookingService.CheckAvailability:output_type -> api_gateway.booking.v1.CheckAvailabilityResponse
+	7, // [7:11] is the sub-list for method output_type
+	3, // [3:7] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_api_gateway_booking_v1_booking_proto_init() }
@@ -597,7 +714,7 @@ func file_api_gateway_booking_v1_booking_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_gateway_booking_v1_booking_proto_rawDesc), len(file_api_gateway_booking_v1_booking_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   7,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

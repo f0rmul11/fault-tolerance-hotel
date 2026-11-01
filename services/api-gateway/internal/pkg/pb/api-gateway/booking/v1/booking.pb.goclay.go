@@ -55,6 +55,24 @@ func (w *BookingServiceServiceDesc) RegisterHTTP(
 
 // Wrap all http methods with interceptor support
 
+func (w *BookingServiceServiceDesc) ListBookings(ctx context.Context, in *ListBookingsRequest) (*ListBookingsResponse, error) {
+	if w.opts.UnaryInterceptor == nil {
+		return w.svc.ListBookings(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     w,
+		FullMethod: "/api_gateway.booking.v1.BookingService/ListBookings",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return w.svc.ListBookings(ctx, req.(*ListBookingsRequest))
+	}
+	resp, err := w.opts.UnaryInterceptor(ctx, in, info, handler)
+	if err != nil || resp == nil {
+		return nil, err
+	}
+	return resp.(*ListBookingsResponse), err
+}
+
 func (w *BookingServiceServiceDesc) CreateBooking(ctx context.Context, in *CreateBookingRequest) (*CreateBookingResponse, error) {
 	if w.opts.UnaryInterceptor == nil {
 		return w.svc.CreateBooking(ctx, in)

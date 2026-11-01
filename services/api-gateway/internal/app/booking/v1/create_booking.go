@@ -14,11 +14,12 @@ func (i *Implementation) CreateBooking(ctx context.Context, req *bookingV1.Creat
 	defer span.End()
 
 	response, err := i.external.CreateBooking(ctx, &externalV1.CreateBookingRequest{
-		Context:        auth.Caller(ctx),
-		IdempotencyKey: req.GetIdempotencyKey(),
-		RoomId:         req.GetRoomId(),
-		StartsAt:       req.GetStartsAt(),
-		EndsAt:         req.GetEndsAt(),
+		Context:         auth.Caller(ctx),
+		IdempotencyKey:  req.GetIdempotencyKey(),
+		BookingsVersion: req.GetBookingsVersion(),
+		RoomId:          req.GetRoomId(),
+		StartsAt:        req.GetStartsAt(),
+		EndsAt:          req.GetEndsAt(),
 	})
 	if err != nil {
 		return nil, err

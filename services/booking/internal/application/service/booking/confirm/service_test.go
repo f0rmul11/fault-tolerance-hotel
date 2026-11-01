@@ -10,15 +10,21 @@ import (
 
 	"booking/internal/domain/entity"
 	"booking/internal/domain/vo"
+
 	app "booking/internal/pkg/bookingerror"
 	"booking/internal/pkg/event"
 )
 
 type storageFake struct {
-	err error
+	err      error
+	version  int64
+	stateErr error
+	created  int
+	states   int
 }
 
 func (s *storageFake) Create(context.Context, *entity.Booking, uuid.UUID) error {
+	s.created++
 	return s.err
 }
 
@@ -45,11 +51,46 @@ func TestConcurrentInsertConflictDoesNotPublishEvent(t *testing.T) {
 	conflict := app.NewConflictErr("Ключ идемпотентности уже использован")
 	flusher := &flusherFake{}
 	result, err := New(&storageFake{err: conflict}, flusher).Confirm(t.Context(), booking,
-		uuid.Must(uuid.NewV4()), vo.Limits{Min: 12 * time.Hour})
+		uuid.Must(uuid.NewV4()), vo.Limits{Min: 12 * time.Hour}, 0)
 	if !errors.Is(err, conflict) || result != nil {
 		t.Fatalf("conflict must reach caller without a booking: result=%v err=%v", result, err)
 	}
 	if len(flusher.events) != 0 {
 		t.Fatalf("conflicting request published %d events", len(flusher.events))
+	}
+}
+
+func (s *storageFake) GetBookingsVersion(_ context.Context, guestID uuid.UUID) (vo.Version, error) {
+	return vo.Version{Old: s.version}, nil
+}
+
+func (s *storageFake) UpdateBookingsVersion(context.Context, uuid.UUID, vo.Version) error {
+	s.states++
+	return s.stateErr
+}
+
+func TestVersionConflictStopsCreation(t *testing.T) {
+	at := time.Now().UTC()
+	period, _ := vo.NewPeriod(at, at.Add(24*time.Hour))
+	booking, _ := entity.NewBooking(uuid.Must(uuid.NewV4()), uuid.Must(uuid.NewV4()), 1, uuid.Must(uuid.NewV4()), period, at)
+	for _, tc := range []struct {
+		name       string
+		expected   int64
+		concurrent bool
+	}{
+		{name: "stale snapshot", expected: 6},
+		{name: "concurrent change", expected: 7, concurrent: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			storage := &storageFake{version: 7}
+			if tc.concurrent {
+				storage.stateErr = app.NewConflictErr("Список изменился")
+			}
+			flusher := &flusherFake{}
+			result, err := New(storage, flusher).Confirm(t.Context(), booking, uuid.Must(uuid.NewV4()), vo.Limits{Min: time.Hour}, tc.expected)
+			if result != nil || !app.IsCode(err, app.Conflict) || storage.created != 0 || len(flusher.events) != 0 {
+				t.Fatalf("conflict created effects: result=%v err=%v creates=%d events=%d", result, err, storage.created, len(flusher.events))
+			}
+		})
 	}
 }

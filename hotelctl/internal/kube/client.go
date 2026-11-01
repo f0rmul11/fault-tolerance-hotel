@@ -116,9 +116,25 @@ func (c *Client) WaitDeployment(ctx context.Context, s config.Service) error {
 				return false, fmt.Errorf("deployment exceeded its progress deadline: %s", condition.Message)
 			}
 		}
-		return d.Status.ObservedGeneration >= d.Generation &&
-			d.Status.UpdatedReplicas == desired &&
-			d.Status.AvailableReplicas == desired &&
-			d.Status.Replicas == desired, nil
+		if d.Status.ObservedGeneration < d.Generation ||
+			d.Status.UpdatedReplicas != desired ||
+			d.Status.AvailableReplicas != desired ||
+			d.Status.Replicas != desired {
+			return false, nil
+		}
+		// Deployment counters may already exclude terminating old Pods.
+		// Wait for their shutdown before a fresh demo/load connects to the service.
+		pods, err := c.Typed.CoreV1().Pods(s.Namespace).List(ctx, metav1.ListOptions{
+			LabelSelector: metav1.FormatLabelSelector(d.Spec.Selector),
+		})
+		if err != nil {
+			return false, err
+		}
+		for _, pod := range pods.Items {
+			if pod.DeletionTimestamp != nil {
+				return false, nil
+			}
+		}
+		return true, nil
 	})
 }

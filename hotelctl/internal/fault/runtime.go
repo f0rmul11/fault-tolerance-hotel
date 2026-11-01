@@ -94,11 +94,15 @@ func (o Options) Values() map[string]string {
 		prefix + "request.delay_percent":  "0",
 		prefix + "request.delay_ms":       "1",
 		prefix + "request.abort_percent":  "0",
+		prefix + "request.pushback_ms":    "disabled",
 		prefix + "response.delay_percent": "0",
 		prefix + "response.delay_ms":      "1",
 	}
 	if o.Unavailable {
 		values[prefix+"request.abort_percent"] = "100"
+		if o.PushbackMS != nil {
+			values[prefix+"request.pushback_ms"] = strconv.FormatInt(int64(*o.PushbackMS), 10)
+		}
 	} else if !o.Clear {
 		values[prefix+o.Direction+".delay_percent"] = "100"
 		values[prefix+o.Direction+".delay_ms"] = strconv.FormatInt(o.Slowdown.Milliseconds(), 10)
@@ -108,6 +112,7 @@ func (o Options) Values() map[string]string {
 
 func ClearRuntime(ctx context.Context, runtime Runtime, options Options) error {
 	options.Clear, options.Unavailable = true, false
+	options.PushbackMS = nil
 	values := options.Values()
 	if err := runtime.Modify(ctx, values); err != nil {
 		return err
@@ -140,6 +145,9 @@ func RunRuntime(ctx context.Context, runtime Runtime, options Options, out io.Wr
 	if err != nil {
 		return err
 	}
+	if options.PushbackMS != nil && current["demo.pushback_supported"] != "1" {
+		return fmt.Errorf("инфраструктура стенда ещё не поддерживает --pushback-ms; обновите её командой hotelctl deploy api-gateway")
+	}
 	values := options.Values()
 	for key := range values {
 		if strings.HasSuffix(key, "_percent") && current[key] != "" && current[key] != "0" {
@@ -164,6 +172,9 @@ func RunRuntime(ctx context.Context, runtime Runtime, options Options, out io.Wr
 	}
 	if options.Unavailable {
 		fmt.Fprintf(out, "ACTIVE %s → %s: UNAVAILABLE на %s\n", options.From, options.To, options.Duration)
+		if options.PushbackMS != nil {
+			fmt.Fprintf(out, "grpc-retry-pushback-ms: %d (ответ до обработки запроса сервисом)\n", *options.PushbackMS)
+		}
 	} else {
 		fmt.Fprintf(out, "ACTIVE %s → %s: %s +%s на %s\n", options.From, options.To, options.Direction, options.Slowdown, options.Duration)
 	}

@@ -1,7 +1,13 @@
 package config
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
+	"time"
+
+	"github.com/ilyakaznacheev/cleanenv"
 )
 
 func TestEnvironmentOverridesAndInvalidConfig(t *testing.T) {
@@ -46,6 +52,47 @@ func TestGracefulDelay(t *testing.T) {
 			}
 			if valid && cfg.Graceful.Delay.String() != delay {
 				t.Fatalf("delay override not applied: %v", cfg.Graceful.Delay)
+			}
+		})
+	}
+}
+
+func TestRetryYAML(t *testing.T) {
+	for _, enabled := range []bool{false, true} {
+		t.Run(fmt.Sprint(enabled), func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "config.yaml")
+			content := fmt.Sprintf(`retry:
+  __default__:
+    enabled: false
+    max_attempts: 3
+    initial_backoff: 200ms
+    max_backoff: 1s
+    throttler:
+      throttling_enabled: false
+  handlers:
+    - method: /booking.booking.v1.BookingService/CreateBooking
+      enabled: %t
+`, enabled)
+			if err := os.WriteFile(path, []byte(content), 0600); err != nil {
+				t.Fatal(err)
+			}
+			var cfg Config
+			if err := cleanenv.ReadConfig(path, &cfg); err != nil {
+				t.Fatal(err)
+			}
+			policy := cfg.Retry.Default
+			if len(cfg.Retry.Handlers) != 1 {
+				t.Fatalf("unexpected retry handlers: %+v", cfg.Retry.Handlers)
+			}
+			handler := cfg.Retry.Handlers[0]
+			if handler.Method != "/booking.booking.v1.BookingService/CreateBooking" ||
+				handler.Enabled == nil || *handler.Enabled != enabled {
+				t.Fatalf("unexpected handler policy: %+v", handler)
+			}
+			if policy.Enabled == nil || *policy.Enabled || policy.MaxAttempts != 3 ||
+				policy.InitialBackoff != 200*time.Millisecond || policy.MaxBackoff != time.Second ||
+				policy.Throttler.Enabled == nil || *policy.Throttler.Enabled {
+				t.Fatalf("unexpected booking retry policy: %+v", policy)
 			}
 		})
 	}

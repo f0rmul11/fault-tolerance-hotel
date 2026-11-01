@@ -36,16 +36,17 @@ func (f *creatorFake) Get(context.Context, int64) (roomdto.Room, error) {
 	return roomdto.Room{ID: 1, Number: "101", RoomType: "Standard"}, nil
 }
 
-func (f *creatorFake) Confirm(_ context.Context, b *entity.Booking, key uuid.UUID, _ vo.Limits) (*entity.Booking, error) {
+func (f *creatorFake) Confirm(_ context.Context, b *entity.Booking, key uuid.UUID, _ vo.Limits, version int64) (*entity.Booking, error) {
 	f.calls++
 	f.request = create.Input{
 		Context: bookingdto.Context{
 			ActorID:   b.GuestID(),
 			RequestID: b.RequestID(),
 		},
-		RoomID:         b.RoomID(),
-		Period:         b.Period(),
-		IdempotencyKey: key,
+		RoomID:          b.RoomID(),
+		Period:          b.Period(),
+		IdempotencyKey:  key,
+		BookingsVersion: version,
 	}
 	return b, f.err
 }
@@ -64,10 +65,11 @@ func TestCreateMapping(t *testing.T) {
 			DemoRole:  pb.RequestContext_GUEST.Enum(),
 			DemoActor: &actor,
 		},
-		RoomId:         "1",
-		IdempotencyKey: "e886b633-1e19-45fd-b06d-c2a17e61ccbf",
-		StartsAt:       "2026-10-12T00:00:00Z",
-		EndsAt:         "2026-10-13T00:00:00Z",
+		RoomId:          "1",
+		BookingsVersion: 7,
+		IdempotencyKey:  "e886b633-1e19-45fd-b06d-c2a17e61ccbf",
+		StartsAt:        "2026-10-12T00:00:00Z",
+		EndsAt:          "2026-10-13T00:00:00Z",
 	}
 
 	out, err := invokeCreate(server, r)
@@ -80,7 +82,7 @@ func TestCreateMapping(t *testing.T) {
 		t.Fatalf("wrong response: %+v", out.Booking)
 	}
 
-	if fake.request.Context.ActorID.String() != actor || fake.request.IdempotencyKey.String() != r.IdempotencyKey {
+	if fake.request.BookingsVersion != 7 || fake.request.Context.ActorID.String() != actor || fake.request.IdempotencyKey.String() != r.IdempotencyKey {
 		t.Fatal("guest missing")
 	}
 	for _, roomID := range []string{"broken", "", "0", "-1", "9223372036854775808"} {
@@ -138,10 +140,11 @@ func TestFailureDoesNotAdvertiseUncommittedBooking(t *testing.T) {
 			DemoRole:  pb.RequestContext_GUEST.Enum(),
 			DemoActor: &actor,
 		},
-		RoomId:         "1",
-		IdempotencyKey: "e886b633-1e19-45fd-b06d-c2a17e61ccbf",
-		StartsAt:       "2026-10-12T00:00:00Z",
-		EndsAt:         "2026-10-13T00:00:00Z",
+		RoomId:          "1",
+		BookingsVersion: 7,
+		IdempotencyKey:  "e886b633-1e19-45fd-b06d-c2a17e61ccbf",
+		StartsAt:        "2026-10-12T00:00:00Z",
+		EndsAt:          "2026-10-13T00:00:00Z",
 	}
 	info := &grpc.UnaryServerInfo{FullMethod: pb.BookingService_CreateBooking_FullMethodName}
 	response, err := intercept.ErrorInterceptor()(ctx, request, info, func(ctx context.Context, request any) (any, error) {

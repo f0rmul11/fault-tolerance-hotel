@@ -13,8 +13,10 @@ import (
 func ProxyMetadata() grpc.UnaryClientInterceptor {
 	return func(ctx context.Context, method string, request, reply any, conn *grpc.ClientConn, invoke grpc.UnaryInvoker, options ...grpc.CallOption) error {
 		var headers, trailers metadata.MD
-		options = append(options, grpc.Header(&headers), grpc.Trailer(&trailers))
-		err := invoke(ctx, method, request, reply, conn, options...)
+		callOptions := make([]grpc.CallOption, len(options), len(options)+2)
+		copy(callOptions, options)
+		callOptions = append(callOptions, grpc.Header(&headers), grpc.Trailer(&trailers))
+		err := invoke(ctx, method, request, reply, conn, callOptions...)
 		_ = grpc.SetHeader(ctx, headers)
 		_ = grpc.SetTrailer(ctx, trailers)
 

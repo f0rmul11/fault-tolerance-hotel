@@ -19,6 +19,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
+	BookingService_ListBookings_FullMethodName      = "/booking.booking.v1.BookingService/ListBookings"
 	BookingService_CreateBooking_FullMethodName     = "/booking.booking.v1.BookingService/CreateBooking"
 	BookingService_GetBooking_FullMethodName        = "/booking.booking.v1.BookingService/GetBooking"
 	BookingService_CheckAvailability_FullMethodName = "/booking.booking.v1.BookingService/CheckAvailability"
@@ -30,6 +31,8 @@ const (
 //
 // Создание и чтение броней, проверка занятости номеров.
 type BookingServiceClient interface {
+	// Список всех броней текущего гостя, включая отменённые, и его версия.
+	ListBookings(ctx context.Context, in *ListBookingsRequest, opts ...grpc.CallOption) (*ListBookingsResponse, error)
 	// Атомарно создаёт подтверждённую бронь; повтор ключа возвращает результат операции.
 	CreateBooking(ctx context.Context, in *CreateBookingRequest, opts ...grpc.CallOption) (*CreateBookingResponse, error)
 	// Возвращает бронь по UUID с учётом прав вызывающего пользователя.
@@ -44,6 +47,16 @@ type bookingServiceClient struct {
 
 func NewBookingServiceClient(cc grpc.ClientConnInterface) BookingServiceClient {
 	return &bookingServiceClient{cc}
+}
+
+func (c *bookingServiceClient) ListBookings(ctx context.Context, in *ListBookingsRequest, opts ...grpc.CallOption) (*ListBookingsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListBookingsResponse)
+	err := c.cc.Invoke(ctx, BookingService_ListBookings_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *bookingServiceClient) CreateBooking(ctx context.Context, in *CreateBookingRequest, opts ...grpc.CallOption) (*CreateBookingResponse, error) {
@@ -82,6 +95,8 @@ func (c *bookingServiceClient) CheckAvailability(ctx context.Context, in *CheckA
 //
 // Создание и чтение броней, проверка занятости номеров.
 type BookingServiceServer interface {
+	// Список всех броней текущего гостя, включая отменённые, и его версия.
+	ListBookings(context.Context, *ListBookingsRequest) (*ListBookingsResponse, error)
 	// Атомарно создаёт подтверждённую бронь; повтор ключа возвращает результат операции.
 	CreateBooking(context.Context, *CreateBookingRequest) (*CreateBookingResponse, error)
 	// Возвращает бронь по UUID с учётом прав вызывающего пользователя.
@@ -98,6 +113,9 @@ type BookingServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedBookingServiceServer struct{}
 
+func (UnimplementedBookingServiceServer) ListBookings(context.Context, *ListBookingsRequest) (*ListBookingsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListBookings not implemented")
+}
 func (UnimplementedBookingServiceServer) CreateBooking(context.Context, *CreateBookingRequest) (*CreateBookingResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateBooking not implemented")
 }
@@ -126,6 +144,24 @@ func RegisterBookingServiceServer(s grpc.ServiceRegistrar, srv BookingServiceSer
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&BookingService_ServiceDesc, srv)
+}
+
+func _BookingService_ListBookings_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListBookingsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BookingServiceServer).ListBookings(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BookingService_ListBookings_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BookingServiceServer).ListBookings(ctx, req.(*ListBookingsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _BookingService_CreateBooking_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -189,6 +225,10 @@ var BookingService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "booking.booking.v1.BookingService",
 	HandlerType: (*BookingServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "ListBookings",
+			Handler:    _BookingService_ListBookings_Handler,
+		},
 		{
 			MethodName: "CreateBooking",
 			Handler:    _BookingService_CreateBooking_Handler,

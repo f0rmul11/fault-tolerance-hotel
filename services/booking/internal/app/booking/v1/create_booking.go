@@ -31,10 +31,11 @@ func (s *Server) CreateBooking(ctx context.Context, r *pb.CreateBookingRequest) 
 	b, err := s.usecases.CreateBooking.Execute(
 		ctx,
 		create.Input{
-			Context:        intercept.Caller(ctx),
-			RoomID:         roomID,
-			IdempotencyKey: uuid.FromStringOrNil(r.GetIdempotencyKey()),
-			Period:         period,
+			Context:         intercept.Caller(ctx),
+			RoomID:          roomID,
+			IdempotencyKey:  uuid.FromStringOrNil(r.GetIdempotencyKey()),
+			BookingsVersion: r.GetBookingsVersion(),
+			Period:          period,
 		},
 	)
 	if err != nil {
