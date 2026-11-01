@@ -307,6 +307,5 @@ pushback отсутствует. Допустимый диапазон: -1…214
 шаблон через `./bin/hotelctl deploy api-gateway` на запущенном стенде. Старую инфраструктуру
 команда с pushback распознаёт и возвращает инструкцию обновления, не включая неполный сбой.
 
-Шпаргалки урока 3: [ретраи](../demo/module-3/lesson-03-1-retry-demo-cheatsheet.md), [бюджет](../demo/module-3/lesson-03-2-budget-demo-cheatsheet.md), [pushback](../demo/module-3/lesson-03-3-pushback-demo-cheatsheet.md), [идемпотентность и версия списка](../demo/module-3/lesson-03-4-idempotency-demo-cheatsheet.md).
 
 `deploy` ждёт готовности новой ревизии и исчезновения завершающихся Pod выбранного Deployment. Это позволяет начинать следующий нагрузочный прогон после возврата команды, не смешивая старую и новую конфигурации.
