@@ -26,7 +26,7 @@ func NewRegistry(
 ) *Registry {
 	return &Registry{
 		ListHotels: hotellist.New(stores.Hotels, services.HotelEnrich),
-		GetHotel:   hotelget.New(stores.Hotels, gateways.Review),
+		GetHotel:   hotelget.New(stores.Hotels, services.HotelRatings),
 		GetRoom:    roomget.New(stores.Rooms),
 		ListRooms:  roomlist.New(stores.Rooms, rtConfig),
 	}

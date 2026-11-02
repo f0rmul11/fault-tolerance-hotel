@@ -27,6 +27,7 @@ import (
 	runtimeconfig "hotels/internal/config"
 	"hotels/internal/infrastructure/gateway"
 	"hotels/internal/infrastructure/storage"
+	"hotels/internal/pkg/circuit"
 	"hotels/internal/pkg/closer"
 	"hotels/internal/pkg/connector/postgres"
 	"hotels/internal/pkg/grpc/intercept"
@@ -180,7 +181,12 @@ func (a *App) initGrpcConn(_ context.Context) error {
 
 		conn, err := grpc.NewClient(address,
 			grpc.WithStatsHandler(traces.ClientHandler()),
-			grpc.WithTransportCredentials(insecure.NewCredentials()))
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithDisableRetry(),
+			grpc.WithChainUnaryInterceptor(
+				circuit.NewCircuitBreaker(config.Instance().Circuit).UnaryClientInterceptor(),
+			),
+		)
 
 		if err != nil {
 			return fmt.Errorf(
@@ -277,7 +283,7 @@ func (a *App) initGateway(context.Context) error {
 }
 
 func (a *App) initServices(context.Context) error {
-	a.services = service.NewRegistry(a.gateway)
+	a.services = service.NewRegistry(a.gateway, config.Instance().ReviewFallback.Enabled)
 	return nil
 }
 

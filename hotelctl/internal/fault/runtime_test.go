@@ -37,7 +37,7 @@ func (r *fakeRuntime) Modify(ctx context.Context, values map[string]string) erro
 }
 
 func TestRuntimeFaultLifecycle(t *testing.T) {
-	for _, mode := range []string{"request", "response", "unavailable", "pushback", "cancel", "lost apply"} {
+	for _, mode := range []string{"request", "response", "handler", "unavailable", "pushback", "cancel", "lost apply"} {
 		t.Run(mode, func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
 				ctx, cancel := context.WithCancel(context.Background())
@@ -50,12 +50,13 @@ func TestRuntimeFaultLifecycle(t *testing.T) {
 					Duration:  10 * time.Second,
 				}
 				r := &fakeRuntime{values: map[string]string{
-					"unrelated":               "keep",
-					"demo.pushback_supported": "1",
+					"unrelated":                    "keep",
+					"demo.pushback_supported":      "1",
+					"demo.handler_delay_supported": "1",
 				}}
 				switch mode {
-				case "response":
-					o.Direction = "response"
+				case "response", "handler":
+					o.Direction = mode
 				case "unavailable":
 					o.Unavailable, o.Slowdown = true, 0
 				case "pushback":
@@ -156,5 +157,47 @@ func TestPushbackRequiresUpdatedProxy(t *testing.T) {
 	r := &fakeRuntime{values: map[string]string{}}
 	if err := RunRuntime(context.Background(), r, o, io.Discard); err == nil || r.calls != 0 {
 		t.Fatal("pushback silently accepted by old infrastructure")
+	}
+}
+
+func TestHandlerDelayRequiresUpdatedProxy(t *testing.T) {
+	o := Options{
+		From:      "hotels",
+		To:        "review",
+		Direction: "handler",
+		Slowdown:  8 * time.Second,
+		Duration:  time.Second,
+	}
+	r := &fakeRuntime{values: map[string]string{}}
+	if err := RunRuntime(context.Background(), r, o, io.Discard); err == nil || r.calls != 0 {
+		t.Fatal("handler delay accepted by old proxy")
+	}
+}
+
+func TestHandlerDelayCleanupOnInterruption(t *testing.T) {
+	for _, mode := range []string{"cancel", "lost apply"} {
+		t.Run(mode, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			o := Options{
+				From:      "hotels",
+				To:        "review",
+				Direction: "handler",
+				Slowdown:  8 * time.Second,
+				Duration:  time.Second,
+			}
+			r := &fakeRuntime{values: map[string]string{"demo.handler_delay_supported": "1"}}
+			if mode == "cancel" {
+				r.cancel = cancel
+			} else {
+				r.fail = true
+			}
+			if err := RunRuntime(ctx, r, o, io.Discard); err == nil {
+				t.Fatal("expected interrupted run")
+			}
+			if r.calls != 2 || r.values["demo.hotels.review.handler.delay_percent"] != "0" {
+				t.Fatalf("handler rule not cleared: %v", r.values)
+			}
+		})
 	}
 }

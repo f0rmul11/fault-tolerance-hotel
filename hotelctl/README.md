@@ -309,3 +309,33 @@ pushback отсутствует. Допустимый диапазон: -1…214
 
 
 `deploy` ждёт готовности новой ревизии и исчезновения завершающихся Pod выбранного Deployment. Это позволяет начинать следующий нагрузочный прогон после возврата команды, не смешивая старую и новую конфигурации.
+
+## Выборочные сбои для урока 4
+
+```bash
+./bin/hotelctl fault api-gateway booking --slowdown 800ms --percent 3 --duration 4m
+./bin/hotelctl fault hotels review --slowdown 8s --direction handler --duration 3m
+./bin/hotelctl fault hotels review --unavailable --duration 4m
+```
+
+Запускать по одной команде, дождаться `ACTIVE`, затем подавать запросы из второго терминала.
+`--percent` задаёт вероятность сбоя каждой физической попытки: целое 0–100, default 100.
+Применяется к request/response delay и Unavailable; 0 отключает инъекцию. Hedging-дубль
+выбирается независимо от primary. Это задержка на связи, не замедление выбранного pod.
+Ctrl+C и истечение duration снимают правило. С `--clear` процент не передаётся.
+
+Envoy балансирует RPC к Booking по адресам headless Service `booking-headless`; для опыта
+поднять три Booking pod. Поля access log `hedge_attempt` и `upstream_host` показывают роль
+попытки и фактического адресата. Обычный round-robin не гарантирует другой pod для каждого дубля.
+
+Hedging включается в Gateway YAML только для ListBookings, CB — в Hotels YAML для GetHotelRatings,
+fallback — через `review_fallback.enabled`. Конструкторы исходных пакетов сохранены:
+`hedge.NewHedger(cfg).UnaryClientInterceptor()` и `circuit.NewCircuitBreaker(cfg).UnaryClientInterceptor()`.
+Они создаются при инициализации соединений. После YAML-изменения выполнить build/deploy;
+активный fault перед этим остановить. Исходная конфигурация оставляет защиты выключенными.
+
+`--direction handler` доступен для `hotels review`: Envoy передаёт параметр задержки,
+а Review ждёт внутри server span GetHotelRatings до таймера или отмены контекста.
+В Jaeger видны `demo.handler_delay_ms`, `demo.delay.started` и `demo.delay.canceled`.
+Перед первым запуском: `hotelctl build review` и `hotelctl deploy review` (обновляет и Envoy).
+Ctrl+C/окончание duration снимают правило для новых запросов; `--clear` очищает все режимы связи.

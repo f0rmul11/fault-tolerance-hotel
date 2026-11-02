@@ -17,16 +17,17 @@ func (i *Implementation) GetHotel(ctx context.Context, req *pb.GetHotelRequest) 
 	}
 	r := response.GetHotel()
 	return &pb.GetHotelResponse{Hotel: &pb.Hotel{
-		Id:          r.GetId(),
-		Name:        r.GetName(),
-		Description: r.GetDescription(),
-		Stars:       r.GetStars(),
-		Country:     r.GetCountry(),
-		City:        r.GetCity(),
-		Address:     r.GetAddress(),
-		Latitude:    r.GetLatitude(),
-		Longitude:   r.GetLongitude(),
-		ReviewCount: r.GetReviewCount(),
-		Rating:      r.Rating,
+		Id:              r.GetId(),
+		Name:            r.GetName(),
+		Description:     r.GetDescription(),
+		Stars:           r.GetStars(),
+		Country:         r.GetCountry(),
+		City:            r.GetCity(),
+		Address:         r.GetAddress(),
+		Latitude:        r.GetLatitude(),
+		Longitude:       r.GetLongitude(),
+		ReviewCount:     r.GetReviewCount(),
+		RatingsDegraded: r.GetRatingsDegraded(),
+		Rating:          r.Rating,
 	}}, nil
 }

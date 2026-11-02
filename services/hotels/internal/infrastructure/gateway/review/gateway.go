@@ -2,12 +2,17 @@ package review
 
 import (
 	"context"
+	"errors"
+	"log/slog"
 
 	"github.com/gofrs/uuid"
 	"github.com/samber/lo"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	dto "hotels/internal/dto/hotel"
+	"hotels/internal/pkg/circuit"
 	"hotels/internal/pkg/grpc/intercept"
 	pb "hotels/internal/pkg/pb/external/review/review/v1"
 	"hotels/internal/pkg/telemetry/traces"
@@ -37,6 +42,12 @@ func (c *Client) GetHotelRatings(ctx context.Context, ids []uuid.UUID) (map[uuid
 		})},
 	)
 	if err != nil {
+		if errors.Is(err, circuit.ErrCircuitIsOpen) || errors.Is(err, circuit.ErrTooManyRequests) {
+			span.AddEvent("circuit_rejected")
+			slog.DebugContext(ctx, "circuit_rejected", "method", pb.ReviewService_GetHotelRatings_FullMethodName, "reason", err)
+			err = status.Error(codes.Unavailable, "Рейтинги временно недоступны")
+		}
+		traces.RecordError(span, err)
 		return nil, intercept.FromRPC(err, nil)
 	}
 	result := make(map[uuid.UUID]dto.Rating, len(response.GetRatings()))

@@ -7,6 +7,7 @@ layered_runtime:
     - name: capabilities
       static_layer:
         demo.pushback_supported: "1"
+        demo.handler_delay_supported: "1"
     - name: admin
       admin_layer: {}
 static_resources:
@@ -46,7 +47,12 @@ static_resources:
                               "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
                               disabled: true
                         - match: {prefix: "/"}
-                          route: {cluster: {{.To}}, timeout: 0s}
+                          route:
+                            cluster: {{.To}}
+                            timeout: 0s
+                            # Honor the caller's remaining gRPC budget in the proxy too.
+                            max_stream_duration:
+                              grpc_timeout_header_max: 0s
                 access_log:
                   - name: envoy.access_loggers.stdout
                     typed_config:
@@ -57,6 +63,8 @@ static_resources:
                           to: "{{.To}}"
                           method: "%REQ(:PATH)%"
                           request_id: "%REQ(X-REQUEST-ID)%"
+                          hedge_attempt: "%REQ(X-HEDGE-ATTEMPT)%"
+                          upstream_host: "%UPSTREAM_HOST%"
                           traceparent: "%REQ(TRACEPARENT)%"
                           duration_ms: "%DURATION%"
                           grpc_status: "%GRPC_STATUS%"
@@ -67,6 +75,31 @@ static_resources:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
                       default_source_code:
                         inline_string: |
+{{if eq .To "review"}}
+                          function envoy_on_request(handle)
+                            -- Only hotelctl runtime may supply this demo parameter.
+                            handle:headers():remove("x-hotelflow-handler-delay-ms")
+                            if handle:headers():get(":path") ~= "/review.review.v1.ReviewService/GetHotelRatings" then
+                              return
+                            end
+                            local response, body = handle:httpCall("fault-runtime", {
+                              [":method"] = "GET", [":path"] = "/runtime", [":authority"] = "localhost"
+                            }, "", 1000)
+                            if response == nil or response[":status"] ~= "200" or body == nil then
+                              return
+                            end
+                            local prefix = "demo.{{.From}}.{{.To}}.handler."
+                            local function value(name)
+                              local key = string.gsub(prefix .. name, "(%W)", "%%%1")
+                              return tonumber(string.match(body, '"' .. key .. '"%s*:%s*{.-"final_value"%s*:%s*"([^"}]+)"'))
+                            end
+                            local percent = value("delay_percent") or 0
+                            local delay = value("delay_ms") or 0
+                            if delay >= 1 and delay <= 60000 and math.random(100) <= percent then
+                              handle:headers():replace("x-hotelflow-handler-delay-ms", tostring(delay))
+                            end
+                          end
+{{end}}
                           function envoy_on_response(handle)
                             local injected = handle:headers():get("x-hotelflow-injected-abort")
                             handle:headers():remove("x-hotelflow-injected-abort")
@@ -168,6 +201,9 @@ static_resources:
 {{range .Upstreams}}
     - name: {{.Name}}
       type: STRICT_DNS
+      lb_policy: ROUND_ROBIN
+      dns_lookup_family: V4_ONLY
+      dns_refresh_rate: 1s
       connect_timeout: 2s
       typed_extension_protocol_options:
         envoy.extensions.upstreams.http.v3.HttpProtocolOptions:

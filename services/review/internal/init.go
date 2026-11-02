@@ -67,7 +67,7 @@ func (a *App) initMainServer(ctx context.Context) error {
 			grpc.StatsHandler(traces.ServerHandler()),
 			grpc.StatsHandler(metrics.ServerHandler()),
 			grpc.InTapHandle(metrics.TapHandler),
-			grpc.ChainUnaryInterceptor(intercept.ErrorInterceptor()),
+			grpc.ChainUnaryInterceptor(intercept.ErrorInterceptor(), intercept.DemoDelayInterceptor()),
 			grpc.KeepaliveParams(keepalive.ServerParameters{
 				MaxConnectionIdle: config.Instance().GrpcServer.MaxConnectionIdle,
 				MaxConnectionAge:  config.Instance().GrpcServer.MaxConnectionAge,

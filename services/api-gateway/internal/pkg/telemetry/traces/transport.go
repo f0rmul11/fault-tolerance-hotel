@@ -12,6 +12,7 @@ import (
 	metricnoop "go.opentelemetry.io/otel/metric/noop"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/stats"
 )
 
@@ -82,11 +83,25 @@ func ServerHandler() stats.Handler {
 }
 
 func ClientHandler() stats.Handler {
-	return otelgrpc.NewClientHandler(
+	return &attemptHandler{Handler: otelgrpc.NewClientHandler(
 		otelgrpc.WithPropagators(propagation.TraceContext{}),
 		otelgrpc.WithMeterProvider(metricnoop.NewMeterProvider()),
 		otelgrpc.WithFilter(traceRPC),
-	)
+	)}
+}
+
+type attemptHandler struct {
+	stats.Handler
+}
+
+func (h *attemptHandler) TagRPC(ctx context.Context, info *stats.RPCTagInfo) context.Context {
+	ctx = h.Handler.TagRPC(ctx, info)
+	if md, ok := metadata.FromOutgoingContext(ctx); ok {
+		if role := md.Get("x-hedge-attempt"); len(role) != 0 {
+			trace.SpanFromContext(ctx).SetAttributes(attribute.String("hedge.attempt", role[0]))
+		}
+	}
+	return ctx
 }
 
 func traceRPC(info *stats.RPCTagInfo) bool {

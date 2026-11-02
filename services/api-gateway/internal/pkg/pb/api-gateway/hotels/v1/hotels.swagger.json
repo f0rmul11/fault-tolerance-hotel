@@ -226,6 +226,10 @@
           "type": "string",
           "format": "int64",
           "description": "Количество пользовательских оценок отеля."
+        },
+        "ratingsDegraded": {
+          "type": "boolean",
+          "description": "Рейтинги временно недоступны: rating отсутствует, review_count неизвестен.\nПри false отсутствие rating означает, что оценок ещё нет."
         }
       },
       "description": "Основные сведения об отеле без вложенного списка номеров."

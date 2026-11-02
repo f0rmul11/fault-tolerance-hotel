@@ -6,7 +6,7 @@ metadata:
     app.kubernetes.io/name: booking
     app.kubernetes.io/part-of: hotelflow
 spec:
-  replicas: 1
+  replicas: 3
   revisionHistoryLimit: 3
   strategy:
     type: RollingUpdate

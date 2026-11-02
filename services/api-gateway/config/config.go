@@ -6,6 +6,7 @@ import (
 	"os"
 	"sync"
 
+	"api-gateway/internal/pkg/hedge"
 	"api-gateway/internal/pkg/retry"
 	"api-gateway/internal/pkg/telemetry"
 
@@ -29,6 +30,7 @@ func Instance() *Config {
 }
 
 type Config struct {
+	Hedge      hedge.Config      `yaml:"hedge"`
 	Retry      retry.Config      `yaml:"retry"`
 	Telemetry  telemetry.Config  `yaml:"telemetry"`
 	Targets    map[string]string `yaml:"service" env:"SERVICE_TARGETS"`

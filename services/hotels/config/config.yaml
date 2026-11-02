@@ -41,3 +41,21 @@ telemetry:
   service_namespace: hotelflow
   otlp_endpoint: otel-collector:4317
   otlp_insecure: true
+
+circuit:
+  __default__:
+    enabled: false
+    separate_circuit_per_handler_enabled: true
+  handlers:
+    - method: /review.review.v1.ReviewService/GetHotelRatings
+      enabled: false
+      max_requests: 1
+      timeout: 5s
+      interval: 20s
+      bucket_period: 5s
+      threshold_consecutive: 3
+      threshold_percentage: 100
+      failure_codes: [Unavailable, DeadlineExceeded]
+
+review_fallback:
+  enabled: false

@@ -45,3 +45,16 @@ retry:
   handlers:
     - method: /booking.booking.v1.BookingService/CreateBooking
       enabled: false # Для показа retry переключить на true.
+
+hedge:
+  __default__:
+    enabled: false
+    separate_hr_per_handler_enabled: true
+  handlers:
+    - method: /booking.booking.v1.BookingService/ListBookings
+      enabled: false
+      window_size: 1000
+      percentile: 0.99
+      percentile_offset: 0.04
+      budget: 0.1
+      reset_period: 30s

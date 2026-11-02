@@ -20,18 +20,19 @@ func (s *Service) GetHotel(ctx context.Context, req *pb.GetHotelRequest) (*pb.Ge
 	}
 	rating := h.Rating()
 	view := &pb.Hotel{
-		Id:          h.ID().String(),
-		Name:        h.Name(),
-		Description: h.Description(),
-		Stars:       int32(h.Stars()),
-		Country:     h.Country(),
-		City:        h.City(),
-		Address:     h.Address(),
-		Latitude:    h.Latitude(),
-		Longitude:   h.Longitude(),
-		ReviewCount: rating.ReviewCount,
+		Id:              h.ID().String(),
+		Name:            h.Name(),
+		Description:     h.Description(),
+		Stars:           int32(h.Stars()),
+		Country:         h.Country(),
+		City:            h.City(),
+		Address:         h.Address(),
+		Latitude:        h.Latitude(),
+		Longitude:       h.Longitude(),
+		ReviewCount:     rating.ReviewCount,
+		RatingsDegraded: rating.Degraded,
 	}
-	if rating.ReviewCount > 0 {
+	if !rating.Degraded && rating.ReviewCount > 0 {
 		view.Rating = lo.ToPtr(rating.Value)
 	}
 	return &pb.GetHotelResponse{Hotel: view}, nil

@@ -28,6 +28,7 @@ import (
 	"api-gateway/internal/pkg/closer"
 	"api-gateway/internal/pkg/grpc/intercept"
 	"api-gateway/internal/pkg/healthcheck"
+	"api-gateway/internal/pkg/hedge"
 	"api-gateway/internal/pkg/httptransport"
 	bookingV1 "api-gateway/internal/pkg/pb/api-gateway/booking/v1"
 	checkinV1 "api-gateway/internal/pkg/pb/api-gateway/checkin/v1"
@@ -196,6 +197,7 @@ func (a *App) initGrpcConn(_ context.Context) error {
 			grpc.WithChainUnaryInterceptor(
 				intercept.ProxyMetadata(),
 				retry.NewRetry(config.Instance().Retry).UnaryClientInterceptor(),
+				hedge.NewHedger(config.Instance().Hedge).UnaryClientInterceptor(),
 			),
 		)
 		if err != nil {

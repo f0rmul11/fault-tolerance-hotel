@@ -22,17 +22,18 @@ func (i *Implementation) ListHotels(ctx context.Context, req *pb.ListHotelsReque
 	}
 	return &pb.ListHotelsResponse{Hotels: lo.Map(response.GetHotels(), func(r *external.Hotel, _ int) *pb.Hotel {
 		return &pb.Hotel{
-			Id:          r.GetId(),
-			Name:        r.GetName(),
-			Description: r.GetDescription(),
-			Stars:       r.GetStars(),
-			Country:     r.GetCountry(),
-			City:        r.GetCity(),
-			Address:     r.GetAddress(),
-			Latitude:    r.GetLatitude(),
-			Longitude:   r.GetLongitude(),
-			ReviewCount: r.GetReviewCount(),
-			Rating:      r.Rating,
+			Id:              r.GetId(),
+			Name:            r.GetName(),
+			Description:     r.GetDescription(),
+			Stars:           r.GetStars(),
+			Country:         r.GetCountry(),
+			City:            r.GetCity(),
+			Address:         r.GetAddress(),
+			Latitude:        r.GetLatitude(),
+			Longitude:       r.GetLongitude(),
+			ReviewCount:     r.GetReviewCount(),
+			RatingsDegraded: r.GetRatingsDegraded(),
+			Rating:          r.Rating,
 		}
 	})}, nil
 }

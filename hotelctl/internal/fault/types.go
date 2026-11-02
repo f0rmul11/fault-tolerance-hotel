@@ -50,15 +50,20 @@ type Options struct {
 	Duration    time.Duration
 	Unavailable bool
 	PushbackMS  *int32
-	Clear       bool
+	// Percent is nil for the default 100%; explicit zero disables injection.
+	Percent *int
+	Clear   bool
 }
 
 func (o Options) Validate() error {
+	if o.Percent != nil && (*o.Percent < 0 || *o.Percent > 100) {
+		return fmt.Errorf("--percent должен быть от 0 до 100")
+	}
 	if _, err := FindEdge(o.From, o.To); err != nil {
 		return err
 	}
 	if o.Clear {
-		if o.Slowdown != 0 || o.Duration != 0 || o.Unavailable || o.Direction != "request" || o.PushbackMS != nil {
+		if o.Slowdown != 0 || o.Duration != 0 || o.Unavailable || o.Direction != "request" || o.PushbackMS != nil || o.Percent != nil {
 			return fmt.Errorf("--clear не совмещается с настройками сбоя")
 		}
 		return nil
@@ -71,8 +76,11 @@ func (o Options) Validate() error {
 			return fmt.Errorf("--pushback-ms должен быть -1 или неотрицательным int32")
 		}
 	}
-	if o.Direction != "request" && o.Direction != "response" {
-		return fmt.Errorf("--direction должен быть request или response")
+	if o.Direction != "request" && o.Direction != "response" && o.Direction != "handler" {
+		return fmt.Errorf("--direction должен быть request, response или handler")
+	}
+	if o.Direction == "handler" && (o.From != "hotels" || o.To != "review") {
+		return fmt.Errorf("--direction handler поддерживается только для hotels → review")
 	}
 	if o.Unavailable {
 		if o.Slowdown != 0 {
@@ -88,4 +96,12 @@ func (o Options) Validate() error {
 		return fmt.Errorf("--duration должен быть от 1ms до %s, с точностью до миллисекунды", MaxDuration)
 	}
 	return nil
+}
+
+// Percentage preserves the existing whole-link fault when the flag is omitted.
+func (o Options) Percentage() int {
+	if o.Percent != nil {
+		return *o.Percent
+	}
+	return 100
 }

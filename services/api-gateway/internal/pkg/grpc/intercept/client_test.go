@@ -91,3 +91,17 @@ func TestProxyDoesNotMutateSharedCallOptions(t *testing.T) {
 		}
 	}
 }
+
+// Envoy may report an upstream reset while the caller's budget is expiring.
+func TestProxyPreservesExpiredBudgetOnTransportReset(t *testing.T) {
+	ctx, cancel := context.WithDeadline(t.Context(), time.Now().Add(-time.Second))
+	defer cancel()
+	err := ProxyMetadata()(ctx, "/hotels/ListHotels", nil, nil, nil,
+		func(context.Context, string, any, any, *grpc.ClientConn, ...grpc.CallOption) error {
+			return status.Error(codes.Unavailable, "upstream reset")
+		},
+	)
+	if status.Code(err) != codes.DeadlineExceeded {
+		t.Fatalf("expired budget became %v", err)
+	}
+}

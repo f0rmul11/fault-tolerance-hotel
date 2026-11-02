@@ -45,9 +45,12 @@ type Hotel struct {
 	// Средняя оценка от 0 до 5; поле отсутствует, если оценок ещё нет.
 	Rating *float64 `protobuf:"fixed64,10,opt,name=rating,proto3,oneof" json:"rating,omitempty"`
 	// Количество пользовательских оценок отеля.
-	ReviewCount   int64 `protobuf:"varint,11,opt,name=review_count,json=reviewCount,proto3" json:"review_count,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	ReviewCount int64 `protobuf:"varint,11,opt,name=review_count,json=reviewCount,proto3" json:"review_count,omitempty"`
+	// Рейтинги временно недоступны: rating отсутствует, review_count неизвестен.
+	// При false отсутствие rating означает, что оценок ещё нет.
+	RatingsDegraded bool `protobuf:"varint,12,opt,name=ratings_degraded,json=ratingsDegraded,proto3" json:"ratings_degraded,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *Hotel) Reset() {
@@ -155,6 +158,13 @@ func (x *Hotel) GetReviewCount() int64 {
 		return x.ReviewCount
 	}
 	return 0
+}
+
+func (x *Hotel) GetRatingsDegraded() bool {
+	if x != nil {
+		return x.RatingsDegraded
+	}
+	return false
 }
 
 // Номер в отеле, его оснащение и ограничения длительности бронирования.
@@ -692,7 +702,7 @@ var File_hotels_hotels_v1_hotels_proto protoreflect.FileDescriptor
 
 const file_hotels_hotels_v1_hotels_proto_rawDesc = "" +
 	"\n" +
-	"\x1dhotels/hotels/v1/hotels.proto\x12\x10hotels.hotels.v1\"\xb0\x02\n" +
+	"\x1dhotels/hotels/v1/hotels.proto\x12\x10hotels.hotels.v1\"\xdb\x02\n" +
 	"\x05Hotel\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
@@ -705,7 +715,8 @@ const file_hotels_hotels_v1_hotels_proto_rawDesc = "" +
 	"\tlongitude\x18\t \x01(\x01R\tlongitude\x12\x1b\n" +
 	"\x06rating\x18\n" +
 	" \x01(\x01H\x00R\x06rating\x88\x01\x01\x12!\n" +
-	"\freview_count\x18\v \x01(\x03R\vreviewCountB\t\n" +
+	"\freview_count\x18\v \x01(\x03R\vreviewCount\x12)\n" +
+	"\x10ratings_degraded\x18\f \x01(\bR\x0fratingsDegradedB\t\n" +
 	"\a_rating\"\xc2\x03\n" +
 	"\x04Room\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x19\n" +

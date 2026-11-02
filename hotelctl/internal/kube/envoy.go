@@ -51,9 +51,14 @@ func RenderEnvoy(c config.Config) ([]*unstructured.Unstructured, error) {
 				namespace = service.Namespace
 			}
 		}
+		dnsName := edge.To
+		if edge.To == "booking" {
+			// Resolve individual pods so HTTP/2 pooling cannot pin all hedges to one ClusterIP.
+			dnsName = "booking-headless"
+		}
 		upstreams = append(upstreams, upstream{
 			Name:    edge.To,
-			Address: edge.To + "." + namespace + ".svc.cluster.local",
+			Address: dnsName + "." + namespace + ".svc.cluster.local",
 		})
 	}
 	var rendered bytes.Buffer

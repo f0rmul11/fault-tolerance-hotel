@@ -24,6 +24,12 @@ func ProxyMetadata() grpc.UnaryClientInterceptor {
 			return err
 		}
 
+		// A proxy reset may race the local deadline and arrive as Unavailable.
+		// Once our context has ended, preserve its cancellation reason.
+		if status.Code(err) == codes.Unavailable && ctx.Err() != nil {
+			err = status.FromContextError(ctx.Err()).Err()
+		}
+
 		// Сбой транспорта происходит до ErrorInterceptor владельца.
 		switch status.Code(err) {
 		case codes.Unavailable:

@@ -97,14 +97,16 @@ func (o Options) Values() map[string]string {
 		prefix + "request.pushback_ms":    "disabled",
 		prefix + "response.delay_percent": "0",
 		prefix + "response.delay_ms":      "1",
+		prefix + "handler.delay_percent":  "0",
+		prefix + "handler.delay_ms":       "1",
 	}
 	if o.Unavailable {
-		values[prefix+"request.abort_percent"] = "100"
+		values[prefix+"request.abort_percent"] = strconv.Itoa(o.Percentage())
 		if o.PushbackMS != nil {
 			values[prefix+"request.pushback_ms"] = strconv.FormatInt(int64(*o.PushbackMS), 10)
 		}
 	} else if !o.Clear {
-		values[prefix+o.Direction+".delay_percent"] = "100"
+		values[prefix+o.Direction+".delay_percent"] = strconv.Itoa(o.Percentage())
 		values[prefix+o.Direction+".delay_ms"] = strconv.FormatInt(o.Slowdown.Milliseconds(), 10)
 	}
 	return values
@@ -148,6 +150,9 @@ func RunRuntime(ctx context.Context, runtime Runtime, options Options, out io.Wr
 	if options.PushbackMS != nil && current["demo.pushback_supported"] != "1" {
 		return fmt.Errorf("инфраструктура стенда ещё не поддерживает --pushback-ms; обновите её командой hotelctl deploy api-gateway")
 	}
+	if options.Direction == "handler" && current["demo.handler_delay_supported"] != "1" {
+		return fmt.Errorf("обновите Review и Envoy: hotelctl build review && hotelctl deploy review")
+	}
 	values := options.Values()
 	for key := range values {
 		if strings.HasSuffix(key, "_percent") && current[key] != "" && current[key] != "0" {
@@ -178,6 +183,7 @@ func RunRuntime(ctx context.Context, runtime Runtime, options Options, out io.Wr
 	} else {
 		fmt.Fprintf(out, "ACTIVE %s → %s: %s +%s на %s\n", options.From, options.To, options.Direction, options.Slowdown, options.Duration)
 	}
+	fmt.Fprintf(out, "Доля попыток со сбоем: %d%%\n", options.Percentage())
 	fmt.Fprintln(out, "Отправьте запрос из второго терминала. Ctrl+C досрочно снимает правило.")
 	timer := time.NewTimer(options.Duration)
 	defer timer.Stop()

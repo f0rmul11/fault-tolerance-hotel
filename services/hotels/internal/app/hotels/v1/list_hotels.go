@@ -30,18 +30,19 @@ func (s *Service) ListHotels(ctx context.Context, req *pb.ListHotelsRequest) (*p
 	views := lo.Map(result, func(h *entity.Hotel, _ int) *pb.Hotel {
 		rating := h.Rating()
 		view := &pb.Hotel{
-			Id:          h.ID().String(),
-			Name:        h.Name(),
-			Description: h.Description(),
-			Stars:       int32(h.Stars()),
-			Country:     h.Country(),
-			City:        h.City(),
-			Address:     h.Address(),
-			Latitude:    h.Latitude(),
-			Longitude:   h.Longitude(),
-			ReviewCount: rating.ReviewCount,
+			Id:              h.ID().String(),
+			Name:            h.Name(),
+			Description:     h.Description(),
+			Stars:           int32(h.Stars()),
+			Country:         h.Country(),
+			City:            h.City(),
+			Address:         h.Address(),
+			Latitude:        h.Latitude(),
+			Longitude:       h.Longitude(),
+			ReviewCount:     rating.ReviewCount,
+			RatingsDegraded: rating.Degraded,
 		}
-		if rating.ReviewCount > 0 {
+		if !rating.Degraded && rating.ReviewCount > 0 {
 			view.Rating = lo.ToPtr(rating.Value)
 		}
 		return view
