@@ -3,7 +3,6 @@ package circuit
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 
 	"github.com/sony/gobreaker/v2"
@@ -38,7 +37,8 @@ func newInternalState(config MainConfig, name string) *internalState {
 			shouldOpen := observations > 10 && (counts.ConsecutiveFailures >= config.ThresholdConsecutive ||
 				(counts.TotalFailures*100/observations) > config.ThresholdPercentage)
 
-			slog.Info(fmt.Sprintf("circuit should open: %v", shouldOpen),
+			slog.Info("circuit failure observed",
+				"method", name, "should_open", shouldOpen, "observations", observations,
 				"total", counts.Requests,
 				"total_successes", counts.TotalSuccesses,
 				"total_failures", counts.TotalFailures,
@@ -49,7 +49,7 @@ func newInternalState(config MainConfig, name string) *internalState {
 			return shouldOpen
 		},
 		OnStateChange: func(name string, from, to gobreaker.State) {
-			slog.Info(fmt.Sprintf("circuit breaker '%s' changed state: %s → %s", name, from, to))
+			slog.Info("circuit state changed", "method", name, "from", from.String(), "to", to.String())
 		},
 		IsSuccessful: func(err error) bool {
 			return !triggerOnError(err, config.failureCodeSet())

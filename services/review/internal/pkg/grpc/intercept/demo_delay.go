@@ -8,6 +8,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
@@ -16,12 +17,17 @@ import (
 
 const handlerDelayHeader = "x-hotelflow-handler-delay-ms"
 
-// DemoDelayInterceptor эмулирует медленную обработку внутри server span Review.
+// DemoDelayInterceptor эмулирует задержку или отказ внутри server span Review.
 // Параметр передаёт Envoy по команде hotelctl; Echo и probes не задерживаются.
 func DemoDelayInterceptor() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, next grpc.UnaryHandler) (any, error) {
 		if info.FullMethod != pb.ReviewService_GetHotelRatings_FullMethodName {
 			return next(ctx, req)
+		}
+		// Отказ происходит внутри Review: server span и метрики учитывают запрос.
+		if unavailable := metadata.ValueFromIncomingContext(ctx, "x-hotelflow-handler-unavailable"); len(unavailable) == 1 && unavailable[0] == "1" {
+			trace.SpanFromContext(ctx).AddEvent("demo.handler.unavailable")
+			return nil, status.Error(codes.Unavailable, "Review временно недоступен: учебный сбой")
 		}
 		values := metadata.ValueFromIncomingContext(ctx, handlerDelayHeader)
 		if len(values) != 1 {

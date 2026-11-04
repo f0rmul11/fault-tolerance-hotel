@@ -90,10 +90,278 @@
             "selected": false
           }
         ]
+      },
+      {
+        "name": "traffic_handler",
+        "label": "Traffic handler",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "hotelflow-prometheus"
+        },
+        "definition": "label_values(hotelflow_server_request_duration_seconds_count{service_namespace=\"hotelflow\",service_name=~\"${service:regex}\",protocol=~\"${protocol:regex}\"}, handler)",
+        "query": {
+          "query": "label_values(hotelflow_server_request_duration_seconds_count{service_namespace=\"hotelflow\",service_name=~\"${service:regex}\",protocol=~\"${protocol:regex}\"}, handler)",
+          "refId": "TrafficHandlerVariable"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "multi": false,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": [],
+        "allowCustomValue": false
       }
     ]
   },
   "panels": [
+    {
+      "id": 5,
+      "type": "row",
+      "title": "Traffic",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Service response time",
+      "description": "p50 / p95 / p99 завершённых входящих запросов, включая ошибки. Слева — время ответа; справа — RPS того же набора запросов. Окно rate: 1 минута. Traffic handler фильтрует только эту панель. Квантили оценены по histogram buckets; при отсутствии запросов не определены.",
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 24,
+        "h": 10
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "lineWidth": 2,
+            "fillOpacity": 45,
+            "gradientMode": "opacity",
+            "spanNulls": false,
+            "insertNulls": false,
+            "showPoints": "never",
+            "pointSize": 5,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "axisPlacement": "left",
+            "axisLabel": "",
+            "axisColorMode": "text",
+            "axisBorderShow": false,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "axisCenteredZero": false,
+            "hideFrom": {
+              "tooltip": false,
+              "viz": false,
+              "legend": false
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "links": [],
+          "min": 0,
+          "unit": "s"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "p50"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#C0D8FF"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "p95"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#8AB8FF"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "p99"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5794F2"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "RPS"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#E0B400"
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              },
+              {
+                "id": "unit",
+                "value": "reqps"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 2
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    6,
+                    5
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotelflow-prometheus"
+          },
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(hotelflow_server_request_duration_seconds_bucket{service_namespace=\"hotelflow\",service_name=~\"${service:regex}\",protocol=~\"${protocol:regex}\",handler=~\"${traffic_handler}\"}[1m])))",
+          "legendFormat": "p50",
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "interval": "3s"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotelflow-prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(hotelflow_server_request_duration_seconds_bucket{service_namespace=\"hotelflow\",service_name=~\"${service:regex}\",protocol=~\"${protocol:regex}\",handler=~\"${traffic_handler}\"}[1m])))",
+          "legendFormat": "p95",
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "interval": "3s"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotelflow-prometheus"
+          },
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(hotelflow_server_request_duration_seconds_bucket{service_namespace=\"hotelflow\",service_name=~\"${service:regex}\",protocol=~\"${protocol:regex}\",handler=~\"${traffic_handler}\"}[1m])))",
+          "legendFormat": "p99",
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "interval": "3s"
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotelflow-prometheus"
+          },
+          "expr": "sum(rate(hotelflow_server_request_duration_seconds_count{service_namespace=\"hotelflow\",service_name=~\"${service:regex}\",protocol=~\"${protocol:regex}\",handler=~\"${traffic_handler}\"}[1m]))",
+          "legendFormat": "RPS",
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "interval": "3s"
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotelflow-prometheus"
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc",
+          "hideZeros": false
+        },
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "mean",
+            "lastNotNull",
+            "max",
+            "min"
+          ],
+          "width": 450
+        }
+      }
+    },
     {
       "id": 1,
       "type": "row",
@@ -101,7 +369,7 @@
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 0,
+        "y": 11,
         "w": 24,
         "h": 1
       },
@@ -118,7 +386,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 1,
+        "y": 12,
         "w": 24,
         "h": 8
       },
@@ -262,7 +530,7 @@
           "range": true,
           "instant": false,
           "editorMode": "code",
-          "interval": "15s"
+          "interval": "3s"
         },
         {
           "refId": "B",
@@ -275,7 +543,7 @@
           "range": true,
           "instant": false,
           "editorMode": "code",
-          "interval": "15s"
+          "interval": "3s"
         },
         {
           "refId": "C",
@@ -288,7 +556,7 @@
           "range": true,
           "instant": false,
           "editorMode": "code",
-          "interval": "15s"
+          "interval": "3s"
         },
         {
           "refId": "D",
@@ -301,7 +569,7 @@
           "range": true,
           "instant": false,
           "editorMode": "code",
-          "interval": "15s"
+          "interval": "3s"
         },
         {
           "refId": "E",
@@ -314,7 +582,7 @@
           "range": true,
           "instant": false,
           "editorMode": "code",
-          "interval": "15s"
+          "interval": "3s"
         }
       ]
     },
@@ -329,7 +597,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 9,
+        "y": 20,
         "w": 24,
         "h": 8
       },
@@ -397,7 +665,7 @@
           "range": true,
           "instant": false,
           "editorMode": "code",
-          "interval": "15s"
+          "interval": "3s"
         }
       ],
       "transformations": [
@@ -421,7 +689,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 17,
+        "y": 28,
         "w": 24,
         "h": 8
       },
@@ -489,7 +757,7 @@
           "range": true,
           "instant": false,
           "editorMode": "code",
-          "interval": "15s"
+          "interval": "3s"
         }
       ],
       "transformations": [

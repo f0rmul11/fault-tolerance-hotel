@@ -17,11 +17,12 @@ type Review interface {
 
 // Service applies the same degradation policy to GetHotel and ListHotels.
 type Service struct {
-	review   Review
-	fallback bool
+	review Review
+	// Читаем текущий локальный snapshot, а не фиксируем флаг при создании сервиса.
+	fallback func(context.Context) bool
 }
 
-func New(review Review, fallback bool) *Service {
+func New(review Review, fallback func(context.Context) bool) *Service {
 	return &Service{
 		review:   review,
 		fallback: fallback,
@@ -42,7 +43,7 @@ func (s *Service) GetHotelRatings(ctx context.Context, ids []uuid.UUID) (map[uui
 	if err == nil {
 		return values, nil
 	}
-	if !s.fallback || (!app.IsCode(err, app.Unavailable) && !app.IsCode(err, app.DeadlineExceeded)) {
+	if !s.fallback(ctx) || (!app.IsCode(err, app.Unavailable) && !app.IsCode(err, app.DeadlineExceeded)) {
 		return nil, err
 	}
 

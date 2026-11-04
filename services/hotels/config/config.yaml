@@ -33,7 +33,7 @@ runtime_config:
 
 telemetry:
   metrics_enabled: true
-  metrics_interval: 15s
+  metrics_interval: 3s
   logs_enabled: true
   log_level: info
   enabled: false
@@ -56,6 +56,3 @@ circuit:
       threshold_consecutive: 3
       threshold_percentage: 100
       failure_codes: [Unavailable, DeadlineExceeded]
-
-review_fallback:
-  enabled: false

@@ -1,6 +1,8 @@
 package internal
 
 import (
+	"api-gateway/internal/pkg/hedge"
+	"api-gateway/internal/pkg/retry"
 	"context"
 	"fmt"
 	"log/slog"
@@ -28,7 +30,6 @@ import (
 	"api-gateway/internal/pkg/closer"
 	"api-gateway/internal/pkg/grpc/intercept"
 	"api-gateway/internal/pkg/healthcheck"
-	"api-gateway/internal/pkg/hedge"
 	"api-gateway/internal/pkg/httptransport"
 	bookingV1 "api-gateway/internal/pkg/pb/api-gateway/booking/v1"
 	checkinV1 "api-gateway/internal/pkg/pb/api-gateway/checkin/v1"
@@ -39,7 +40,6 @@ import (
 	externalHotelsV1 "api-gateway/internal/pkg/pb/external/hotels/hotels/v1"
 	"api-gateway/internal/pkg/requestid"
 	"api-gateway/internal/pkg/requesttimeout"
-	"api-gateway/internal/pkg/retry"
 	"api-gateway/internal/pkg/telemetry"
 	"api-gateway/internal/pkg/telemetry/metrics"
 	"api-gateway/internal/pkg/telemetry/traces"
@@ -67,6 +67,7 @@ func (a *App) initMainServer(ctx context.Context) error {
 		server.WithHTTPPort(config.Instance().HttpServer.Port),
 		server.WithHTTPMiddlewares(
 			metrics.HTTP,
+			requesttimeout.Limit(requesttimeout.MaxDuration),
 			requesttimeout.Middleware,
 			traces.HTTP,
 			func(next http.Handler) http.Handler {

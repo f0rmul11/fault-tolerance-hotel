@@ -43,13 +43,14 @@ func FindEdge(from, to string) (Edge, error) {
 }
 
 type Options struct {
-	From        string
-	To          string
-	Direction   string
-	Slowdown    time.Duration
-	Duration    time.Duration
-	Unavailable bool
-	PushbackMS  *int32
+	From         string
+	To           string
+	Direction    string
+	Slowdown     time.Duration
+	Duration     time.Duration
+	Unavailable  bool
+	PushbackMS   *int32
+	DelayProfile []DelayStep
 	// Percent is nil for the default 100%; explicit zero disables injection.
 	Percent *int
 	Clear   bool
@@ -63,14 +64,14 @@ func (o Options) Validate() error {
 		return err
 	}
 	if o.Clear {
-		if o.Slowdown != 0 || o.Duration != 0 || o.Unavailable || o.Direction != "request" || o.PushbackMS != nil || o.Percent != nil {
+		if o.Slowdown != 0 || o.Duration != 0 || o.Unavailable || o.Direction != "request" || o.PushbackMS != nil || o.Percent != nil || len(o.DelayProfile) != 0 {
 			return fmt.Errorf("--clear не совмещается с настройками сбоя")
 		}
 		return nil
 	}
 	if o.PushbackMS != nil {
-		if !o.Unavailable {
-			return fmt.Errorf("--pushback-ms требует --unavailable")
+		if !o.Unavailable || o.Direction != "request" {
+			return fmt.Errorf("--pushback-ms требует --unavailable и --direction request")
 		}
 		if *o.PushbackMS < -1 {
 			return fmt.Errorf("--pushback-ms должен быть -1 или неотрицательным int32")
@@ -82,12 +83,22 @@ func (o Options) Validate() error {
 	if o.Direction == "handler" && (o.From != "hotels" || o.To != "review") {
 		return fmt.Errorf("--direction handler поддерживается только для hotels → review")
 	}
-	if o.Unavailable {
+	if len(o.DelayProfile) != 0 {
+		if o.From != "api-gateway" || o.To != "booking" || o.Direction != "request" {
+			return fmt.Errorf("--delay-profile поддерживается для api-gateway → booking, --direction request")
+		}
+		if o.Slowdown != 0 || o.Unavailable || o.Percent != nil || o.PushbackMS != nil {
+			return fmt.Errorf("--delay-profile нельзя совмещать с --slowdown, --percent, --unavailable или --pushback-ms")
+		}
+		if err := validateProfile(o.DelayProfile); err != nil {
+			return err
+		}
+	} else if o.Unavailable {
 		if o.Slowdown != 0 {
 			return fmt.Errorf("--unavailable нельзя совмещать с --slowdown")
 		}
-		if o.Direction != "request" {
-			return fmt.Errorf("--unavailable поддерживает только --direction request")
+		if o.Direction == "response" {
+			return fmt.Errorf("--unavailable поддерживает --direction request или handler")
 		}
 	} else if o.Slowdown < time.Millisecond || o.Slowdown > MaxSlowdown || o.Slowdown%time.Millisecond != 0 {
 		return fmt.Errorf("укажите --unavailable или --slowdown от 1ms до %s, с точностью до миллисекунды", MaxSlowdown)

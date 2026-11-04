@@ -5,3 +5,9 @@ realtimeConfig:
     value: "false"
     type: bool
     writable: true
+  review_fallback_enabled:
+    usage: Возвращать отели без рейтингов при недоступности Review
+    group: degradation
+    value: "false"
+    type: bool
+    writable: true

@@ -283,7 +283,9 @@ func (a *App) initGateway(context.Context) error {
 }
 
 func (a *App) initServices(context.Context) error {
-	a.services = service.NewRegistry(a.gateway, config.Instance().ReviewFallback.Enabled)
+	a.services = service.NewRegistry(a.gateway, func(ctx context.Context) bool {
+		return runtimeconfig.GetValue(ctx, runtimeconfig.ReviewFallbackEnabled).Bool()
+	})
 	return nil
 }
 

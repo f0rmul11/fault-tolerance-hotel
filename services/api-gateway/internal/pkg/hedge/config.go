@@ -36,7 +36,9 @@ type MainConfig struct {
 	Enabled bool `yaml:"enabled"`
 	// Размер окна подсчета времен ответов
 	WindowSize int `yaml:"window_size"`
-	// Целевой перцентиль, который собираемся оптимизировать
+	// До запуска дублей накопить полное окно обычных ответов.
+	Warmup bool `yaml:"warmup"`
+	// Перцентиль окна для расчёта задержки запуска дубля
 	Percentile float64 `yaml:"percentile"`
 	// Офсет взятия latency для оптимизации нужного перцентиля
 	PercentileOffset float64 `yaml:"percentile_offset"`

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"hotels/internal/application/service/hotel/enrich"
 	"hotels/internal/application/service/hotel/ratings"
 	"hotels/internal/infrastructure/gateway"
@@ -11,7 +12,7 @@ type Registry struct {
 	HotelEnrich  *enrich.Service
 }
 
-func NewRegistry(gateways *gateway.Registry, fallback bool) *Registry {
+func NewRegistry(gateways *gateway.Registry, fallback func(context.Context) bool) *Registry {
 	ratingsService := ratings.New(gateways.Review, fallback)
 	return &Registry{
 		HotelRatings: ratingsService,

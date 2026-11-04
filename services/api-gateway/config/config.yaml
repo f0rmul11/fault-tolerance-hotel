@@ -20,9 +20,9 @@ service:
 
 telemetry:
   metrics_enabled: true
-  metrics_interval: 15s
+  metrics_interval: 3s
   logs_enabled: true
-  log_level: info
+  log_level: debug
   enabled: false
   service_name: api-gateway
   service_namespace: hotelflow
@@ -39,12 +39,12 @@ retry:
     backoff_multiplier: 2
     retryable_codes: [Unavailable]
     throttler:
-      throttling_enabled: true
+      throttling_enabled: false
       throttle_max_tokens: 10
-      throttle_token_ratio: 0.1
+      throttle_token_ratio: 1
   handlers:
     - method: /booking.booking.v1.BookingService/CreateBooking
-      enabled: false # Для показа retry переключить на true.
+      enabled: false
 
 hedge:
   __default__:
@@ -54,7 +54,8 @@ hedge:
     - method: /booking.booking.v1.BookingService/ListBookings
       enabled: false
       window_size: 1000
+      warmup: true
       percentile: 0.99
-      percentile_offset: 0.04
-      budget: 0.1
+      percentile_offset: 0.06
+      budget: 0.2
       reset_period: 30s

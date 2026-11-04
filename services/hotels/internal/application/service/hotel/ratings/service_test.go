@@ -36,7 +36,9 @@ func TestFallbackPolicy(t *testing.T) {
 			failure := app.New(app.WithCode(int(test.code)), app.WithMessage("Ошибка зависимости"))
 			service := New(reviewFunc(func(context.Context, []uuid.UUID) (map[uuid.UUID]dto.Rating, error) {
 				return nil, failure
-			}), test.enabled)
+			}), func(context.Context) bool {
+				return test.enabled
+			})
 			values, err := service.GetHotelRatings(t.Context(), []uuid.UUID{id})
 			if test.degraded {
 				if err != nil || !values[id].Degraded || values[id].ReviewCount != 0 {
@@ -55,7 +57,9 @@ func TestParentCancellationAndRecovery(t *testing.T) {
 	service := New(reviewFunc(func(context.Context, []uuid.UUID) (map[uuid.UUID]dto.Rating, error) {
 		cancel()
 		return nil, app.New(app.WithCode(int(app.Unavailable)))
-	}), true)
+	}), func(context.Context) bool {
+		return true
+	})
 	if _, err := service.GetHotelRatings(ctx, []uuid.UUID{id}); !errors.Is(err, context.Canceled) {
 		t.Fatalf("parent cancellation masked: %v", err)
 	}
@@ -65,5 +69,28 @@ func TestParentCancellationAndRecovery(t *testing.T) {
 	values, err := service.GetHotelRatings(t.Context(), []uuid.UUID{id})
 	if err != nil || values[id].Degraded || values[id].Value != 4.5 || values[id].ReviewCount != 20 {
 		t.Fatalf("healthy values were not restored: %v %v", values, err)
+	}
+}
+
+func TestFallbackChangesWithoutRecreatingService(t *testing.T) {
+	enabled := false
+	failure := app.New(app.WithCode(int(app.Unavailable)))
+	service := New(reviewFunc(func(context.Context, []uuid.UUID) (map[uuid.UUID]dto.Rating, error) {
+		return nil, failure
+	}), func(context.Context) bool {
+		return enabled
+	})
+	id := uuid.Must(uuid.NewV4())
+	if _, err := service.GetHotelRatings(t.Context(), []uuid.UUID{id}); err != failure {
+		t.Fatal(err)
+	}
+	enabled = true
+	values, err := service.GetHotelRatings(t.Context(), []uuid.UUID{id})
+	if err != nil || !values[id].Degraded {
+		t.Fatalf("values=%v err=%v", values, err)
+	}
+	enabled = false
+	if _, err := service.GetHotelRatings(t.Context(), []uuid.UUID{id}); err != failure {
+		t.Fatal(err)
 	}
 }

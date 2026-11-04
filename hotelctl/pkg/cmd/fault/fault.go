@@ -13,9 +13,10 @@ import (
 
 type Options struct {
 	util.Options
-	Fault      faultctl.Options
-	pushbackMS int32
-	percent    int
+	Fault        faultctl.Options
+	pushbackMS   int32
+	percent      int
+	delayProfile string
 }
 
 func NewCmdFault(f util.Factory, streams iostreams.IOStreams) *cobra.Command {
@@ -26,11 +27,12 @@ func NewCmdFault(f util.Factory, streams iostreams.IOStreams) *cobra.Command {
 		Use:   "fault FROM TO --slowdown 8s --duration 10s",
 		Short: "Временно замедлить RPC или сделать связь недоступной через Envoy",
 		Long: "Сбой на одной RPC-связи. --direction response задерживает готовый ответ.\n" +
-			"--direction handler задерживает обработку GetHotelRatings внутри Review.\n" +
+			"--direction handler эмулирует задержку или UNAVAILABLE внутри Review.GetHotelRatings.\n" +
 			"--duration задаёт окно инъекции; уже задержанные вызовы могут закончиться позже.\n" +
 			"Команда ждёт окончания окна и снимает правило; Ctrl+C снимает его досрочно.\n" +
 			"После SIGKILL/сбоя CLI используйте --clear.",
 		Example: "  hotelctl fault api-gateway booking --slowdown 8s --duration 10s\n" +
+			"  hotelctl fault api-gateway booking --delay-profile '8:150ms,2:800ms' --duration 5m\n" +
 			"  hotelctl fault api-gateway booking --direction response --slowdown 8s --duration 10s\n" +
 			"  hotelctl fault hotels review --unavailable --duration 10s\n" +
 			"  hotelctl fault api-gateway booking --unavailable --pushback-ms 1500 --duration 1m\n" +
@@ -38,6 +40,13 @@ func NewCmdFault(f util.Factory, streams iostreams.IOStreams) *cobra.Command {
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			o.Fault.From, o.Fault.To = args[0], args[1]
+			if cmd.Flags().Changed("delay-profile") {
+				profile, err := faultctl.ParseDelayProfile(o.delayProfile)
+				if err != nil {
+					return err
+				}
+				o.Fault.DelayProfile = profile
+			}
 			if cmd.Flags().Changed("percent") {
 				o.Fault.Percent = &o.percent
 			}
@@ -54,17 +63,21 @@ func NewCmdFault(f util.Factory, streams iostreams.IOStreams) *cobra.Command {
 		},
 	}
 	o.AddFlags(command.Flags())
+	command.Flags().StringVar(&o.delayProfile, "delay-profile", "", "Группы задержек api-gateway → booking: 8:150ms,2:800ms; остаток без задержки")
 	command.Flags().IntVar(&o.percent, "percent", 100, "Доля физических попыток со сбоем, от 0 до 100 процентов")
 	command.Flags().Int32Var(&o.pushbackMS, "pushback-ms", 0, "С --unavailable: gRPC pushback в мс; -1 запрещает retry, 0 разрешает без паузы")
 	command.Flags().DurationVar(&o.Fault.Slowdown, "slowdown", 0, "Дополнительная задержка от 1ms до 1m")
 	command.Flags().DurationVar(&o.Fault.Duration, "duration", 0, "Окно действия сбоя от 1ms до 1h")
 	command.Flags().StringVar(&o.Fault.Direction, "direction", "request", "Что задержать: request, response или handler (внутри Review)")
-	command.Flags().BoolVar(&o.Fault.Unavailable, "unavailable", false, "Вернуть gRPC UNAVAILABLE без вызова downstream")
+	command.Flags().BoolVar(&o.Fault.Unavailable, "unavailable", false, "Вернуть gRPC UNAVAILABLE; с --direction handler — внутри Review")
 	command.Flags().BoolVar(&o.Fault.Clear, "clear", false, "Снять инъекции на выбранной связи после прерванного запуска")
 	command.MarkFlagsMutuallyExclusive("slowdown", "unavailable")
 	command.MarkFlagsMutuallyExclusive("clear", "slowdown", "unavailable")
 	command.MarkFlagsMutuallyExclusive("clear", "pushback-ms")
 	command.MarkFlagsMutuallyExclusive("clear", "percent")
+	for _, flag := range []string{"slowdown", "percent", "unavailable", "pushback-ms", "clear"} {
+		command.MarkFlagsMutuallyExclusive("delay-profile", flag)
+	}
 	return command
 }
 

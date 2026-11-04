@@ -137,7 +137,7 @@ func (s *StrategySingleD) computeOptimalDelay(offset float64) (d time.Duration, 
 	s.muCache.RUnlock()
 
 	respTimes := s.latencyRingBuf.Copy()
-	if len(respTimes) == 0 {
+	if len(respTimes) == 0 || s.cfg.Warmup && len(respTimes) < s.cfg.WindowSize {
 		return 0, 0
 	}
 

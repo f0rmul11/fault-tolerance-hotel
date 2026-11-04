@@ -249,7 +249,7 @@ telemetry:
   service_name: booking
   logs_enabled: true
   metrics_enabled: true
-  metrics_interval: 15s
+  metrics_interval: 3s
   otlp_endpoint: otel-collector:4317
   otlp_insecure: true
 ```

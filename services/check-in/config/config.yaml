@@ -52,7 +52,7 @@ timezone: Europe/Moscow
 
 telemetry:
   metrics_enabled: true
-  metrics_interval: 15s
+  metrics_interval: 3s
   logs_enabled: true
   log_level: info
   enabled: false

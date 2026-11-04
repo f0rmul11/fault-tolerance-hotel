@@ -8,6 +8,8 @@ layered_runtime:
       static_layer:
         demo.pushback_supported: "1"
         demo.handler_delay_supported: "1"
+        demo.handler_abort_supported: "1"
+        demo.delay_profile_supported: "1"
     - name: admin
       admin_layer: {}
 static_resources:
@@ -64,6 +66,7 @@ static_resources:
                           method: "%REQ(:PATH)%"
                           request_id: "%REQ(X-REQUEST-ID)%"
                           hedge_attempt: "%REQ(X-HEDGE-ATTEMPT)%"
+                          injected_delay_ms: "%REQ(X-ENVOY-FAULT-DELAY-REQUEST)%"
                           upstream_host: "%UPSTREAM_HOST%"
                           traceparent: "%REQ(TRACEPARENT)%"
                           duration_ms: "%DURATION%"
@@ -75,10 +78,39 @@ static_resources:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
                       default_source_code:
                         inline_string: |
+{{if eq .To "booking"}}
+                          function envoy_on_request(handle)
+                            -- Never accept a client-supplied injection header.
+                            handle:headers():remove("x-envoy-fault-delay-request")
+                            handle:headers():remove("x-envoy-fault-delay-request-percentage")
+                            local response, body = handle:httpCall("fault-runtime", {
+                              [":method"] = "GET", [":path"] = "/runtime", [":authority"] = "localhost"
+                            }, "", 1000)
+                            if response == nil or response[":status"] ~= "200" or body == nil then
+                              return
+                            end
+                            local key = string.gsub("demo.{{.From}}.{{.To}}.request.delay_profile", "(%W)", "%%%1")
+                            local profile = string.match(body, '"' .. key .. '"%s*:%s*{.-"final_value"%s*:%s*"([^"}]+)"')
+                            if profile == nil or profile == "disabled" then
+                              return
+                            end
+                            -- One draw selects at most one group: delays never add up.
+                            local draw = math.random(100)
+                            local cumulative = 0
+                            for percent, delay in string.gmatch(profile, "(%d+):(%d+)") do
+                              cumulative = cumulative + tonumber(percent)
+                              if draw <= cumulative then
+                                handle:headers():replace("x-envoy-fault-delay-request", delay)
+                                return
+                              end
+                            end
+                          end
+{{end}}
 {{if eq .To "review"}}
                           function envoy_on_request(handle)
                             -- Only hotelctl runtime may supply this demo parameter.
                             handle:headers():remove("x-hotelflow-handler-delay-ms")
+                            handle:headers():remove("x-hotelflow-handler-unavailable")
                             if handle:headers():get(":path") ~= "/review.review.v1.ReviewService/GetHotelRatings" then
                               return
                             end
@@ -92,6 +124,11 @@ static_resources:
                             local function value(name)
                               local key = string.gsub(prefix .. name, "(%W)", "%%%1")
                               return tonumber(string.match(body, '"' .. key .. '"%s*:%s*{.-"final_value"%s*:%s*"([^"}]+)"'))
+                            end
+                            local abort = value("abort_percent") or 0
+                            if math.random(100) <= abort then
+                              handle:headers():replace("x-hotelflow-handler-unavailable", "1")
+                              return
                             end
                             local percent = value("delay_percent") or 0
                             local delay = value("delay_ms") or 0
@@ -130,6 +167,15 @@ static_resources:
                               handle:logErr("Envoy response delay listener failed")
                             end
                           end
+{{if eq .To "booking"}}
+                  - name: envoy.filters.http.fault
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
+                      delay:
+                        header_delay: {}
+                        percentage: {numerator: 0, denominator: HUNDRED}
+                      delay_percent_runtime: demo.{{.From}}.{{.To}}.request.profile_percent
+{{end}}
                   - name: envoy.filters.http.fault
                     typed_config:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault

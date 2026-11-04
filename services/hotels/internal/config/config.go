@@ -12,13 +12,15 @@ import (
 type configKey string
 
 const (
+	// Возвращать отели без рейтингов при недоступности Review
+	ReviewFallbackEnabled = configKey("review_fallback_enabled")
 	// Разрешает получение списка номеров выбранного отеля
 	RoomsListEnabled = configKey("rooms_list_enabled")
 )
 
 // SchemaHash соответствует объединённому service/system каталогу генерации.
 // Bootstrap сверяет его с schema.Hash() до установки клиента и serving.
-const SchemaHash = "ea249d268cf8b3d3018df4e6da2829de5860a3b64a6a4bcb527e5c858cb96f10"
+const SchemaHash = "8acf9dd2900182ecbc5b7ff1198e665b5fa0244505c02a8542dcff64d0659a6d"
 
 // GetValue читает явно установленный global client, без I/O или логов.
 // global.SetClient нельзя подменять в parallel tests; используйте NewClient.

@@ -23,7 +23,7 @@ type Config struct {
 
 func normalizeConfig(config Config) Config {
 	if config.MetricsInterval <= 0 {
-		config.MetricsInterval = 15 * time.Second
+		config.MetricsInterval = 3 * time.Second
 	}
 	if config.ServiceNamespace == "" {
 		config.ServiceNamespace = "hotelflow"

@@ -99,7 +99,7 @@ func (r *Retry) UnaryClientInterceptor() grpc.UnaryClientInterceptor {
 				delay = r.backoff(attemptsSincePushBack, state.cfg)
 				attemptsSincePushBack++
 			}
-			slog.DebugContext(ctx, "retry: wait", "method", method, "delay", delay, "pushback", pb.Has)
+			slog.DebugContext(ctx, "retry: wait", "method", method, "delay_ms", float64(delay)/float64(time.Millisecond), "pushback", pb.Has)
 			if err := wait(ctx, delay); err != nil {
 				return err
 			}

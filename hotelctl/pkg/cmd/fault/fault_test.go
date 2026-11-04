@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"reflect"
 	"testing"
 	"time"
 
@@ -164,7 +165,7 @@ func TestFaultModesReachStandWithoutLosingDirectionOrDuration(t *testing.T) {
 			if err := execute(t, factory, test.args); err != nil {
 				t.Fatal(err)
 			}
-			if factory.received != test.want {
+			if !reflect.DeepEqual(factory.received, test.want) {
 				t.Fatalf("stand received %+v, want %+v", factory.received, test.want)
 			}
 			if factory.runtimeCalls != 1 || factory.faultCalls != 1 || !factory.closed {

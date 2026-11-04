@@ -98,10 +98,23 @@ func (o Options) Values() map[string]string {
 		prefix + "response.delay_percent": "0",
 		prefix + "response.delay_ms":      "1",
 		prefix + "handler.delay_percent":  "0",
+		prefix + "handler.abort_percent":  "0",
 		prefix + "handler.delay_ms":       "1",
 	}
-	if o.Unavailable {
-		values[prefix+"request.abort_percent"] = strconv.Itoa(o.Percentage())
+	values[prefix+"request.profile_percent"] = "0"
+	values[prefix+"request.delay_profile"] = "disabled"
+	if o.Clear {
+		return values
+	}
+	if len(o.DelayProfile) != 0 {
+		parts := make([]string, 0, len(o.DelayProfile))
+		for _, step := range o.DelayProfile {
+			parts = append(parts, fmt.Sprintf("%d:%d", step.Percent, step.Delay.Milliseconds()))
+		}
+		values[prefix+"request.delay_profile"] = strings.Join(parts, ",")
+		values[prefix+"request.profile_percent"] = "100"
+	} else if o.Unavailable {
+		values[prefix+o.Direction+".abort_percent"] = strconv.Itoa(o.Percentage())
 		if o.PushbackMS != nil {
 			values[prefix+"request.pushback_ms"] = strconv.FormatInt(int64(*o.PushbackMS), 10)
 		}
@@ -153,6 +166,12 @@ func RunRuntime(ctx context.Context, runtime Runtime, options Options, out io.Wr
 	if options.Direction == "handler" && current["demo.handler_delay_supported"] != "1" {
 		return fmt.Errorf("обновите Review и Envoy: hotelctl build review && hotelctl deploy review")
 	}
+	if options.Direction == "handler" && options.Unavailable && current["demo.handler_abort_supported"] != "1" {
+		return fmt.Errorf("обновите Review и Envoy: hotelctl build review && hotelctl deploy review")
+	}
+	if len(options.DelayProfile) != 0 && current["demo.delay_profile_supported"] != "1" {
+		return fmt.Errorf("Envoy ещё не поддерживает --delay-profile; обновите его через hotelctl deploy api-gateway")
+	}
 	values := options.Values()
 	for key := range values {
 		if strings.HasSuffix(key, "_percent") && current[key] != "" && current[key] != "0" {
@@ -175,15 +194,25 @@ func RunRuntime(ctx context.Context, runtime Runtime, options Options, out io.Wr
 	if err := verifyRuntime(ctx, runtime, values); err != nil {
 		return err
 	}
-	if options.Unavailable {
-		fmt.Fprintf(out, "ACTIVE %s → %s: UNAVAILABLE на %s\n", options.From, options.To, options.Duration)
+	if len(options.DelayProfile) != 0 {
+		fmt.Fprintf(out, "ACTIVE %s → %s: профиль request на %s\n", options.From, options.To, options.Duration)
+		total := 0
+		for _, step := range options.DelayProfile {
+			fmt.Fprintf(out, "  %d%% попыток: +%s\n", step.Percent, step.Delay)
+			total += step.Percent
+		}
+		fmt.Fprintf(out, "  %d%% попыток: без задержки\n", 100-total)
+	} else if options.Unavailable {
+		fmt.Fprintf(out, "ACTIVE %s → %s: UNAVAILABLE (%s) на %s\n", options.From, options.To, options.Direction, options.Duration)
 		if options.PushbackMS != nil {
 			fmt.Fprintf(out, "grpc-retry-pushback-ms: %d (ответ до обработки запроса сервисом)\n", *options.PushbackMS)
 		}
 	} else {
 		fmt.Fprintf(out, "ACTIVE %s → %s: %s +%s на %s\n", options.From, options.To, options.Direction, options.Slowdown, options.Duration)
 	}
-	fmt.Fprintf(out, "Доля попыток со сбоем: %d%%\n", options.Percentage())
+	if len(options.DelayProfile) == 0 {
+		fmt.Fprintf(out, "Доля попыток со сбоем: %d%%\n", options.Percentage())
+	}
 	fmt.Fprintln(out, "Отправьте запрос из второго терминала. Ctrl+C досрочно снимает правило.")
 	timer := time.NewTimer(options.Duration)
 	defer timer.Stop()

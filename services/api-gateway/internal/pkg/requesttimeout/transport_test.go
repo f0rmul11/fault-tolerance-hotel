@@ -60,7 +60,7 @@ func TestHTTPDeadlineCancelsDownstreamAndReturns504(t *testing.T) {
 	if err := descriptor.RegisterHTTP(t.Context(), mux); err != nil {
 		t.Fatal(err)
 	}
-	handler := requesttimeout.Middleware(mux)
+	handler := requesttimeout.Limit(requesttimeout.MaxDuration)(requesttimeout.Middleware(mux))
 	const requestID = "1b085786-a2db-43aa-8387-4e67cd626647"
 	for _, message := range []string{"fast", "slow"} {
 		request := httptest.NewRequest(http.MethodGet, "/v1/echo?message="+message, nil)

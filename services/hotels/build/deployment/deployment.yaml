@@ -79,7 +79,7 @@ spec:
             - name: TELEMETRY_METRICS_ENABLED
               value: "true"
             - name: TELEMETRY_METRICS_INTERVAL
-              value: 15s
+              value: 3s
             - name: OTEL_METRIC_EXPORT_TIMEOUT
               value: "3000"
             - name: OTEL_BSP_MAX_QUEUE_SIZE

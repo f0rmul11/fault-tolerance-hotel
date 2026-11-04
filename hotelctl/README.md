@@ -324,12 +324,32 @@ pushback отсутствует. Допустимый диапазон: -1…214
 выбирается независимо от primary. Это задержка на связи, не замедление выбранного pod.
 Ctrl+C и истечение duration снимают правило. С `--clear` процент не передаётся.
 
+Для нескольких групп задержек на связи api-gateway → booking:
+
+```bash
+./bin/hotelctl fault api-gateway booking \
+  --delay-profile '8:150ms,2:800ms' --duration 5m --timeout 6m
+```
+
+8% физических попыток получают +150ms, ещё 2% — +800ms, остальные 90% идут без
+добавленной задержки. Группы взаимоисключающие; для hedge выполняется новый выбор.
+Формат — `процент:задержка`, сумма процентов не больше 100. Режим работает только
+с `--direction request` и не совмещается с `--percent`, `--slowdown`, `--unavailable`
+или `--pushback-ms`. Ctrl+C, истечение времени и `--clear` снимают профиль.
+Перед первым использованием обновите CLI и Envoy: `make build`, затем
+`./bin/hotelctl deploy api-gateway`.
+
+Для сравнения настроек hedging под этим профилем можно включить `warmup: true`
+в конфиге handler: дубли начнут запускаться после заполнения `window_size` измерений.
+При окне 1000 и 30 RPS прогрев занимает около 34 секунд; нагрузку запускайте уже
+при активном сбое. По умолчанию warmup выключен; у handler задаётся явно.
+
 Envoy балансирует RPC к Booking по адресам headless Service `booking-headless`; для опыта
-поднять три Booking pod. Поля access log `hedge_attempt` и `upstream_host` показывают роль
-попытки и фактического адресата. Обычный round-robin не гарантирует другой pod для каждого дубля.
+поднять три Booking pod. Поля access log `traceparent`, `injected_delay_ms` и `upstream_host` позволяют
+сопоставить попытки одной трассы, инъекцию и фактического адресата. Обычный round-robin не гарантирует другой pod для каждого дубля.
 
 Hedging включается в Gateway YAML только для ListBookings, CB — в Hotels YAML для GetHotelRatings,
-fallback — через `review_fallback.enabled`. Конструкторы исходных пакетов сохранены:
+fallback — через runtime-флаг `hotelctl config set hotels review_fallback_enabled true` (default false). Конструкторы исходных пакетов сохранены:
 `hedge.NewHedger(cfg).UnaryClientInterceptor()` и `circuit.NewCircuitBreaker(cfg).UnaryClientInterceptor()`.
 Они создаются при инициализации соединений. После YAML-изменения выполнить build/deploy;
 активный fault перед этим остановить. Исходная конфигурация оставляет защиты выключенными.
@@ -339,3 +359,12 @@ fallback — через `review_fallback.enabled`. Конструкторы ис
 В Jaeger видны `demo.handler_delay_ms`, `demo.delay.started` и `demo.delay.canceled`.
 Перед первым запуском: `hotelctl build review` и `hotelctl deploy review` (обновляет и Envoy).
 Ctrl+C/окончание duration снимают правило для новых запросов; `--clear` очищает все режимы связи.
+
+Для CB-демо используйте `hotelctl fault hotels review --unavailable --direction handler --duration 4m`.
+Отказ возвращает сам Review: его server span и метрики учитывают входящий запрос, поэтому
+снижение Review RPS показывает эффект CB. Это детерминированная имитация отказа, не тест перегрузки.
+Обычный `--unavailable` остаётся отказом Envoy до downstream; handler-режим не поддерживает pushback.
+Перед первым запуском обновите CLI (`make build`), `hotelctl build hotels review` и
+`hotelctl deploy hotels review`. Fallback читается из локального snapshot rtconfig на каждый
+вызов, изменения etcd применяются через watch без redeploy. При потере etcd сохраняется
+последний валидный snapshot; до первого sync Hotels не готов. Ошибка чтения флага даёт false.

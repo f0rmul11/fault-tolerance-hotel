@@ -30,16 +30,15 @@ func Instance() *Config {
 }
 
 type Config struct {
-	Circuit        circuit.Config    `yaml:"circuit"`
-	ReviewFallback ReviewFallback    `yaml:"review_fallback"`
-	RuntimeConfig  rtconfig.Config   `yaml:"runtime_config"`
-	Telemetry      telemetry.Config  `yaml:"telemetry"`
-	Postgres       Postgres          `yaml:"postgres"`
-	PostgresDSN    string            `yaml:"postgres_dsn" env:"POSTGRES_DSN"`
-	Targets        map[string]string `yaml:"service" env:"SERVICE_TARGETS"`
-	GrpcServer     GrpcServer        `yaml:"grpc_server"`
-	HttpServer     HttpServer        `yaml:"http_server"`
-	Graceful       Graceful          `yaml:"graceful"`
+	Circuit       circuit.Config    `yaml:"circuit"`
+	RuntimeConfig rtconfig.Config   `yaml:"runtime_config"`
+	Telemetry     telemetry.Config  `yaml:"telemetry"`
+	Postgres      Postgres          `yaml:"postgres"`
+	PostgresDSN   string            `yaml:"postgres_dsn" env:"POSTGRES_DSN"`
+	Targets       map[string]string `yaml:"service" env:"SERVICE_TARGETS"`
+	GrpcServer    GrpcServer        `yaml:"grpc_server"`
+	HttpServer    HttpServer        `yaml:"http_server"`
+	Graceful      Graceful          `yaml:"graceful"`
 }
 
 // Read загружает конфигурацию из YAML и применяет переменные окружения.
@@ -86,9 +85,4 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("graceful timeout must be positive")
 	}
 	return nil
-}
-
-// ReviewFallback preserves the catalog while ratings are unavailable.
-type ReviewFallback struct {
-	Enabled bool `yaml:"enabled"`
 }
