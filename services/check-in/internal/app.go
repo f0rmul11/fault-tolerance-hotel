@@ -21,6 +21,7 @@ import (
 	"check-in/internal/pkg/healthcheck"
 	"check-in/internal/pkg/inbox"
 	"check-in/internal/pkg/outbox"
+	"check-in/internal/pkg/ratelimit"
 	"check-in/internal/pkg/telemetry"
 	"check-in/internal/pkg/worker"
 
@@ -34,6 +35,7 @@ import (
 
 // App application
 type App struct {
+	rateLimiter  *ratelimit.Limiter
 	telemetry    *telemetry.Telemetry
 	inbox        *inbox.Inbox
 	eventRouter  *event_router.EventRouter[string, []byte]
@@ -157,6 +159,7 @@ func (a *App) Run(ctx context.Context) {
 func (a *App) init(ctx context.Context) error {
 	initFuncs := []func(context.Context) error{
 		a.initTelemetry,
+		a.initRateLimiter,
 		a.initMainServer,
 		a.initGrpcConn,
 		a.initPostgres,

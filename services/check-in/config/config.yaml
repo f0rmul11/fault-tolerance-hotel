@@ -60,3 +60,12 @@ telemetry:
   service_namespace: hotelflow
   otlp_endpoint: otel-collector:4317
   otlp_insecure: true
+
+# Локальный token bucket для ListArrivals: 10 токенов/с, запас до 200.
+rate_limit:
+  rules:
+    - clients: [api-gateway]
+      handlers: [/check_in.checkin.v1.CheckinService/ListArrivals]
+      limit: 10
+      burst: 200
+      timeout: 0s

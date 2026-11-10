@@ -136,3 +136,29 @@ OpenTelemetry Collector, Jaeger, Loki, Prometheus и Grafana включены в
 [Устройство, команды и ограничения](deploy/observability/README.md).
 
 [Service Overview](http://localhost:3000/d/hotelflow-service-overview) — готовый дашборд в папке **HotelFlow**. В поле **Service** можно искать и выбирать сервис; **Protocol** переключает HTTP/gRPC. Раскрывающийся ряд **Errors** показывает доли ответов, технические ошибки и клиентские отказы по обработчикам. [Как читать графики и провести демонстрацию сбоя](deploy/observability/service-overview.md).
+
+## Урок 5: серверный rate limiter
+
+В Check-in подключён token bucket для
+`/check_in.checkin.v1.CheckinService/ListArrivals` при вызове из API Gateway.
+Настройки находятся в `services/check-in/config/config.yaml`: `limit: 10`,
+`burst: 200`, `timeout: 0s`. Первые 200 запросов могут пройти сразу;
+затем запас пополняется со скоростью 10 токенов/с. Это одна квота на правило
+в одном процессе; при нескольких репликах общий допустимый поток увеличивается.
+Превышение возвращает gRPC `ResourceExhausted`, через Gateway — HTTP 429
+с `Retry-After` и `X-RateLimit-*`. Пустой список `rules: []` отключает ограничение.
+После изменения YAML пересоберите и разверните Check-in через hotelctl.
+
+Начните с [описания interceptor](services/check-in/internal/pkg/ratelimit/README.md),
+затем изучите [четыре учебных алгоритма](services/check-in/internal/pkg/ratelimit/algorithms/).
+В сервисе используется `golang.org/x/time/rate`; учебные алгоритмы предназначены
+для самостоятельного разбора. Они входят в обычный `make test`.
+В Grafana Service Overview добавлены панели Rate limiter: допуски, отказы,
+баланс токенов и параметры квоты.
+
+```bash
+# Из корня репозитория: только лимитер и учебные алгоритмы.
+go test -race -count=1 ./services/check-in/internal/pkg/ratelimit/...
+# Подробный вывод сценариев алгоритмов.
+go test -v -count=1 ./services/check-in/internal/pkg/ratelimit/algorithms/...
+```

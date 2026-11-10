@@ -33,7 +33,7 @@ func Options() []runtime.ServeMuxOption {
 			}
 		}),
 		runtime.WithOutgoingHeaderMatcher(func(key string) (string, bool) {
-			return key, strings.HasPrefix(key, "x-")
+			return key, strings.HasPrefix(key, "x-") || key == "retry-after"
 		}),
 		runtime.WithErrorHandler(errorHandler),
 		runtime.WithRoutingErrorHandler(func(ctx context.Context, mux *runtime.ServeMux, marshaler runtime.Marshaler, w http.ResponseWriter, r *http.Request, code int) {

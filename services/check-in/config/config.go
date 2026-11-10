@@ -8,6 +8,7 @@ import (
 	"time"
 	_ "time/tzdata"
 
+	"check-in/internal/pkg/ratelimit"
 	"check-in/internal/pkg/telemetry"
 
 	"github.com/ilyakaznacheev/cleanenv"
@@ -30,6 +31,7 @@ func Instance() *Config {
 }
 
 type Config struct {
+	RateLimit     ratelimit.Config  `yaml:"rate_limit"`
 	Telemetry     telemetry.Config  `yaml:"telemetry"`
 	Timezone      string            `yaml:"timezone" env:"CHECKIN_TIMEZONE"`
 	Inbox         Inbox             `yaml:"inbox"`

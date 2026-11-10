@@ -29,8 +29,11 @@ import (
 	pb "check-in/internal/pkg/pb/check-in/checkin/v1"
 	"check-in/internal/pkg/worker"
 
+	"check-in/internal/pkg/grpc/clientname"
 	"check-in/internal/pkg/grpc/intercept"
 	"check-in/internal/pkg/healthcheck"
+	"check-in/internal/pkg/ratelimit"
+	"github.com/prometheus/client_golang/prometheus"
 
 	chimw "github.com/go-chi/chi/v5/middleware"
 
@@ -88,7 +91,12 @@ func (a *App) initMainServer(ctx context.Context) error {
 			grpc.StatsHandler(traces.ServerHandler()),
 			grpc.StatsHandler(metrics.ServerHandler()),
 			grpc.InTapHandle(metrics.TapHandler),
-			grpc.ChainUnaryInterceptor(intercept.ErrorInterceptor(), intercept.AuthInterceptor()),
+			grpc.ChainUnaryInterceptor(
+				clientname.UnaryServerInterceptor(),
+				a.rateLimiter.UnaryServerInterceptor(),
+				intercept.ErrorInterceptor(),
+				intercept.AuthInterceptor(),
+			),
 			grpc.KeepaliveParams(keepalive.ServerParameters{
 				MaxConnectionIdle: config.Instance().GrpcServer.MaxConnectionIdle,
 				MaxConnectionAge:  config.Instance().GrpcServer.MaxConnectionAge,
@@ -349,5 +357,13 @@ func (a *App) initTelemetry(ctx context.Context) error {
 		return err
 	}
 	a.telemetry = instance
+	return nil
+}
+
+func (a *App) initRateLimiter(_ context.Context) error {
+	a.rateLimiter = ratelimit.NewLimiter(config.Instance().RateLimit)
+	if err := a.rateLimiter.RegisterMetrics(prometheus.DefaultRegisterer); err != nil {
+		return fmt.Errorf("rate limiter metrics: %w", err)
+	}
 	return nil
 }

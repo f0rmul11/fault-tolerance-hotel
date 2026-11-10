@@ -197,6 +197,7 @@ func (a *App) initGrpcConn(_ context.Context) error {
 			grpc.WithDisableRetry(),
 			grpc.WithChainUnaryInterceptor(
 				intercept.ProxyMetadata(),
+				intercept.ClientName("api-gateway"),
 				retry.NewRetry(config.Instance().Retry).UnaryClientInterceptor(),
 				hedge.NewHedger(config.Instance().Hedge).UnaryClientInterceptor(),
 			),
