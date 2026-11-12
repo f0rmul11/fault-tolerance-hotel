@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
-	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -206,14 +205,6 @@ func (a *App) initHealthCheck(_ context.Context) error {
 	a.healthCheck = healthcheck.NewHandler()
 	a.healthCheck.AddReadinessCheck("runtime_config", func() error {
 		return a.runtimeConfig.Load().CheckInitialSync()
-	})
-
-	// поверяю, что нет утечки горутин на старте (как пример)
-	a.healthCheck.AddLivenessCheck("goroutines", func() error {
-		if runtime.NumGoroutine() < 1000 {
-			return nil
-		}
-		return fmt.Errorf("Превышено допустимое число горутин")
 	})
 
 	a.healthCheck.AddStartupCheck("started", func() error {

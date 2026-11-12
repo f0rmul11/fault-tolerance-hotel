@@ -15,9 +15,13 @@ var serverRequests = promauto.NewCounterVec(prometheus.CounterOpts{
 
 // Duration covers server processing, not delivery acknowledgement by the client.
 var serverDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
-	Name:    "hotelflow_server_request_duration_seconds",
-	Help:    "Server request duration from transport arrival to server completion, in seconds.",
-	Buckets: []float64{0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30},
+	Name: "hotelflow_server_request_duration_seconds",
+	Help: "Server request duration from transport arrival to server completion, in seconds.",
+	Buckets: []float64{
+		0.001, 0.005, 0.01, 0.025, 0.05,
+		0.1, 0.105, 0.11, 0.125, 0.15, 0.2, 0.25, 0.35, 0.5, 0.75,
+		1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.1, 5.25, 5.5, 6, 8, 10, 30,
+	},
 }, []string{"protocol", "handler", "code"})
 
 func grpcCategory(code codes.Code) string {

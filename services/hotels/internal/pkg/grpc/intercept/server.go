@@ -65,6 +65,11 @@ var errorStatuses = map[app.Code]errorStatus{
 		reason:  "DEPENDENCY_TIMEOUT",
 		message: "Время ожидания ответа сервиса истекло",
 	},
+	app.ResourceExhausted: {
+		code:    codes.ResourceExhausted,
+		reason:  "RESOURCE_EXHAUSTED",
+		message: "Сервис перегружен, повторите запрос позже",
+	},
 	app.Canceled: {
 		code:    codes.Canceled,
 		reason:  "OUTCOME_UNKNOWN",
@@ -100,6 +105,8 @@ func FromRPC(err error, md metadata.MD) *app.Error {
 		code = app.Conflict
 	case codes.FailedPrecondition:
 		code = app.FailedPrecondition
+	case codes.ResourceExhausted:
+		code = app.ResourceExhausted
 	case codes.Unavailable:
 		code = app.Unavailable
 	case codes.DeadlineExceeded:

@@ -55,7 +55,7 @@ hedge:
       enabled: false
       window_size: 1000
       warmup: true
-      percentile: 0.99
+      percentile: 0.95
       percentile_offset: 0.06
       budget: 0.2
       reset_period: 30s

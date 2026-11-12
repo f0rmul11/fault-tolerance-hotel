@@ -231,3 +231,25 @@ func TestInputBusinessAndConflictErrors(t *testing.T) {
 		})
 	}
 }
+
+func TestReviewOverloadSurvivesHotelsRoundTrip(t *testing.T) {
+	stream := &transportStream{}
+	ctx := grpc.NewContextWithServerTransportStream(context.Background(), stream)
+	downstream := status.Error(codes.ResourceExhausted, "private limit details")
+	typed := FromRPC(downstream, nil)
+	if typed.Code() != app.ResourceExhausted {
+		t.Fatalf("downstream overload became %v", typed.Code())
+	}
+	_, err := ErrorInterceptor()(ctx, nil, &grpc.UnaryServerInfo{}, func(context.Context, any) (any, error) {
+		return nil, fmt.Errorf("get hotel ratings: %w", typed)
+	})
+	if status.Code(err) != codes.ResourceExhausted {
+		t.Fatalf("wire status = %v, want ResourceExhausted", status.Code(err))
+	}
+	if status.Convert(err).Message() != "Сервис перегружен, повторите запрос позже" {
+		t.Fatalf("unexpected public message: %v", err)
+	}
+	if got := stream.trailers.Get("x-error-code"); len(got) != 1 || got[0] != "RESOURCE_EXHAUSTED" {
+		t.Fatalf("overload metadata lost: %v", got)
+	}
+}

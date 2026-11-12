@@ -363,13 +363,820 @@
       }
     },
     {
+      "id": 10,
+      "type": "row",
+      "title": "Load shedding",
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "x": 0,
+        "y": 11,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Load shedding · limit & inflight",
+      "description": "Каждый instance имеет собственный limiter. Старые серии после rollout исключены по timestamp >15s. Limit — действующий concurrency limit Vegas. Inflight — занятые токены SimpleStrategy, без очереди допуска. После снижения лимита inflight может временно быть выше: уже допущенные запросы не отменяются. Shared limiter отображается как __shared__.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotelflow-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 24,
+        "h": 10
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "stepAfter",
+            "lineWidth": 1.5,
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "axisPlacement": "auto",
+            "axisLabel": "",
+            "axisBorderShow": false,
+            "hideFrom": {
+              "tooltip": false,
+              "viz": false,
+              "legend": false
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#FF9830"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 2
+              },
+              {
+                "id": "custom.lineInterpolation",
+                "value": "stepAfter"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#73BF69"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 1.5
+              },
+              {
+                "id": "custom.lineInterpolation",
+                "value": "linear"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotelflow-prometheus"
+          },
+          "expr": "load_shedding_estimated_limit{service_namespace=\"hotelflow\",service_name=~\"${service:regex}\",handler=~\"(${traffic_handler})|__shared__\"} and (time() - timestamp(load_shedding_estimated_limit{service_namespace=\"hotelflow\",service_name=~\"${service:regex}\",handler=~\"(${traffic_handler})|__shared__\"}) < 15)",
+          "legendFormat": "limit · {{instance}}",
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "interval": "3s"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotelflow-prometheus"
+          },
+          "expr": "load_shedding_inflight{service_namespace=\"hotelflow\",service_name=~\"${service:regex}\",handler=~\"(${traffic_handler})|__shared__\"} and (time() - timestamp(load_shedding_inflight{service_namespace=\"hotelflow\",service_name=~\"${service:regex}\",handler=~\"(${traffic_handler})|__shared__\"}) < 15)",
+          "legendFormat": "inflight · {{instance}}",
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "interval": "3s"
+        }
+      ],
+      "transformations": []
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "Load shedding · Vegas RTT",
+      "description": "RTT sample — последний вход OnSample Vegas: MIN успешных RTT в агрегированном окне DefaultLimiter, а не p95 или среднее. Admission wait сюда не входит. Baseline — текущий RTTNoLoad, включая probe resets. Обе линии в секундах. В покое линии RTT сохраняют последнее значение.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotelflow-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 22,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "stepAfter",
+            "lineWidth": 1.5,
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "axisPlacement": "auto",
+            "axisLabel": "",
+            "axisBorderShow": false,
+            "hideFrom": {
+              "tooltip": false,
+              "viz": false,
+              "legend": false
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#FF9830"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 1.5
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#9FA7B3"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 1.25
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    4,
+                    4
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotelflow-prometheus"
+          },
+          "expr": "load_shedding_vegas_rtt_seconds{service_namespace=\"hotelflow\",service_name=~\"${service:regex}\",handler=~\"(${traffic_handler})|__shared__\"} and (time() - timestamp(load_shedding_vegas_rtt_seconds{service_namespace=\"hotelflow\",service_name=~\"${service:regex}\",handler=~\"(${traffic_handler})|__shared__\"}) < 15)",
+          "legendFormat": "RTT sample · {{instance}}",
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "interval": "3s"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotelflow-prometheus"
+          },
+          "expr": "load_shedding_vegas_min_rtt_seconds{service_namespace=\"hotelflow\",service_name=~\"${service:regex}\",handler=~\"(${traffic_handler})|__shared__\"} and (time() - timestamp(load_shedding_vegas_min_rtt_seconds{service_namespace=\"hotelflow\",service_name=~\"${service:regex}\",handler=~\"(${traffic_handler})|__shared__\"}) < 15)",
+          "legendFormat": "baseline · {{instance}}",
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "interval": "3s"
+        }
+      ],
+      "transformations": []
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "title": "Load shedding · queue estimate & alpha / beta",
+      "description": "Queue estimate = ceil(int(limit_before) × (1 − baseline/RTT_sample)): оценка последнего окна в запросах, не реальная очередь admission. При smoothing <1 отличается от внутреннего float расчёта максимум на 1; при смене baseline нет точки решения (NaN). Alpha/beta — пороги ТЕКУЩЕГО limit; после обновления могут отличаться от порогов последнего решения. q<alpha: рост; q>beta: снижение; иначе удержание. Drop/недостаточная загрузка обрабатываются раньше этих условий.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotelflow-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 22,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "stepAfter",
+            "lineWidth": 1.5,
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "axisPlacement": "auto",
+            "axisLabel": "",
+            "axisBorderShow": false,
+            "hideFrom": {
+              "tooltip": false,
+              "viz": false,
+              "legend": false
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#FFFFFF"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 1.75
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#73BF69"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 1.25
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    6,
+                    4
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "C"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#F2495C"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 1.25
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    6,
+                    4
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotelflow-prometheus"
+          },
+          "expr": "load_shedding_vegas_queue_estimate{service_namespace=\"hotelflow\",service_name=~\"${service:regex}\",handler=~\"(${traffic_handler})|__shared__\"} and (time() - timestamp(load_shedding_vegas_queue_estimate{service_namespace=\"hotelflow\",service_name=~\"${service:regex}\",handler=~\"(${traffic_handler})|__shared__\"}) < 15)",
+          "legendFormat": "queue estimate · {{instance}}",
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "interval": "3s"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotelflow-prometheus"
+          },
+          "expr": "load_shedding_vegas_alpha{service_namespace=\"hotelflow\",service_name=~\"${service:regex}\",handler=~\"(${traffic_handler})|__shared__\"} and (time() - timestamp(load_shedding_vegas_alpha{service_namespace=\"hotelflow\",service_name=~\"${service:regex}\",handler=~\"(${traffic_handler})|__shared__\"}) < 15)",
+          "legendFormat": "alpha · {{instance}}",
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "interval": "3s"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotelflow-prometheus"
+          },
+          "expr": "load_shedding_vegas_beta{service_namespace=\"hotelflow\",service_name=~\"${service:regex}\",handler=~\"(${traffic_handler})|__shared__\"} and (time() - timestamp(load_shedding_vegas_beta{service_namespace=\"hotelflow\",service_name=~\"${service:regex}\",handler=~\"(${traffic_handler})|__shared__\"}) < 15)",
+          "legendFormat": "beta · {{instance}}",
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "interval": "3s"
+        }
+      ],
+      "transformations": []
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Load shedding · admission backlog",
+      "description": "Каждый instance имеет собственный limiter. Старые серии после rollout исключены по timestamp >15s. Реальная LIFO-очередь QueueBlockingLimiter: запросы ещё ждут токен. Capacity — максимальный размер backlog. Это не queue estimate Vegas. При остановке нагрузки backlog должен вернуться к нулю. Wait p95 справа — p95 длительности Acquire всех допущенных и отклонённых попыток за 15s: ожидание допуска плюс небольшие накладные расходы. Это не RTT handler. Единицы справа — секунды (автоматически мс для малых значений); слева — число запросов. Квантиль интерполируется по histogram buckets.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotelflow-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 30,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "stepAfter",
+            "lineWidth": 1.5,
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "axisPlacement": "left",
+            "axisLabel": "Запросы",
+            "axisBorderShow": false,
+            "hideFrom": {
+              "tooltip": false,
+              "viz": false,
+              "legend": false
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#FF9830"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 1.5
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#9FA7B3"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 1.25
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    4,
+                    4
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "C"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#B877D9"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 1.5
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "solid"
+                }
+              },
+              {
+                "id": "custom.lineInterpolation",
+                "value": "linear"
+              },
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Ожидание допуска"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotelflow-prometheus"
+          },
+          "expr": "load_shedding_backlog{service_namespace=\"hotelflow\",service_name=~\"${service:regex}\",handler=~\"(${traffic_handler})|__shared__\"} and (time() - timestamp(load_shedding_backlog{service_namespace=\"hotelflow\",service_name=~\"${service:regex}\",handler=~\"(${traffic_handler})|__shared__\"}) < 15)",
+          "legendFormat": "waiting · {{instance}}",
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "interval": "3s"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotelflow-prometheus"
+          },
+          "expr": "load_shedding_backlog_limit{service_namespace=\"hotelflow\",service_name=~\"${service:regex}\",handler=~\"(${traffic_handler})|__shared__\"} and (time() - timestamp(load_shedding_backlog_limit{service_namespace=\"hotelflow\",service_name=~\"${service:regex}\",handler=~\"(${traffic_handler})|__shared__\"}) < 15)",
+          "legendFormat": "capacity · {{instance}}",
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "interval": "3s"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotelflow-prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le, instance) (rate(load_shedding_acquire_duration_seconds_bucket{service_namespace=\"hotelflow\",service_name=~\"${service:regex}\",handler=~\"(${traffic_handler})|__shared__\"}[15s])))",
+          "legendFormat": "wait p95 · {{instance}}",
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "interval": "3s"
+        }
+      ],
+      "transformations": []
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Load shedding · admitted / rejected",
+      "description": "Число завершённых попыток Acquire в секунду за 15s, суммарно по выбранным limiter. Admitted — запрос получил токен. Rejected — отказ ДО выполнения handler: очередь полна, истекло ожидание либо отменён context; библиотека не различает причины. Это не успешные/ошибочные бизнес-ответы.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotelflow-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 30,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "stepAfter",
+            "lineWidth": 1.5,
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "axisPlacement": "auto",
+            "axisLabel": "",
+            "axisBorderShow": false,
+            "hideFrom": {
+              "tooltip": false,
+              "viz": false,
+              "legend": false
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#73BF69"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 1.5
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#F2495C"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 1.5
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotelflow-prometheus"
+          },
+          "expr": "sum (rate(load_shedding_admissions_total{service_namespace=\"hotelflow\",service_name=~\"${service:regex}\",handler=~\"(${traffic_handler})|__shared__\",result=\"admitted\"}[15s]))",
+          "legendFormat": "admitted",
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "interval": "3s"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotelflow-prometheus"
+          },
+          "expr": "sum (rate(load_shedding_admissions_total{service_namespace=\"hotelflow\",service_name=~\"${service:regex}\",handler=~\"(${traffic_handler})|__shared__\",result=\"rejected\"}[15s]))",
+          "legendFormat": "rejected",
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "interval": "3s"
+        }
+      ],
+      "transformations": []
+    },
+    {
       "id": 7,
       "type": "row",
       "title": "Rate limiter",
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 11,
+        "y": 38,
         "w": 24,
         "h": 1
       },
@@ -386,7 +1193,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 12,
+        "y": 39,
         "w": 24,
         "h": 8
       },
@@ -572,7 +1379,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 20,
+        "y": 47,
         "w": 24,
         "h": 9
       },
@@ -664,7 +1471,7 @@
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 29,
+        "y": 56,
         "w": 24,
         "h": 1
       },
@@ -681,7 +1488,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 30,
+        "y": 57,
         "w": 24,
         "h": 8
       },
@@ -892,7 +1699,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 38,
+        "y": 65,
         "w": 24,
         "h": 8
       },
@@ -984,7 +1791,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 46,
+        "y": 73,
         "w": 24,
         "h": 8
       },

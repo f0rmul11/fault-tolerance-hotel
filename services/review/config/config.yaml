@@ -33,3 +33,27 @@ telemetry:
   service_namespace: hotelflow
   otlp_endpoint: otel-collector:4317
   otlp_insecure: true
+
+# Старый limiter без изменений: Vegas + ограниченная LIFO-очередь.
+# Конфигурация читается при запуске; изменение требует рестарта Review.
+load_shedding:
+  __default__:
+    enabled: false
+    separate_hr_per_handler_enabled: true
+  handlers:
+    - method: /review.review.v1.ReviewService/GetHotelRatings
+      enabled: true
+      limiter:
+        window_size: 100
+        min_window_time: 1s
+        max_window_time: 2s
+        min_rtt_threshold: 1ms
+        max_backlog_size: 100
+        max_backlog_wait_time: 200ms
+      vegas:
+        initial_max_inflight_limit: 40
+        max_inflight_limit: 200
+        smoothing: 1.0
+        alpha_func_coefficient: 6
+        beta_func_coefficient: 12
+        rtt_no_load_probe_multiplier: 1000

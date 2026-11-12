@@ -45,7 +45,7 @@ func TestProfileRuntimeLifecycle(t *testing.T) {
 					r.cancel = cancel
 				}
 				r.fail = mode == "lost apply"
-				err := RunRuntime(ctx, r, o, io.Discard)
+				err := RunRuntime(ctx, r, o, nil, io.Discard)
 				if (err != nil) != (mode != "duration") {
 					t.Fatalf("error = %v", err)
 				}
@@ -60,13 +60,13 @@ func TestProfileRuntimeLifecycle(t *testing.T) {
 func TestProfileRequiresCapabilityAndBlocksOtherFaults(t *testing.T) {
 	o := Options{From: "api-gateway", To: "booking", Direction: "request", Duration: time.Second, DelayProfile: []DelayStep{{Percent: 8, Delay: time.Second}}}
 	r := &fakeRuntime{values: map[string]string{}}
-	if RunRuntime(t.Context(), r, o, io.Discard) == nil || r.calls != 0 {
+	if RunRuntime(t.Context(), r, o, nil, io.Discard) == nil || r.calls != 0 {
 		t.Fatal("profile applied to an unsupported proxy")
 	}
 	r.values = o.Values()
 	o.DelayProfile = nil
 	o.Unavailable = true
-	if RunRuntime(t.Context(), r, o, io.Discard) == nil || r.calls != 0 {
+	if RunRuntime(t.Context(), r, o, nil, io.Discard) == nil || r.calls != 0 {
 		t.Fatal("active profile overwritten by abort")
 	}
 	if err := ClearRuntime(t.Context(), r, o); err != nil {

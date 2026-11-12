@@ -30,6 +30,8 @@ type options struct {
 	addr, method, data, dataFile, reportDir string
 	headers, protos, imports                []string
 	rps, clients                            int
+	profile                                 string
+	rpsTo                                   int
 	duration                                time.Duration
 }
 
@@ -37,7 +39,7 @@ func NewCmdLoad(f util.Factory, streams iostreams.IOStreams) *cobra.Command {
 	o := &options{}
 	cmd := &cobra.Command{
 		Use: "load", Short: "gRPC-нагрузка через Framer: endpoint, JSON, RPS и длительность",
-		Long: "Постоянная нагрузка на unary gRPC через Framer. Plaintext, timeout запроса 11s.\nReflection включена по умолчанию; без неё используйте --proto и --import-path.\nКаждый запрос повторяет заданное тело. Автоматических ретраев запросов нет.",
+		Long: "Нагрузка на unary gRPC через Framer: постоянная или линейный рост RPS.\nPlaintext, timeout запроса 11s. Reflection включена по умолчанию.\nКаждый запрос повторяет заданное тело. Автоматических ретраев запросов нет.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			payload, metadata, err := o.validate()
@@ -56,7 +58,9 @@ func NewCmdLoad(f util.Factory, streams iostreams.IOStreams) *cobra.Command {
 	flags.StringVar(&o.method, "method", "", "Полное имя package.Service/Method")
 	flags.StringVar(&o.data, "data", "{}", "JSON-тело запроса")
 	flags.StringVar(&o.dataFile, "data-file", "", "Файл с JSON-телом")
-	flags.IntVar(&o.rps, "rps", 0, "Общий RPS для всех соединений")
+	flags.StringVar(&o.profile, "profile", "const", "Профиль подачи нагрузки: const или line")
+	flags.IntVar(&o.rps, "rps", 0, "Общий RPS для всех соединений; начальный RPS для line")
+	flags.IntVar(&o.rpsTo, "rps-to", 0, "Конечный RPS для --profile line; достигается за --duration")
 	flags.DurationVar(&o.duration, "duration", 0, "Длительность подачи нагрузки, например 30s или 5m")
 	flags.IntVar(&o.clients, "clients", 1, "Число gRPC-соединений")
 	flags.StringArrayVarP(&o.headers, "header", "H", nil, "gRPC metadata key:value, можно повторять")
@@ -82,6 +86,18 @@ func (o *options) validate() (json.RawMessage, map[string][]string, error) {
 	}
 	if o.rps < 1 || o.rps > 1000000 {
 		return nil, nil, fmt.Errorf("--rps должен быть от 1 до 1000000")
+	}
+	switch o.profile {
+	case "", "const":
+		if o.rpsTo != 0 {
+			return nil, nil, fmt.Errorf("--rps-to требует --profile line")
+		}
+	case "line":
+		if o.rpsTo <= o.rps || o.rpsTo > 1000000 {
+			return nil, nil, fmt.Errorf("для line --rps-to должен быть больше --rps и не больше 1000000")
+		}
+	default:
+		return nil, nil, fmt.Errorf("--profile должен быть const или line")
 	}
 	if o.duration <= 0 {
 		return nil, nil, fmt.Errorf("--duration должен быть положительным")
@@ -206,8 +222,12 @@ func (o *options) run(ctx context.Context, root string, s iostreams.IOStreams, p
 	if err != nil {
 		return fmt.Errorf("подготовка gRPC-запроса: %w: %s", err, diagnostic.String())
 	}
-	args = []string{"load", "--addr=" + o.addr, "--requests-file=" + binary, "--inmem-requests", "--clients=" + strconv.Itoa(o.clients), "--phout=" + report, "const", strconv.Itoa(o.rps), "--duration=" + o.duration.String()}
-	fmt.Fprintf(s.Out, "gRPC  %s  →  %s\nRPS: %d · duration: %s · connections: %d\nОтчёт: %s\n\n", o.addr, o.method, o.rps, o.duration, o.clients, dir)
+	args = o.loadArgs(binary, report)
+	rate := strconv.Itoa(o.rps)
+	if o.profile == "line" {
+		rate += " → " + strconv.Itoa(o.rpsTo) + " (линейно)"
+	}
+	fmt.Fprintf(s.Out, "gRPC  %s  →  %s\nRPS: %s · duration: %s · connections: %d\nОтчёт: %s\n\n", o.addr, o.method, rate, o.duration, o.clients, dir)
 	fmt.Fprintln(s.Out, "TIME      SENT/s   OK/s   ERR/s   ERROR %")
 	loadCtx, stop := context.WithTimeout(ctx, o.duration+15*time.Second)
 	defer stop()
@@ -269,6 +289,21 @@ func (o *options) run(ctx context.Context, root string, s iostreams.IOStreams, p
 	}
 	fmt.Fprintf(s.Out, "Сохранён отчёт Framer: %s\n", report)
 	return nil
+}
+
+func (o *options) loadArgs(requests, report string) []string {
+	args := []string{
+		"load",
+		"--addr=" + o.addr,
+		"--requests-file=" + requests,
+		"--inmem-requests",
+		"--clients=" + strconv.Itoa(o.clients),
+		"--phout=" + report,
+	}
+	if o.profile == "line" {
+		return append(args, "line", strconv.Itoa(o.rps), strconv.Itoa(o.rpsTo), o.duration.String())
+	}
+	return append(args, "const", strconv.Itoa(o.rps), "--duration="+o.duration.String())
 }
 
 // printReport streams the report so memory does not grow with test duration.

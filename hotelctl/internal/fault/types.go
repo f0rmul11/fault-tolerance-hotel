@@ -51,6 +51,12 @@ type Options struct {
 	Unavailable  bool
 	PushbackMS   *int32
 	DelayProfile []DelayStep
+	// Handler delay grows with concurrent admitted GetHotelRatings calls per Review process.
+	DelayPerInflight  time.Duration
+	MaxDelay          time.Duration
+	InflightThreshold int
+	DelayRamp         time.Duration
+	ActivateOnEnter   bool
 	// Percent is nil for the default 100%; explicit zero disables injection.
 	Percent *int
 	Clear   bool
@@ -64,7 +70,7 @@ func (o Options) Validate() error {
 		return err
 	}
 	if o.Clear {
-		if o.Slowdown != 0 || o.Duration != 0 || o.Unavailable || o.Direction != "request" || o.PushbackMS != nil || o.Percent != nil || len(o.DelayProfile) != 0 {
+		if o.Slowdown != 0 || o.Duration != 0 || o.Unavailable || o.Direction != "request" || o.PushbackMS != nil || o.Percent != nil || len(o.DelayProfile) != 0 || o.DelayPerInflight != 0 || o.MaxDelay != 0 || o.controlledInflight() {
 			return fmt.Errorf("--clear не совмещается с настройками сбоя")
 		}
 		return nil
@@ -82,6 +88,26 @@ func (o Options) Validate() error {
 	}
 	if o.Direction == "handler" && (o.From != "hotels" || o.To != "review") {
 		return fmt.Errorf("--direction handler поддерживается только для hotels → review")
+	}
+	if o.controlledInflight() && o.DelayPerInflight == 0 {
+		return fmt.Errorf("--inflight-threshold, --delay-ramp и --activate-on-enter требуют --delay-per-inflight")
+	}
+	if o.InflightThreshold < 0 || o.InflightThreshold > 1_000_000 {
+		return fmt.Errorf("--inflight-threshold должен быть от 0 до 1000000 (0: порог по умолчанию 1)")
+	}
+	if o.DelayRamp < 0 || o.DelayRamp > o.Duration || o.DelayRamp%time.Millisecond != 0 {
+		return fmt.Errorf("--delay-ramp должен быть не больше --duration, с точностью до миллисекунд")
+	}
+	if o.DelayPerInflight != 0 || o.MaxDelay != 0 {
+		if o.Direction != "handler" || o.Unavailable || len(o.DelayProfile) != 0 || o.PushbackMS != nil {
+			return fmt.Errorf("--delay-per-inflight требует --direction handler и --slowdown; не совмещается с другими видами сбоя")
+		}
+		if o.DelayPerInflight < time.Millisecond || o.DelayPerInflight > MaxSlowdown || o.DelayPerInflight%time.Millisecond != 0 {
+			return fmt.Errorf("--delay-per-inflight должен быть от 1ms до %s, с точностью до миллисекунды", MaxSlowdown)
+		}
+		if o.MaxDelay < time.Millisecond || o.MaxDelay < o.Slowdown || o.MaxDelay > MaxSlowdown || o.MaxDelay%time.Millisecond != 0 {
+			return fmt.Errorf("--max-delay должен быть от 1ms до %s и не меньше --slowdown, с точностью до миллисекунды", MaxSlowdown)
+		}
 	}
 	if len(o.DelayProfile) != 0 {
 		if o.From != "api-gateway" || o.To != "booking" || o.Direction != "request" {
@@ -107,6 +133,10 @@ func (o Options) Validate() error {
 		return fmt.Errorf("--duration должен быть от 1ms до %s, с точностью до миллисекунды", MaxDuration)
 	}
 	return nil
+}
+
+func (o Options) controlledInflight() bool {
+	return o.InflightThreshold != 0 || o.DelayRamp != 0 || o.ActivateOnEnter
 }
 
 // Percentage preserves the existing whole-link fault when the flag is omitted.

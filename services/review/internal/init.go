@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
-	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -29,6 +28,7 @@ import (
 	"review/internal/pkg/grpc/intercept"
 	"review/internal/pkg/grpcdesc"
 	"review/internal/pkg/healthcheck"
+	"review/internal/pkg/loadshedding"
 	echoV1 "review/internal/pkg/pb/review/echo/v1"
 	businessV1 "review/internal/pkg/pb/review/review/v1"
 	"review/internal/pkg/telemetry"
@@ -67,7 +67,7 @@ func (a *App) initMainServer(ctx context.Context) error {
 			grpc.StatsHandler(traces.ServerHandler()),
 			grpc.StatsHandler(metrics.ServerHandler()),
 			grpc.InTapHandle(metrics.TapHandler),
-			grpc.ChainUnaryInterceptor(intercept.ErrorInterceptor(), intercept.DemoDelayInterceptor()),
+			grpc.ChainUnaryInterceptor(reviewUnaryInterceptors(config.Instance().LoadShedding)...),
 			grpc.KeepaliveParams(keepalive.ServerParameters{
 				MaxConnectionIdle: config.Instance().GrpcServer.MaxConnectionIdle,
 				MaxConnectionAge:  config.Instance().GrpcServer.MaxConnectionAge,
@@ -185,14 +185,6 @@ func (a *App) initGrpcConn(_ context.Context) error {
 func (a *App) initHealthCheck(_ context.Context) error {
 	a.healthCheck = healthcheck.NewHandler()
 
-	// поверяю, что нет утечки горутин на старте (как пример)
-	a.healthCheck.AddLivenessCheck("goroutines", func() error {
-		if runtime.NumGoroutine() < 1000 {
-			return nil
-		}
-		return fmt.Errorf("Превышено допустимое число горутин")
-	})
-
 	a.healthCheck.AddStartupCheck("started", func() error {
 		if atomic.LoadInt32(&a.started) != 0 {
 			return nil
@@ -257,4 +249,14 @@ func (a *App) initTelemetry(ctx context.Context) error {
 	}
 	a.telemetry = instance
 	return nil
+}
+
+// reviewUnaryInterceptors создаёт один limiter на сервер. Он получает gRPC-коды
+// после ErrorInterceptor и измеряет обработку вместе с учебной задержкой.
+func reviewUnaryInterceptors(cfg loadshedding.Config) []grpc.UnaryServerInterceptor {
+	return []grpc.UnaryServerInterceptor{
+		loadshedding.NewLoadShedding(cfg).UnaryServerInterceptor(),
+		intercept.ErrorInterceptor(),
+		intercept.DemoDelayInterceptor(),
+	}
 }

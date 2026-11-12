@@ -6,6 +6,7 @@ import (
 	"os"
 	"sync"
 
+	"review/internal/pkg/loadshedding"
 	"review/internal/pkg/telemetry"
 
 	"github.com/ilyakaznacheev/cleanenv"
@@ -28,13 +29,14 @@ func Instance() *Config {
 }
 
 type Config struct {
-	Telemetry   telemetry.Config  `yaml:"telemetry"`
-	Postgres    Postgres          `yaml:"postgres"`
-	PostgresDSN string            `yaml:"postgres_dsn" env:"POSTGRES_DSN"`
-	Targets     map[string]string `yaml:"service"`
-	GrpcServer  GrpcServer        `yaml:"grpc_server"`
-	HttpServer  HttpServer        `yaml:"http_server"`
-	Graceful    Graceful          `yaml:"graceful"`
+	LoadShedding loadshedding.Config `yaml:"load_shedding"`
+	Telemetry    telemetry.Config    `yaml:"telemetry"`
+	Postgres     Postgres            `yaml:"postgres"`
+	PostgresDSN  string              `yaml:"postgres_dsn" env:"POSTGRES_DSN"`
+	Targets      map[string]string   `yaml:"service"`
+	GrpcServer   GrpcServer          `yaml:"grpc_server"`
+	HttpServer   HttpServer          `yaml:"http_server"`
+	Graceful     Graceful            `yaml:"graceful"`
 }
 
 // Read загружает конфигурацию из YAML и применяет переменные окружения.

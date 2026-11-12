@@ -162,3 +162,10 @@ go test -race -count=1 ./services/check-in/internal/pkg/ratelimit/...
 # Подробный вывод сценариев алгоритмов.
 go test -v -count=1 ./services/check-in/internal/pkg/ratelimit/algorithms/...
 ```
+
+## Прогрессивная перегрузка Review
+
+`hotelctl load --profile line --rps 1 --rps-to 600 --duration 2m` повышает RPS линейно.
+`hotelctl fault hotels review --direction handler --slowdown 500ms --delay-per-inflight 2ms --max-delay 8s --duration 3m` связывает задержку с допущенными inflight-вызовами Review.
+
+[Сценарий урока: подготовка, два терминала, графики, снятие сбоя и сравнение с load shedding](docs/demo-review-progressive-overload.md).

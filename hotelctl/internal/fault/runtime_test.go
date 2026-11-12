@@ -12,6 +12,7 @@ import (
 
 type fakeRuntime struct {
 	values map[string]string
+	writes []map[string]string
 	fail   bool
 	calls  int
 	cancel context.CancelFunc
@@ -26,6 +27,7 @@ func (r *fakeRuntime) Modify(ctx context.Context, values map[string]string) erro
 		return err
 	}
 	r.calls++
+	r.writes = append(r.writes, maps.Clone(values))
 	maps.Copy(r.values, values)
 	if r.calls == 1 && r.cancel != nil {
 		r.cancel()
@@ -68,7 +70,7 @@ func TestRuntimeFaultLifecycle(t *testing.T) {
 					r.fail = true
 				}
 				started := time.Now()
-				err := RunRuntime(ctx, r, o, io.Discard)
+				err := RunRuntime(ctx, r, o, nil, io.Discard)
 				wantErr := mode == "cancel" || mode == "lost apply"
 				if (err != nil) != wantErr {
 					t.Fatalf("error=%v", err)
@@ -99,11 +101,11 @@ func TestActiveFaultIsNotOverwritten(t *testing.T) {
 		Duration:    time.Second,
 	}
 	r := &fakeRuntime{values: o.Values()}
-	if err := RunRuntime(context.Background(), r, o, io.Discard); err == nil || r.calls != 0 {
+	if err := RunRuntime(context.Background(), r, o, nil, io.Discard); err == nil || r.calls != 0 {
 		t.Fatal("existing fault was overwritten")
 	}
 	o.Clear, o.Unavailable, o.Duration = true, false, 0
-	if err := RunRuntime(context.Background(), r, o, io.Discard); err != nil {
+	if err := RunRuntime(context.Background(), r, o, nil, io.Discard); err != nil {
 		t.Fatal(err)
 	}
 	if r.values["demo.hotels.review.request.abort_percent"] != "0" {
@@ -135,7 +137,7 @@ func TestPushbackRuntimeCleanup(t *testing.T) {
 					r.cancel = cancel
 				}
 				r.fail = mode == "lost apply"
-				err := RunRuntime(ctx, r, o, io.Discard)
+				err := RunRuntime(ctx, r, o, nil, io.Discard)
 				if (err != nil) != (mode != "duration") || r.values[key] != "disabled" || r.values["demo.api-gateway.booking.request.abort_percent"] != "0" {
 					t.Fatalf("cleanup failed: err=%v values=%v", err, r.values)
 				}
@@ -155,7 +157,7 @@ func TestPushbackRequiresUpdatedProxy(t *testing.T) {
 		Duration:    time.Second,
 	}
 	r := &fakeRuntime{values: map[string]string{}}
-	if err := RunRuntime(context.Background(), r, o, io.Discard); err == nil || r.calls != 0 {
+	if err := RunRuntime(context.Background(), r, o, nil, io.Discard); err == nil || r.calls != 0 {
 		t.Fatal("pushback silently accepted by old infrastructure")
 	}
 }
@@ -169,7 +171,7 @@ func TestHandlerDelayRequiresUpdatedProxy(t *testing.T) {
 		Duration:  time.Second,
 	}
 	r := &fakeRuntime{values: map[string]string{}}
-	if err := RunRuntime(context.Background(), r, o, io.Discard); err == nil || r.calls != 0 {
+	if err := RunRuntime(context.Background(), r, o, nil, io.Discard); err == nil || r.calls != 0 {
 		t.Fatal("handler delay accepted by old proxy")
 	}
 }
@@ -192,7 +194,7 @@ func TestHandlerDelayCleanupOnInterruption(t *testing.T) {
 			} else {
 				r.fail = true
 			}
-			if err := RunRuntime(ctx, r, o, io.Discard); err == nil {
+			if err := RunRuntime(ctx, r, o, nil, io.Discard); err == nil {
 				t.Fatal("expected interrupted run")
 			}
 			if r.calls != 2 || r.values["demo.hotels.review.handler.delay_percent"] != "0" {

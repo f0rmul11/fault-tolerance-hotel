@@ -49,20 +49,24 @@ func (m *Manager) Fault(ctx context.Context, options fault.Options) error {
 	control := fault.NewRuntimeClient(fmt.Sprintf("http://127.0.0.1:%d", forward.Ports[fault.ControlPort]))
 	defer control.Close()
 	address := fmt.Sprintf("127.0.0.1:%d", forward.Ports[edge.Port])
-	probe := func() error {
-		attempt, cancel := context.WithTimeout(ctx, 3*time.Second)
+	probe := func(parent context.Context) error {
+		attempt, cancel := context.WithTimeout(parent, 3*time.Second)
 		defer cancel()
 		return diagnostics.CheckEcho(attempt, address, services[1].EchoMethod, edge.To)
 	}
 	if !options.Clear {
-		if err := probe(); err != nil {
+		if err := probe(ctx); err != nil {
 			return fmt.Errorf("baseline Envoy → %s: %w", edge.To, err)
 		}
 	}
-	if err := fault.RunRuntime(ctx, control, options, m.Streams.Out); err != nil {
-		return err
+	if err := fault.RunRuntime(ctx, control, options, m.Streams.In, m.Streams.Out); err != nil {
+		// A clean Ctrl+C is an expected end of the demo. Exact equality matters:
+		// errors.Join(Canceled, cleanupError) must still fail visibly.
+		if err != context.Canceled || ctx.Err() != context.Canceled {
+			return err
+		}
 	}
-	if err := probe(); err != nil {
+	if err := probe(context.WithoutCancel(ctx)); err != nil {
 		return fmt.Errorf("правило снято, но контрольный Echo через Envoy → %s не прошёл: %w", edge.To, err)
 	}
 	fmt.Fprintf(m.Streams.Out, "OK Envoy → %s: контрольный Echo после снятия правила\n", edge.To)

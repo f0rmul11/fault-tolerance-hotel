@@ -8,6 +8,9 @@ layered_runtime:
       static_layer:
         demo.pushback_supported: "1"
         demo.handler_delay_supported: "1"
+
+        demo.handler_inflight_delay_supported: "1"
+        demo.handler_inflight_ramp_supported: "1"
         demo.handler_abort_supported: "1"
         demo.delay_profile_supported: "1"
     - name: admin
@@ -107,17 +110,36 @@ static_resources:
                           end
 {{end}}
 {{if eq .To "review"}}
+                          -- Per-worker cache: the injector must not overload Envoy admin.
+                          -- One refresh at a time; updates are normally visible within 100ms.
+                          local handler_runtime_body = nil
+                          local handler_runtime_expiry = 0
+                          local handler_runtime_refreshing = false
                           function envoy_on_request(handle)
                             -- Only hotelctl runtime may supply this demo parameter.
                             handle:headers():remove("x-hotelflow-handler-delay-ms")
+                            handle:headers():remove("x-hotelflow-handler-delay-per-inflight-ms")
+                            handle:headers():remove("x-hotelflow-handler-max-delay-ms")
+                            handle:headers():remove("x-hotelflow-handler-inflight-threshold")
                             handle:headers():remove("x-hotelflow-handler-unavailable")
                             if handle:headers():get(":path") ~= "/review.review.v1.ReviewService/GetHotelRatings" then
                               return
                             end
-                            local response, body = handle:httpCall("fault-runtime", {
-                              [":method"] = "GET", [":path"] = "/runtime", [":authority"] = "localhost"
-                            }, "", 1000)
-                            if response == nil or response[":status"] ~= "200" or body == nil then
+                            local now = handle:timestamp()
+                            if now >= handler_runtime_expiry and not handler_runtime_refreshing then
+                              handler_runtime_refreshing = true
+                              handler_runtime_expiry = now + 100
+                              local response, body = handle:httpCall("fault-runtime", {
+                                [":method"] = "GET", [":path"] = "/runtime", [":authority"] = "localhost"
+                              }, "", 1000)
+                              handler_runtime_body = nil
+                              if response ~= nil and response[":status"] == "200" then
+                                handler_runtime_body = body
+                              end
+                              handler_runtime_refreshing = false
+                            end
+                            local body = handler_runtime_body
+                            if body == nil then
                               return
                             end
                             local prefix = "demo.{{.From}}.{{.To}}.handler."
@@ -134,6 +156,22 @@ static_resources:
                             local delay = value("delay_ms") or 0
                             if delay >= 1 and delay <= 60000 and math.random(100) <= percent then
                               handle:headers():replace("x-hotelflow-handler-delay-ms", tostring(delay))
+                              local step = value("delay_per_inflight_ms") or 0
+                              local maximum = value("max_delay_ms") or 0
+                              if step >= 1 and step <= 60000 and maximum >= delay and maximum <= 60000 then
+                                local ramp = value("delay_ramp_ms") or 0
+                                local start = value("delay_ramp_start_ms") or 0
+                                if ramp > 0 and start > 0 then
+                                  local progress = math.max(0, math.min(1, (now - start) / ramp))
+                                  maximum = delay + math.floor((maximum - delay) * progress)
+                                end
+                                handle:headers():replace("x-hotelflow-handler-delay-per-inflight-ms", tostring(step))
+                                handle:headers():replace("x-hotelflow-handler-max-delay-ms", tostring(maximum))
+                                local threshold = value("inflight_threshold") or 0
+                                if threshold >= 1 and threshold <= 1000000 then
+                                  handle:headers():replace("x-hotelflow-handler-inflight-threshold", tostring(threshold))
+                                end
+                              end
                             end
                           end
 {{end}}
@@ -247,6 +285,14 @@ static_resources:
 {{range .Upstreams}}
     - name: {{.Name}}
       type: STRICT_DNS
+{{if or (eq .Name "hotels") (eq .Name "review")}}
+      # Allow the course's 600 RPS × 5s experiment to reach the application.
+      # The default 1024 active requests would hide Review saturation behind the proxy.
+      circuit_breakers:
+        thresholds:
+          - priority: DEFAULT
+            max_requests: 4096
+{{end}}
       lb_policy: ROUND_ROBIN
       dns_lookup_family: V4_ONLY
       dns_refresh_rate: 1s

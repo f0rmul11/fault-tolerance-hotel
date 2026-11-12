@@ -18,11 +18,11 @@ func TestHandlerUnavailableRuntime(t *testing.T) {
 			t.Fatal(values)
 		}
 		r := &fakeRuntime{values: map[string]string{"demo.handler_delay_supported": "1"}}
-		if RunRuntime(t.Context(), r, o, io.Discard) == nil {
+		if RunRuntime(t.Context(), r, o, nil, io.Discard) == nil {
 			t.Fatal("accepted old proxy")
 		}
 		r.values["demo.handler_abort_supported"] = "1"
-		if err := RunRuntime(t.Context(), r, o, io.Discard); err != nil {
+		if err := RunRuntime(t.Context(), r, o, nil, io.Discard); err != nil {
 			t.Fatal(err)
 		}
 		if r.values["demo.hotels.review.handler.abort_percent"] != "0" {

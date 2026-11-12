@@ -28,6 +28,8 @@ func NewCmdFault(f util.Factory, streams iostreams.IOStreams) *cobra.Command {
 		Short: "Временно замедлить RPC или сделать связь недоступной через Envoy",
 		Long: "Сбой на одной RPC-связи. --direction response задерживает готовый ответ.\n" +
 			"--direction handler эмулирует задержку или UNAVAILABLE внутри Review.GetHotelRatings.\n" +
+			"С --delay-per-inflight задержка растёт за каждый inflight сверх --inflight-threshold (по умолчанию 1).\n" +
+			"--activate-on-enter держит базовую задержку до Enter; --delay-ramp плавно поднимает потолок задержки после активации.\n" +
 			"--duration задаёт окно инъекции; уже задержанные вызовы могут закончиться позже.\n" +
 			"Команда ждёт окончания окна и снимает правило; Ctrl+C снимает его досрочно.\n" +
 			"После SIGKILL/сбоя CLI используйте --clear.",
@@ -35,6 +37,7 @@ func NewCmdFault(f util.Factory, streams iostreams.IOStreams) *cobra.Command {
 			"  hotelctl fault api-gateway booking --delay-profile '8:150ms,2:800ms' --duration 5m\n" +
 			"  hotelctl fault api-gateway booking --direction response --slowdown 8s --duration 10s\n" +
 			"  hotelctl fault hotels review --unavailable --duration 10s\n" +
+			"  hotelctl fault hotels review --direction handler --slowdown 20ms --delay-per-inflight 20ms --max-delay 8s --duration 3m\n" +
 			"  hotelctl fault api-gateway booking --unavailable --pushback-ms 1500 --duration 1m\n" +
 			"  hotelctl fault api-gateway booking --unavailable --pushback-ms=-1 --duration 1m",
 		Args: cobra.ExactArgs(2),
@@ -67,6 +70,11 @@ func NewCmdFault(f util.Factory, streams iostreams.IOStreams) *cobra.Command {
 	command.Flags().IntVar(&o.percent, "percent", 100, "Доля физических попыток со сбоем, от 0 до 100 процентов")
 	command.Flags().Int32Var(&o.pushbackMS, "pushback-ms", 0, "С --unavailable: gRPC pushback в мс; -1 запрещает retry, 0 разрешает без паузы")
 	command.Flags().DurationVar(&o.Fault.Slowdown, "slowdown", 0, "Дополнительная задержка от 1ms до 1m")
+	command.Flags().DurationVar(&o.Fault.DelayPerInflight, "delay-per-inflight", 0, "Для handler: добавка задержки за каждый другой допущенный запрос Review")
+	command.Flags().DurationVar(&o.Fault.MaxDelay, "max-delay", 0, "Предел задержки с --delay-per-inflight, не больше 1m")
+	command.Flags().IntVar(&o.Fault.InflightThreshold, "inflight-threshold", 0, "Число одновременных запросов Review, до которого задержка остаётся базовой (0: по умолчанию 1)")
+	command.Flags().DurationVar(&o.Fault.DelayRamp, "delay-ramp", 0, "Время роста потолка задержки от --slowdown до --max-delay после активации")
+	command.Flags().BoolVar(&o.Fault.ActivateOnEnter, "activate-on-enter", false, "Начать с базовой задержки и включить зависимость от inflight по Enter")
 	command.Flags().DurationVar(&o.Fault.Duration, "duration", 0, "Окно действия сбоя от 1ms до 1h")
 	command.Flags().StringVar(&o.Fault.Direction, "direction", "request", "Что задержать: request, response или handler (внутри Review)")
 	command.Flags().BoolVar(&o.Fault.Unavailable, "unavailable", false, "Вернуть gRPC UNAVAILABLE; с --direction handler — внутри Review")
@@ -77,6 +85,11 @@ func NewCmdFault(f util.Factory, streams iostreams.IOStreams) *cobra.Command {
 	command.MarkFlagsMutuallyExclusive("clear", "percent")
 	for _, flag := range []string{"slowdown", "percent", "unavailable", "pushback-ms", "clear"} {
 		command.MarkFlagsMutuallyExclusive("delay-profile", flag)
+	}
+	command.MarkFlagsRequiredTogether("delay-per-inflight", "max-delay")
+	for _, flag := range []string{"clear", "unavailable", "delay-profile", "pushback-ms"} {
+		command.MarkFlagsMutuallyExclusive("delay-per-inflight", flag)
+		command.MarkFlagsMutuallyExclusive("max-delay", flag)
 	}
 	return command
 }

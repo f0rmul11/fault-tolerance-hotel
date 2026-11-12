@@ -1,6 +1,7 @@
 package fault
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -91,15 +92,20 @@ func (c *RuntimeClient) Modify(ctx context.Context, values map[string]string) er
 func (o Options) Values() map[string]string {
 	prefix := "demo." + o.From + "." + o.To + "."
 	values := map[string]string{
-		prefix + "request.delay_percent":  "0",
-		prefix + "request.delay_ms":       "1",
-		prefix + "request.abort_percent":  "0",
-		prefix + "request.pushback_ms":    "disabled",
-		prefix + "response.delay_percent": "0",
-		prefix + "response.delay_ms":      "1",
-		prefix + "handler.delay_percent":  "0",
-		prefix + "handler.abort_percent":  "0",
-		prefix + "handler.delay_ms":       "1",
+		prefix + "request.delay_percent":         "0",
+		prefix + "request.delay_ms":              "1",
+		prefix + "request.abort_percent":         "0",
+		prefix + "request.pushback_ms":           "disabled",
+		prefix + "response.delay_percent":        "0",
+		prefix + "response.delay_ms":             "1",
+		prefix + "handler.delay_percent":         "0",
+		prefix + "handler.abort_percent":         "0",
+		prefix + "handler.delay_ms":              "1",
+		prefix + "handler.delay_per_inflight_ms": "0",
+		prefix + "handler.max_delay_ms":          "0",
+		prefix + "handler.inflight_threshold":    "0",
+		prefix + "handler.delay_ramp_ms":         "0",
+		prefix + "handler.delay_ramp_start_ms":   "0",
 	}
 	values[prefix+"request.profile_percent"] = "0"
 	values[prefix+"request.delay_profile"] = "disabled"
@@ -121,6 +127,12 @@ func (o Options) Values() map[string]string {
 	} else if !o.Clear {
 		values[prefix+o.Direction+".delay_percent"] = strconv.Itoa(o.Percentage())
 		values[prefix+o.Direction+".delay_ms"] = strconv.FormatInt(o.Slowdown.Milliseconds(), 10)
+		if o.DelayPerInflight > 0 {
+			values[prefix+"handler.delay_per_inflight_ms"] = strconv.FormatInt(o.DelayPerInflight.Milliseconds(), 10)
+			values[prefix+"handler.max_delay_ms"] = strconv.FormatInt(o.MaxDelay.Milliseconds(), 10)
+			values[prefix+"handler.inflight_threshold"] = strconv.Itoa(o.InflightThreshold)
+			values[prefix+"handler.delay_ramp_ms"] = strconv.FormatInt(o.DelayRamp.Milliseconds(), 10)
+		}
 	}
 	return values
 }
@@ -149,7 +161,7 @@ func verifyRuntime(ctx context.Context, runtime Runtime, expected map[string]str
 }
 
 // RunRuntime keeps cleanup in the foreground CLI. SIGKILL requires --clear.
-func RunRuntime(ctx context.Context, runtime Runtime, options Options, out io.Writer) (err error) {
+func RunRuntime(ctx context.Context, runtime Runtime, options Options, in io.Reader, out io.Writer) (err error) {
 	if err := options.Validate(); err != nil {
 		return err
 	}
@@ -165,6 +177,15 @@ func RunRuntime(ctx context.Context, runtime Runtime, options Options, out io.Wr
 	}
 	if options.Direction == "handler" && current["demo.handler_delay_supported"] != "1" {
 		return fmt.Errorf("обновите Review и Envoy: hotelctl build review && hotelctl deploy review")
+	}
+	if options.DelayPerInflight > 0 && current["demo.handler_inflight_delay_supported"] != "1" {
+		return fmt.Errorf("обновите Review и Envoy для --delay-per-inflight: hotelctl build review && hotelctl deploy review")
+	}
+	if options.controlledInflight() && current["demo.handler_inflight_ramp_supported"] != "1" {
+		return fmt.Errorf("обновите Review и Envoy для управляемой перегрузки: hotelctl build review && hotelctl deploy review")
+	}
+	if options.ActivateOnEnter && in == nil {
+		return fmt.Errorf("--activate-on-enter требует ввода из терминала или stdin")
 	}
 	if options.Direction == "handler" && options.Unavailable && current["demo.handler_abort_supported"] != "1" {
 		return fmt.Errorf("обновите Review и Envoy: hotelctl build review && hotelctl deploy review")
@@ -188,11 +209,49 @@ func RunRuntime(ctx context.Context, runtime Runtime, options Options, out io.Wr
 		}
 		fmt.Fprintln(out, "Правило снято; новые вызовы проходят без этой инъекции")
 	}()
-	if err := runtime.Modify(ctx, values); err != nil {
+	rampStartKey := "demo." + options.From + "." + options.To + ".handler.delay_ramp_start_ms"
+	initial := values
+	if options.ActivateOnEnter {
+		baseline := options
+		baseline.DelayPerInflight = 0
+		initial = baseline.Values()
+	} else if options.DelayRamp > 0 {
+		values[rampStartKey] = strconv.FormatInt(time.Now().UnixMilli(), 10)
+	}
+	if err := runtime.Modify(ctx, initial); err != nil {
 		return err
 	}
-	if err := verifyRuntime(ctx, runtime, values); err != nil {
+	if err := verifyRuntime(ctx, runtime, initial); err != nil {
 		return err
+	}
+
+	timer := time.NewTimer(options.Duration)
+	defer timer.Stop()
+	if options.ActivateOnEnter {
+		fmt.Fprintf(out, "ACTIVE %s → %s: базовая задержка %s, общее окно %s\n", options.From, options.To, options.Slowdown, options.Duration)
+		fmt.Fprintln(out, "Запустите нагрузку. Нажмите Enter, чтобы включить рост задержки по inflight.")
+		activation := make(chan error, 1)
+		go func() {
+			_, readErr := bufio.NewReader(in).ReadString('\n')
+			activation <- readErr
+		}()
+		select {
+		case <-timer.C:
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		case readErr := <-activation:
+			if readErr != nil {
+				return fmt.Errorf("не удалось дождаться Enter: %w", readErr)
+			}
+		}
+		values[rampStartKey] = strconv.FormatInt(time.Now().UnixMilli(), 10)
+		if err := runtime.Modify(ctx, values); err != nil {
+			return err
+		}
+		if err := verifyRuntime(ctx, runtime, values); err != nil {
+			return err
+		}
 	}
 	if len(options.DelayProfile) != 0 {
 		fmt.Fprintf(out, "ACTIVE %s → %s: профиль request на %s\n", options.From, options.To, options.Duration)
@@ -207,6 +266,19 @@ func RunRuntime(ctx context.Context, runtime Runtime, options Options, out io.Wr
 		if options.PushbackMS != nil {
 			fmt.Fprintf(out, "grpc-retry-pushback-ms: %d (ответ до обработки запроса сервисом)\n", *options.PushbackMS)
 		}
+	} else if options.DelayPerInflight > 0 {
+		if options.ActivateOnEnter {
+			fmt.Fprintf(out, "INFLIGHT ACTIVE %s → %s\n", options.From, options.To)
+		} else {
+			fmt.Fprintf(out, "ACTIVE %s → %s: handler по inflight на %s\n", options.From, options.To, options.Duration)
+		}
+		fmt.Fprintf(out, "Задержка = min(потолок, %s + %s × max(0, inflight − %d))\n", options.Slowdown, options.DelayPerInflight, max(1, options.InflightThreshold))
+		if options.DelayRamp > 0 {
+			fmt.Fprintf(out, "Потолок растёт от %s до %s за %s.\n", options.Slowdown, options.MaxDelay, options.DelayRamp)
+		} else {
+			fmt.Fprintf(out, "Потолок задержки: %s.\n", options.MaxDelay)
+		}
+		fmt.Fprintln(out, "inflight: допущенные GetHotelRatings в одном процессе Review, включая текущий вызов; backlog limiter не учитывается.")
 	} else {
 		fmt.Fprintf(out, "ACTIVE %s → %s: %s +%s на %s\n", options.From, options.To, options.Direction, options.Slowdown, options.Duration)
 	}
@@ -214,8 +286,6 @@ func RunRuntime(ctx context.Context, runtime Runtime, options Options, out io.Wr
 		fmt.Fprintf(out, "Доля попыток со сбоем: %d%%\n", options.Percentage())
 	}
 	fmt.Fprintln(out, "Отправьте запрос из второго терминала. Ctrl+C досрочно снимает правило.")
-	timer := time.NewTimer(options.Duration)
-	defer timer.Stop()
 	select {
 	case <-timer.C:
 		return nil
