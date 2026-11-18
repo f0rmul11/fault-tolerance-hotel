@@ -16,6 +16,13 @@ http_server:
 kafka_brokers:
   - kafka:9092
 consumer_group: notification-booking-events
+retry:
+  notification.booking.retry.1.v1:
+    group: notification-booking-events-retry-1
+    delay: 5s
+  notification.booking.retry.2.v1:
+    group: notification-booking-events-retry-2
+    delay: 30s
 # Уведомления выводятся в stdout, внешнего провайдера нет.
 service: {}
 

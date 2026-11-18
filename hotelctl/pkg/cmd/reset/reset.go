@@ -42,7 +42,7 @@ func (o *ResetOptions) Validate() error {
 		return err
 	}
 	if !o.Yes {
-		return fmt.Errorf("reset удаляет учебные данные четырёх БД, два топика и offsets потребителей; используйте hotelctl reset --yes")
+		return fmt.Errorf("reset удаляет учебные данные четырёх БД, пять топиков и offsets потребителей; используйте hotelctl reset --yes")
 	}
 	return nil
 }

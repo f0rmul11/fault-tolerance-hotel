@@ -12,6 +12,7 @@ import (
 
 	"notification/config"
 	"notification/internal/application/usecase"
+	"notification/internal/dto/bookingevent"
 	"notification/internal/infrastructure/gateway"
 	"notification/internal/infrastructure/handlers/booking_activated"
 	"notification/internal/infrastructure/handlers/booking_canceled"
@@ -239,8 +240,8 @@ func (a *App) initUsecases(_ context.Context) error {
 }
 
 func (a *App) initHandlers(_ context.Context) error {
-	a.eventRouter = event_router.NewEventRouter[string, []byte](
-		event_router.WithSkipUnknownEventType[string, []byte](),
+	a.eventRouter = event_router.NewEventRouter[string, bookingevent.Event](
+		event_router.WithSkipUnknownEventType[string, bookingevent.Event](),
 	)
 	a.eventRouter.RegisterAll(
 		booking_confirmed.NewHandler(a.usecases.NotifyConfirmed),
@@ -251,7 +252,11 @@ func (a *App) initHandlers(_ context.Context) error {
 }
 
 func (a *App) initMessageBus(_ context.Context) error {
-	a.messageBus = messagebus.NewRegistry(a.eventRouter)
+	registry, err := messagebus.NewRegistry(config.Instance(), a.eventRouter)
+	if err != nil {
+		return err
+	}
+	a.messageBus = registry
 	a.publicCloser.Add(a.messageBus.Stop)
 	return nil
 }

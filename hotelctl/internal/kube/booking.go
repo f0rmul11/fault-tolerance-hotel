@@ -27,6 +27,7 @@ type BookingResources struct {
 	Infrastructure []*unstructured.Unstructured
 	Migrations     []*unstructured.Unstructured
 	JobName        string
+	TopicsJobName  string
 }
 
 func NeedsBookingDependencies(services []config.Service) bool {
@@ -167,9 +168,11 @@ func RenderBookingDependencies(root string) (BookingResources, error) {
 	}
 
 	var migrations []*unstructured.Unstructured
+	topics := notificationTopicsJob()
 	for _, object := range []runtime.Object{
 		configMap,
 		job,
+		topics,
 	} {
 		value, err := runtime.DefaultUnstructuredConverter.ToUnstructured(object)
 		if err != nil {
@@ -195,6 +198,7 @@ func RenderBookingDependencies(root string) (BookingResources, error) {
 		Infrastructure: infrastructure,
 		Migrations:     migrations,
 		JobName:        name,
+		TopicsJobName:  topics.Name,
 	}, nil
 }
 

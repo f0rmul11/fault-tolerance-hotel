@@ -7,6 +7,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
+	"notification/internal/pkg/msgbus/subscriber/retry"
 	"notification/internal/pkg/telemetry/traces"
 )
 
@@ -44,7 +45,7 @@ func (g groupSubscriber) ConsumeClaim(session sarama.ConsumerGroupSession, claim
 				return nil
 			}
 
-			err := g.handleMessage(ctx, session, message)
+			err := g.handleMessage(ctx, message)
 			if ctx.Err() != nil {
 				return nil
 			}
@@ -61,26 +62,21 @@ func (g groupSubscriber) ConsumeClaim(session sarama.ConsumerGroupSession, claim
 	}
 }
 
-func (g groupSubscriber) handleMessage(ctx context.Context, session sarama.ConsumerGroupSession, message *sarama.ConsumerMessage) (err error) {
-	headers := make(map[string]string, len(message.Headers))
-	for _, header := range message.Headers {
-		if header != nil {
-			headers[string(header.Key)] = string(header.Value)
-		}
-	}
-	ctx = traces.Extract(ctx, headers)
+func (g groupSubscriber) handleMessage(ctx context.Context, message *sarama.ConsumerMessage) (err error) {
+	fields := retry.Read(message.Headers)
+	ctx = traces.Extract(ctx, fields)
 	ctx, span := traces.Start(ctx, "kafka.receive",
 		trace.WithSpanKind(trace.SpanKindConsumer),
 		trace.WithAttributes(
 			attribute.String("messaging.system", "kafka"),
 			attribute.String("messaging.destination.name", message.Topic),
 			attribute.String("messaging.operation.type", "receive"),
-			attribute.String("messaging.message.id", headers["x-correlation-id"]),
+			attribute.String("messaging.message.id", fields["x-correlation-id"]),
 		),
 	)
 	defer span.End()
 	defer func() {
 		traces.RecordError(span, err)
 	}()
-	return g.messageHandler(ctx, session, message)
+	return g.messageHandler(ctx, message, fields)
 }

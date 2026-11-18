@@ -2,54 +2,46 @@ package booking_events
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
+	"errors"
 
 	"github.com/IBM/sarama"
-	"github.com/gofrs/uuid"
 
+	"notification/internal/dto/bookingevent"
 	event_router "notification/internal/pkg/event-router"
+	"notification/internal/pkg/msgbus/subscriber/retry"
+	"notification/internal/pkg/notificationerror"
 	"notification/internal/pkg/telemetry/traces"
 )
 
 type MessageHandler struct {
-	router *event_router.EventRouter[string, []byte]
+	router *event_router.EventRouter[string, bookingevent.Event]
 }
 
-func NewMessageHandler(router *event_router.EventRouter[string, []byte]) *MessageHandler {
+func NewMessageHandler(router *event_router.EventRouter[string, bookingevent.Event]) *MessageHandler {
 	return &MessageHandler{
 		router: router,
 	}
 }
 
-func (h *MessageHandler) Handle(ctx context.Context, _ sarama.ConsumerGroupSession, message *sarama.ConsumerMessage) (err error) {
+func (h *MessageHandler) Handle(ctx context.Context, message *sarama.ConsumerMessage, headers map[string]string) (err error) {
 	ctx, span := traces.Start(ctx, "handler.kafka.booking_events")
 	defer span.End()
 	defer func() {
 		traces.RecordError(span, err)
 	}()
 
-	var base BaseEvent
-	if err := json.Unmarshal(message.Value, &base); err != nil {
+	event, err := decodeEvent(message.Value, headers)
+	if err != nil {
+		return retry.DLQErr("invalid_event", err)
+	}
+
+	err = h.router.HandleEvent(ctx, event.Type, event)
+	switch {
+	case notificationerror.IsCode(err, notificationerror.InvalidArgument):
+		return retry.DLQErr("invalid_event", err)
+	case errors.Is(err, context.DeadlineExceeded):
+		return retry.RetryErr("provider_timeout", context.DeadlineExceeded)
+	default:
 		return err
 	}
-
-	var correlationID string
-	for _, header := range message.Headers {
-		if string(header.Key) == correlationIDHeader {
-			correlationID = string(header.Value)
-			break
-		}
-	}
-	if uuid.FromStringOrNil(correlationID) == uuid.Nil {
-		return fmt.Errorf("в событии отсутствует корректный x-correlation-id")
-	}
-	if correlationID != base.CorrelationID {
-		return fmt.Errorf("correlation-id в заголовке и событии не совпадают")
-	}
-	if uuid.FromStringOrNil(base.BookingID) == uuid.Nil {
-		return fmt.Errorf("в событии отсутствует идентификатор брони")
-	}
-
-	return h.router.HandleEvent(ctx, base.EventType, message.Value)
 }

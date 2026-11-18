@@ -10,7 +10,7 @@ import (
 	"github.com/IBM/sarama"
 )
 
-type MessageHandler func(context.Context, sarama.ConsumerGroupSession, *sarama.ConsumerMessage) error
+type MessageHandler func(context.Context, *sarama.ConsumerMessage, map[string]string) error
 
 type TopicConsumer struct {
 	topic   string

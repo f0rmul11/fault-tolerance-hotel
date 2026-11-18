@@ -20,4 +20,14 @@ type Graceful struct {
 	Timeout time.Duration `yaml:"timeout" env:"GRACEFUL_TIMEOUT"`
 }
 
-const BookingEventsTopic = "booking.events.v1"
+const (
+	BookingEventsTopic = "booking.events.v1"
+	BookingRetry1Topic = "notification.booking.retry.1.v1"
+	BookingRetry2Topic = "notification.booking.retry.2.v1"
+	BookingDLQTopic    = "notification.booking.dlq.v1"
+)
+
+type RetryStage struct {
+	Group string        `yaml:"group"`
+	Delay time.Duration `yaml:"delay"`
+}

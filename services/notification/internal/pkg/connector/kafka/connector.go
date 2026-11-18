@@ -1,15 +1,12 @@
 package kafka
 
 import (
-	"log"
 	"time"
-
-	"notification/config"
 
 	"github.com/IBM/sarama"
 )
 
-func MustConsumerGroup() sarama.ConsumerGroup {
+func NewConsumerGroup(brokers []string, name string) (sarama.ConsumerGroup, error) {
 	cfg := sarama.NewConfig()
 
 	cfg.Consumer.Group.Rebalance.GroupStrategies = []sarama.BalanceStrategy{sarama.NewBalanceStrategyRoundRobin()}
@@ -29,11 +26,16 @@ func MustConsumerGroup() sarama.ConsumerGroup {
 	cfg.Consumer.Fetch.Max = 10 * 1024 * 1024 // максимум за один fetch
 	cfg.Consumer.MaxProcessingTime = 500 * time.Millisecond
 
-	group, err := sarama.NewConsumerGroup(config.Instance().KafkaBrokers, config.Instance().ConsumerGroup, cfg)
-	if err != nil {
-		log.Fatalf("Не удалось создать Kafka consumer: %v", err)
-		return nil
-	}
+	return sarama.NewConsumerGroup(brokers, name, cfg)
+}
 
-	return group
+func NewProducer(brokers []string) (sarama.SyncProducer, error) {
+	cfg := sarama.NewConfig()
+	cfg.Producer.Partitioner = sarama.NewManualPartitioner
+	cfg.Producer.RequiredAcks = sarama.WaitForAll
+	cfg.Producer.Return.Successes = true
+	// В служебную запись к исходному сообщению добавляются заголовки повтора.
+	cfg.Producer.MaxMessageBytes = 2 << 20
+
+	return sarama.NewSyncProducer(brokers, cfg)
 }

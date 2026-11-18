@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/IBM/sarama"
 	"github.com/gofrs/uuid"
@@ -13,11 +14,13 @@ import (
 	"notification/internal/application/usecase/notification/activated"
 	"notification/internal/application/usecase/notification/canceled"
 	"notification/internal/application/usecase/notification/confirmed"
+	"notification/internal/dto/bookingevent"
 	"notification/internal/dto/push"
 	"notification/internal/infrastructure/handlers/booking_activated"
 	"notification/internal/infrastructure/handlers/booking_canceled"
 	"notification/internal/infrastructure/handlers/booking_confirmed"
 	event_router "notification/internal/pkg/event-router"
+	"notification/internal/pkg/msgbus/subscriber/retry"
 )
 
 type senderFake struct {
@@ -28,6 +31,15 @@ type senderFake struct {
 func (s *senderFake) Send(_ context.Context, message push.Message) error {
 	s.messages = append(s.messages, message)
 	return s.err
+}
+
+type publication struct {
+	message *sarama.ProducerMessage
+}
+
+func (p *publication) SendMessage(message *sarama.ProducerMessage) (int32, int64, error) {
+	p.message = message
+	return message.Partition, 0, nil
 }
 
 func TestNotifications(t *testing.T) {
@@ -59,7 +71,7 @@ func TestNotifications(t *testing.T) {
 			sender := &senderFake{}
 			handler := newHandler(sender)
 			message := newMessage(t, test.event)
-			if err := handler.Handle(context.Background(), nil, message); err != nil {
+			if err := handler.Handle(context.Background(), message, retry.Read(message.Headers)); err != nil {
 				t.Fatal(err)
 			}
 			if test.title == "" {
@@ -80,20 +92,37 @@ func TestNotifications(t *testing.T) {
 				}
 			}
 			// Без inbox повтор доставляется в gateway повторно с тем же correlation-id.
-			if err := handler.Handle(context.Background(), nil, message); err != nil || len(sender.messages) != 2 {
+			if err := handler.Handle(context.Background(), message, retry.Read(message.Headers)); err != nil || len(sender.messages) != 2 {
 				t.Fatalf("unexpected replay: %v", err)
 			}
-			failure := errors.New("провайдер недоступен")
-			sender.err = failure
-			if err := handler.Handle(context.Background(), nil, message); !errors.Is(err, failure) {
-				t.Fatalf("provider error lost: %v", err)
+			for _, failure := range []struct {
+				cause error
+				code  string
+			}{
+				{cause: errors.New("provider unavailable"), code: "unclassified"},
+				{cause: context.DeadlineExceeded, code: "provider_timeout"},
+			} {
+				sender.err = failure.cause
+				headers := retry.Read(message.Headers)
+				err := handler.Handle(t.Context(), message, headers)
+				if !errors.Is(err, failure.cause) {
+					t.Fatalf("provider error lost: %v", err)
+				}
+				published := &publication{}
+				router := retry.NewMainRouter(published, "retry-1", "dlq", time.Second)
+				if err := router.Route(t.Context(), message, headers, time.Now(), err); err != nil {
+					t.Fatal(err)
+				}
+				if published.message == nil || published.message.Topic != "retry-1" || headers["last-error-code"] != failure.code {
+					t.Fatalf("provider error did not schedule a retry: %v", headers)
+				}
 			}
 		})
 	}
 }
 
 func TestMalformedMessageDoesNotSend(t *testing.T) {
-	for _, test := range []struct {
+	tests := []struct {
 		name   string
 		mutate func(*sarama.ConsumerMessage)
 	}{
@@ -115,26 +144,43 @@ func TestMalformedMessageDoesNotSend(t *testing.T) {
 				m.Headers[0].Value = []byte(uuid.Must(uuid.NewV4()).String())
 			},
 		},
-		{
-			name: "invalid timestamp",
-			mutate: func(m *sarama.ConsumerMessage) {
-				m.Value = []byte(strings.ReplaceAll(string(m.Value), "2026-10-14T12:00:00+03:00", "invalid"))
-			},
-		},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			sender := &senderFake{}
-			message := newMessage(t, "booking.confirmed.v1")
-			test.mutate(message)
-			if err := newHandler(sender).Handle(context.Background(), nil, message); err == nil || len(sender.messages) != 0 {
-				t.Fatalf("invalid event reached provider: %v", err)
-			}
-		})
+	}
+	for _, eventType := range []string{"booking.confirmed.v1", "booking.activated.v1", "booking.canceled.v1"} {
+		for _, test := range tests {
+			t.Run(eventType+"/"+test.name, func(t *testing.T) {
+				message := newMessage(t, eventType)
+				test.mutate(message)
+				assertInvalidEvent(t, message)
+			})
+		}
+	}
+	t.Run("confirmation with invalid timestamp", func(t *testing.T) {
+		message := newMessage(t, "booking.confirmed.v1")
+		message.Value = []byte(strings.ReplaceAll(string(message.Value), "2026-10-14T12:00:00+03:00", "invalid"))
+		assertInvalidEvent(t, message)
+	})
+}
+
+func assertInvalidEvent(t *testing.T, message *sarama.ConsumerMessage) {
+	t.Helper()
+	sender := &senderFake{}
+	headers := retry.Read(message.Headers)
+	failure := newHandler(sender).Handle(t.Context(), message, headers)
+	if failure == nil || len(sender.messages) != 0 {
+		t.Fatalf("invalid event reached provider: %v", failure)
+	}
+	published := &publication{}
+	router := retry.NewMainRouter(published, "retry-1", "dlq", time.Second)
+	if err := router.Route(t.Context(), message, headers, time.Now(), failure); err != nil {
+		t.Fatal(err)
+	}
+	if published.message == nil || published.message.Topic != "dlq" || headers["dlq-reason"] != "invalid_event" {
+		t.Fatalf("invalid event did not go straight to DLQ: %v", headers)
 	}
 }
 
-func newHandler(sender *senderFake) *MessageHandler {
-	router := event_router.NewEventRouter[string, []byte](event_router.WithSkipUnknownEventType[string, []byte]())
+func newHandler(sender confirmed.Sender) *MessageHandler {
+	router := event_router.NewEventRouter(event_router.WithSkipUnknownEventType[string, bookingevent.Event]())
 	router.RegisterAll(
 		booking_confirmed.NewHandler(confirmed.New(sender)),
 		booking_activated.NewHandler(activated.New(sender)),

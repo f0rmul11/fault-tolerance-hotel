@@ -195,11 +195,14 @@ func (m *Manager) deploy(
 				return err
 			}
 		}
-		fmt.Fprintln(m.Streams.Out, "Применение миграций и учебных данных")
+		fmt.Fprintln(m.Streams.Out, "Применение миграций, учебных данных и топиков Kafka")
 		if err = client.Apply(ctx, resources.Migrations, m.Streams.Out); err != nil {
 			return err
 		}
 		if err = client.WaitJob(ctx, "hotelflow", resources.JobName); err != nil {
+			return err
+		}
+		if err = client.WaitJob(ctx, "hotelflow", resources.TopicsJobName); err != nil {
 			return err
 		}
 	}

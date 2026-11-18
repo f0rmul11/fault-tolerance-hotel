@@ -26,7 +26,7 @@ func TestBookingDependenciesUseCanonicalSQLAndSeparateOwners(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(resources.Infrastructure) == 0 || len(resources.Migrations) != 2 {
+	if len(resources.Infrastructure) == 0 || len(resources.Migrations) != 3 {
 		t.Fatal("incomplete dependency resources")
 	}
 	var sql corev1.ConfigMap
@@ -56,6 +56,15 @@ func TestBookingDependenciesUseCanonicalSQLAndSeparateOwners(t *testing.T) {
 	var job batchv1.Job
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(resources.Migrations[1].Object, &job); err != nil {
 		t.Fatal(err)
+	}
+	var topicsJob batchv1.Job
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(resources.Migrations[2].Object, &topicsJob); err != nil {
+		t.Fatal(err)
+	}
+	containers := topicsJob.Spec.Template.Spec.Containers
+	if topicsJob.Name != resources.TopicsJobName || topicsJob.Name == job.Name ||
+		len(containers) != 1 || containers[0].Command[2] != createNotificationTopics {
+		t.Fatal("изменение топиков должно выполняться отдельным Job до запуска Notification")
 	}
 	if job.Name != resources.JobName ||
 		len(job.Spec.Template.Spec.InitContainers) != 5 ||

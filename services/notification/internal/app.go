@@ -14,6 +14,7 @@ import (
 
 	"notification/config"
 	"notification/internal/application/usecase"
+	"notification/internal/dto/bookingevent"
 	"notification/internal/infrastructure/gateway"
 	"notification/internal/infrastructure/messagebus"
 	"notification/internal/pkg/closer"
@@ -32,7 +33,7 @@ type App struct {
 	telemetry   *telemetry.Telemetry
 	gateway     *gateway.Registry
 	usecases    *usecase.Registry
-	eventRouter *event_router.EventRouter[string, []byte]
+	eventRouter *event_router.EventRouter[string, bookingevent.Event]
 	messageBus  *messagebus.Registry
 	mainServer  *server.Server
 

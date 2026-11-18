@@ -57,22 +57,9 @@ func ResetResources(root, name string) (*corev1.ConfigMap, *batchv1.Job, error) 
 			}},
 		})
 	}
-	groups := []string{}
-	for _, owner := range []string{"booking", "check-in", "notification"} {
-		body, err := os.ReadFile(filepath.Join(root, "services", owner, "config", "config.yaml"))
-		if err != nil {
-			return nil, nil, err
-		}
-		var consumer struct {
-			Group string `json:"consumer_group"`
-		}
-		if err := yaml.Unmarshal(body, &consumer); err != nil {
-			return nil, nil, err
-		}
-		if consumer.Group == "" {
-			return nil, nil, fmt.Errorf("не задан consumer_group для %s", owner)
-		}
-		groups = append(groups, consumer.Group)
+	groups, err := resetConsumerGroups(root)
+	if err != nil {
+		return nil, nil, err
 	}
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -118,16 +105,57 @@ func ResetResources(root, name string) (*corev1.ConfigMap, *batchv1.Job, error) 
 	return cm, job, nil
 }
 
+func resetConsumerGroups(root string) ([]string, error) {
+	groups := []string{}
+	for _, owner := range []string{"booking", "check-in", "notification"} {
+		body, err := os.ReadFile(filepath.Join(root, "services", owner, "config", "config.yaml"))
+		if err != nil {
+			return nil, err
+		}
+		var consumer struct {
+			Group string `json:"consumer_group"`
+			Retry map[string]struct {
+				Group string `json:"group"`
+			} `json:"retry"`
+		}
+		if err := yaml.Unmarshal(body, &consumer); err != nil {
+			return nil, err
+		}
+		if consumer.Group == "" {
+			return nil, fmt.Errorf("не задан consumer_group для %s", owner)
+		}
+		groups = append(groups, consumer.Group)
+		if owner == "notification" {
+			if len(consumer.Retry) != 2 {
+				return nil, fmt.Errorf("для Notification ожидаются две записи в retry")
+			}
+			for topic, stage := range consumer.Retry {
+				if stage.Group == "" {
+					return nil, fmt.Errorf("не указана consumer group для %s", topic)
+				}
+				groups = append(groups, stage.Group)
+			}
+		}
+	}
+	return groups, nil
+}
+
 const resetKafka = `set -eu
 cd /opt/kafka/bin
-for topic in booking.events.v1 checkin.events.v1; do
-    ./kafka-topics.sh --bootstrap-server kafka:9092 --delete --if-exists --topic "$topic"
+managed_topics='` + businessTopics + ` ` + notificationTopics + `'
+for topic in $managed_topics; do
+    ./kafka-topics.sh --bootstrap-server kafka:9092 --delete --if-exists --topic "\Q$topic\E"
 done
 while :; do
     topics=$(./kafka-topics.sh --bootstrap-server kafka:9092 --list)
-    if ! printf '%s\n' "$topics" | grep -Eq '^(booking|checkin)\.events\.v1$'; then
-        break
-    fi
+    pending=false
+    for topic in $managed_topics; do
+        if printf '%s\n' "$topics" | grep -Fxq -- "$topic"; then
+            pending=true
+            break
+        fi
+    done
+    if [ "$pending" = false ]; then break; fi
     sleep 1
 done
 groups=$(./kafka-consumer-groups.sh --bootstrap-server kafka:9092 --list)
@@ -143,10 +171,10 @@ for group in "$@"; do
         exit 1
     fi
 done
-for topic in booking.events.v1 checkin.events.v1; do
+for topic in ` + businessTopics + `; do
     ./kafka-topics.sh --bootstrap-server kafka:9092 --create --topic "$topic" --partitions 3 --replication-factor 3 --config min.insync.replicas=2
 done
-`
+` + createNotificationTopics
 
 func (c *Client) Replicas(ctx context.Context, services []config.Service) ([]project.ServiceReplicas, error) {
 	var result []project.ServiceReplicas

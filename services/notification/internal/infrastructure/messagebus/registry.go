@@ -2,32 +2,49 @@ package messagebus
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
+	"notification/config"
+	"notification/internal/dto/bookingevent"
 	"notification/internal/infrastructure/messagebus/subscriber"
 	"notification/internal/infrastructure/messagebus/subscriber/scheme/booking_events"
-	"notification/internal/pkg/closer"
+	"notification/internal/pkg/connector/kafka"
 	event_router "notification/internal/pkg/event-router"
+
+	"github.com/IBM/sarama"
 )
 
 type Registry struct {
-	bookingEvents *booking_events.MessageHandler
-	subscribers   subscriber.Subscribers
+	producer    sarama.SyncProducer
+	subscribers subscriber.Subscribers
 }
 
-func NewRegistry(router *event_router.EventRouter[string, []byte]) *Registry {
-	registry := &Registry{
-		bookingEvents: booking_events.NewMessageHandler(router),
-		subscribers:   subscriber.NewSubscribers(),
+func NewRegistry(cfg *config.Config, router *event_router.EventRouter[string, bookingevent.Event]) (*Registry, error) {
+	producer, err := kafka.NewProducer(cfg.KafkaBrokers)
+	if err != nil {
+		return nil, fmt.Errorf("создать Kafka producer для Notification: %w", err)
 	}
-	closer.Add(registry.subscribers.BookingEvents.Close)
-	return registry
+	handler := booking_events.NewMessageHandler(router)
+	subscribers, err := subscriber.NewSubscribers(cfg, producer, handler.Handle)
+	if err != nil {
+		return nil, errors.Join(err, producer.Close())
+	}
+
+	return &Registry{
+		producer:    producer,
+		subscribers: subscribers,
+	}, nil
 }
 
 func (r *Registry) Run(ctx context.Context) {
-	r.subscribers.BookingEvents.Subscribe(ctx, r.bookingEvents.Handle)
+	for _, sub := range r.subscribers {
+		sub.Subscribe(ctx)
+	}
 }
 
 func (r *Registry) Stop() error {
-	r.subscribers.BookingEvents.Stop()
-	return nil
+	// Сначала освобождаем claims, чтобы ни один handler не писал в закрытый producer.
+	err := r.subscribers.Close()
+	return errors.Join(err, r.producer.Close())
 }
