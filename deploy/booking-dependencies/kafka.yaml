@@ -1,3 +1,16 @@
+# Three independent brokers/controllers. Each owns its own PVC and stable node ID.
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka
+spec:
+  selector:
+    kafka-cluster: hotelflow
+  ports:
+    - name: kafka
+      port: 9092
+      targetPort: kafka
+---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -11,14 +24,21 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: kafka
+  name: kafka-1
 spec:
+  publishNotReadyAddresses: true
   selector:
     app.kubernetes.io/name: booking-kafka
   ports:
     - name: kafka
       port: 9092
       targetPort: kafka
+    - name: controller
+      port: 9093
+      targetPort: 9093
+    - name: producer
+      port: 19092
+      targetPort: 19092
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -35,6 +55,7 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: booking-kafka
+        kafka-cluster: hotelflow
     spec:
       automountServiceAccountToken: false
       securityContext:
@@ -49,17 +70,20 @@ spec:
             - {name: CLUSTER_ID, value: "5L6g3nShT-eMCtK--X86sw"}
             - {name: KAFKA_NODE_ID, value: "1"}
             - {name: KAFKA_PROCESS_ROLES, value: "broker,controller"}
-            - {name: KAFKA_LISTENERS, value: "PLAINTEXT://:9092,CONTROLLER://:9093"}
-            - {name: KAFKA_ADVERTISED_LISTENERS, value: "PLAINTEXT://kafka:9092"}
-            - {name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP, value: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT"}
+            - {name: KAFKA_LISTENERS, value: "PLAINTEXT://:9092,CONTROLLER://:9093,PRODUCER://:19092"}
+            - {name: KAFKA_ADVERTISED_LISTENERS, value: "PLAINTEXT://kafka-1:9092,PRODUCER://kafka-proxy:19091"}
+            - {name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP, value: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,PRODUCER:PLAINTEXT"}
             - {name: KAFKA_CONTROLLER_LISTENER_NAMES, value: "CONTROLLER"}
-            - {name: KAFKA_CONTROLLER_QUORUM_VOTERS, value: "1@localhost:9093"}
+            - {name: KAFKA_CONTROLLER_QUORUM_VOTERS, value: "1@kafka-1:9093,2@kafka-2:9093,3@kafka-3:9093"}
             - {name: KAFKA_INTER_BROKER_LISTENER_NAME, value: "PLAINTEXT"}
-            - {name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR, value: "1"}
-            - {name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR, value: "1"}
-            - {name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR, value: "1"}
-            - {name: KAFKA_NUM_PARTITIONS, value: "1"}
-            - {name: KAFKA_AUTO_CREATE_TOPICS_ENABLE, value: "true"}
+            - {name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR, value: "3"}
+            - {name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR, value: "3"}
+            - {name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR, value: "2"}
+            - {name: KAFKA_NUM_PARTITIONS, value: "3"}
+            - {name: KAFKA_AUTO_CREATE_TOPICS_ENABLE, value: "false"}
+            - {name: KAFKA_DEFAULT_REPLICATION_FACTOR, value: "3"}
+            - {name: KAFKA_MIN_INSYNC_REPLICAS, value: "2"}
+            - {name: KAFKA_UNCLEAN_LEADER_ELECTION_ENABLE, value: "false"}
             - {name: KAFKA_LOG_DIRS, value: "/var/lib/kafka/data"}
             - {name: KAFKA_HEAP_OPTS, value: "-Xms256m -Xmx512m"}
           volumeMounts:
@@ -87,3 +111,205 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: booking-kafka-data
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: booking-kafka-2-data
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-2
+spec:
+  publishNotReadyAddresses: true
+  selector:
+    app.kubernetes.io/name: booking-kafka-2
+  ports:
+    - name: kafka
+      port: 9092
+      targetPort: kafka
+    - name: controller
+      port: 9093
+      targetPort: 9093
+    - name: producer
+      port: 19092
+      targetPort: 19092
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: booking-kafka-2
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: booking-kafka-2
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: booking-kafka-2
+        kafka-cluster: hotelflow
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: kafka
+          image: apache/kafka:3.9.1
+          ports:
+            - name: kafka
+              containerPort: 9092
+          env:
+            - {name: CLUSTER_ID, value: "5L6g3nShT-eMCtK--X86sw"}
+            - {name: KAFKA_NODE_ID, value: "2"}
+            - {name: KAFKA_PROCESS_ROLES, value: "broker,controller"}
+            - {name: KAFKA_LISTENERS, value: "PLAINTEXT://:9092,CONTROLLER://:9093,PRODUCER://:19092"}
+            - {name: KAFKA_ADVERTISED_LISTENERS, value: "PLAINTEXT://kafka-2:9092,PRODUCER://kafka-proxy:19092"}
+            - {name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP, value: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,PRODUCER:PLAINTEXT"}
+            - {name: KAFKA_CONTROLLER_LISTENER_NAMES, value: "CONTROLLER"}
+            - {name: KAFKA_CONTROLLER_QUORUM_VOTERS, value: "1@kafka-1:9093,2@kafka-2:9093,3@kafka-3:9093"}
+            - {name: KAFKA_INTER_BROKER_LISTENER_NAME, value: "PLAINTEXT"}
+            - {name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR, value: "3"}
+            - {name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR, value: "3"}
+            - {name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR, value: "2"}
+            - {name: KAFKA_NUM_PARTITIONS, value: "3"}
+            - {name: KAFKA_AUTO_CREATE_TOPICS_ENABLE, value: "false"}
+            - {name: KAFKA_DEFAULT_REPLICATION_FACTOR, value: "3"}
+            - {name: KAFKA_MIN_INSYNC_REPLICAS, value: "2"}
+            - {name: KAFKA_UNCLEAN_LEADER_ELECTION_ENABLE, value: "false"}
+            - {name: KAFKA_LOG_DIRS, value: "/var/lib/kafka/data"}
+            - {name: KAFKA_HEAP_OPTS, value: "-Xms256m -Xmx512m"}
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/kafka/data
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 1Gi
+          startupProbe:
+            exec:
+              command: [/opt/kafka/bin/kafka-broker-api-versions.sh, --bootstrap-server, "localhost:9092"]
+            periodSeconds: 3
+            timeoutSeconds: 10
+            failureThreshold: 60
+          readinessProbe:
+            exec:
+              command: [/opt/kafka/bin/kafka-broker-api-versions.sh, --bootstrap-server, "localhost:9092"]
+            periodSeconds: 5
+            timeoutSeconds: 10
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: booking-kafka-2-data
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: booking-kafka-3-data
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-3
+spec:
+  publishNotReadyAddresses: true
+  selector:
+    app.kubernetes.io/name: booking-kafka-3
+  ports:
+    - name: kafka
+      port: 9092
+      targetPort: kafka
+    - name: controller
+      port: 9093
+      targetPort: 9093
+    - name: producer
+      port: 19092
+      targetPort: 19092
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: booking-kafka-3
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: booking-kafka-3
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: booking-kafka-3
+        kafka-cluster: hotelflow
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: kafka
+          image: apache/kafka:3.9.1
+          ports:
+            - name: kafka
+              containerPort: 9092
+          env:
+            - {name: CLUSTER_ID, value: "5L6g3nShT-eMCtK--X86sw"}
+            - {name: KAFKA_NODE_ID, value: "3"}
+            - {name: KAFKA_PROCESS_ROLES, value: "broker,controller"}
+            - {name: KAFKA_LISTENERS, value: "PLAINTEXT://:9092,CONTROLLER://:9093,PRODUCER://:19092"}
+            - {name: KAFKA_ADVERTISED_LISTENERS, value: "PLAINTEXT://kafka-3:9092,PRODUCER://kafka-proxy:19093"}
+            - {name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP, value: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,PRODUCER:PLAINTEXT"}
+            - {name: KAFKA_CONTROLLER_LISTENER_NAMES, value: "CONTROLLER"}
+            - {name: KAFKA_CONTROLLER_QUORUM_VOTERS, value: "1@kafka-1:9093,2@kafka-2:9093,3@kafka-3:9093"}
+            - {name: KAFKA_INTER_BROKER_LISTENER_NAME, value: "PLAINTEXT"}
+            - {name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR, value: "3"}
+            - {name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR, value: "3"}
+            - {name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR, value: "2"}
+            - {name: KAFKA_NUM_PARTITIONS, value: "3"}
+            - {name: KAFKA_AUTO_CREATE_TOPICS_ENABLE, value: "false"}
+            - {name: KAFKA_DEFAULT_REPLICATION_FACTOR, value: "3"}
+            - {name: KAFKA_MIN_INSYNC_REPLICAS, value: "2"}
+            - {name: KAFKA_UNCLEAN_LEADER_ELECTION_ENABLE, value: "false"}
+            - {name: KAFKA_LOG_DIRS, value: "/var/lib/kafka/data"}
+            - {name: KAFKA_HEAP_OPTS, value: "-Xms256m -Xmx512m"}
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/kafka/data
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 1Gi
+          startupProbe:
+            exec:
+              command: [/opt/kafka/bin/kafka-broker-api-versions.sh, --bootstrap-server, "localhost:9092"]
+            periodSeconds: 3
+            timeoutSeconds: 10
+            failureThreshold: 60
+          readinessProbe:
+            exec:
+              command: [/opt/kafka/bin/kafka-broker-api-versions.sh, --bootstrap-server, "localhost:9092"]
+            periodSeconds: 5
+            timeoutSeconds: 10
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: booking-kafka-3-data

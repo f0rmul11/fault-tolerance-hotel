@@ -215,8 +215,8 @@ ETCD_BIN=/absolute/path/to/etcd go test -race -tags=integration ./pkg/cmd/config
 Несколько имён проверяются до первого изменения; сетевой сбой может оставить частичный результат,
 который виден через status. Команды блокируются при незавершённом reset.
 
-Компоненты: шесть приложений из hotel.yaml, четыре `*-postgres`, `kafka`, `akhq`, `config-etcd`.
-Имя `kafka` соответствует Deployment `booking-kafka`. Кластерные системные Pod сюда не входят.
+Компоненты: шесть приложений из hotel.yaml, четыре `*-postgres`, `kafka`, `kafka-2`, `kafka-3`, `kafka-proxy`, `akhq`, `config-etcd`.
+Имена `kafka`, `kafka-2`, `kafka-3` соответствуют Deployment `booking-kafka`, `booking-kafka-2`, `booking-kafka-3`. Кластерные системные Pod сюда не входят.
 `logs` также принимает имена зависимостей. Список доступен без Docker: `hotelctl components`.
 
 `stop` без аргументов останавливает весь контейнер k3s, как и раньше; возобновление — `up`.
@@ -368,3 +368,27 @@ Ctrl+C/окончание duration снимают правило для новы
 `hotelctl deploy hotels review`. Fallback читается из локального snapshot rtconfig на каждый
 вызов, изменения etcd применяются через watch без redeploy. При потере etcd сохраняется
 последний валидный snapshot; до первого sync Hotels не готов. Ошибка чтения флага даёт false.
+
+
+## Потеря ответа Kafka для урока 7
+
+```bash
+./bin/hotelctl fault-kafka --duration 200ms --timeout 2m
+./bin/hotelctl fault-kafka --clear
+```
+
+Команда затрагивает только Booking producer. Предварительно создать бронь при одной
+реплике Booking и дождаться её появления в Check-in. После `ACTIVE` отменить эту же бронь:
+ключ выбирает уже прогретую партицию. Не отправлять другие события параллельно.
+
+Toxiproxy удерживает downstream-ответы. hotelctl читает конец партиций напрямую,
+ждёт новую запись в booking.events.v1, затем закрывает TCP и через 200ms восстанавливает
+все три proxy. Диапазон `--duration`: 1ms–1s; это длительность разрыва после append,
+а `--timeout` ограничивает весь опыт. Само приложение запросов не повторяет: наблюдаем
+retry внутри Sarama. Без идемпотентности в Kafka появляется дубль; с ней повтор этой
+отправки не добавляет запись. Новый вызов приложения и новый producer — другая гарантия.
+
+При завершении, ошибке или Ctrl+C инъекция снимается. После SIGKILL или аварии компьютера
+выполнить `--clear`; если восстановление не удалось, команда возвращает ошибку.
+Прямой consumer listener, AKHQ и репликация не проходят через proxy.
+Полный [сценарий producer](../demo/module-7/lesson-07-producer-demo-cheatsheet.md).

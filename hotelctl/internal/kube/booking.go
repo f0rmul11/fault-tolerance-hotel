@@ -21,7 +21,7 @@ import (
 
 const bookingNamespace = "hotelflow"
 const gooseImage = "ghcr.io/kukymbr/goose-docker:3.26.0@sha256:0cd025636df126e7f66472861ca4db3683bc649be46cd1f6ef1a316209058e23"
-const migrationJobRevision = "v9-separate-postgres-public"
+const migrationJobRevision = "v10-kafka-three-brokers"
 
 type BookingResources struct {
 	Infrastructure []*unstructured.Unstructured
@@ -141,8 +141,8 @@ func RenderBookingDependencies(root string) (BookingResources, error) {
 								"/bin/sh",
 								"-ec",
 							},
-							Args: []string{`/opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic booking.events.v1 --partitions 1 --replication-factor 1
-/opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic checkin.events.v1 --partitions 1 --replication-factor 1`},
+							Args: []string{`/opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic booking.events.v1 --partitions 3 --replication-factor 3 --config min.insync.replicas=2
+/opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic checkin.events.v1 --partitions 3 --replication-factor 3 --config min.insync.replicas=2`},
 							Env: []corev1.EnvVar{{
 								Name:  "KAFKA_HEAP_OPTS",
 								Value: "-Xms128m -Xmx256m",
@@ -311,6 +311,12 @@ func configureBookingRuntime(object *unstructured.Unstructured, service config.S
 			env = append(env, map[string]any{
 				"name":  "KAFKA_BROKERS",
 				"value": "kafka:9092",
+			})
+		}
+		if service.Name == "booking" && !names["KAFKA_PRODUCER_BROKERS"] {
+			env = append(env, map[string]any{
+				"name":  "KAFKA_PRODUCER_BROKERS",
+				"value": "kafka-proxy:19091,kafka-proxy:19092,kafka-proxy:19093",
 			})
 		}
 		container["env"] = env

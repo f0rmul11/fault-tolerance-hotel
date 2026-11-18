@@ -28,17 +28,18 @@ func Instance() *Config {
 }
 
 type Config struct {
-	Telemetry     telemetry.Config  `yaml:"telemetry"`
-	Inbox         Inbox             `yaml:"inbox"`
-	ConsumerGroup string            `yaml:"consumer_group" env:"KAFKA_CONSUMER_GROUP"`
-	Postgres      Postgres          `yaml:"postgres"`
-	Outbox        Outbox            `yaml:"outbox"`
-	KafkaBrokers  []string          `yaml:"kafka_brokers" env:"KAFKA_BROKERS" env-separator:","`
-	Targets       map[string]string `yaml:"service" env:"SERVICE_TARGETS"`
-	GrpcServer    GrpcServer        `yaml:"grpc_server"`
-	HttpServer    HttpServer        `yaml:"http_server"`
-	Graceful      Graceful          `yaml:"graceful"`
-	PostgresDSN   string            `yaml:"postgres_dsn" env:"POSTGRES_DSN"`
+	Telemetry            telemetry.Config  `yaml:"telemetry"`
+	Inbox                Inbox             `yaml:"inbox"`
+	ConsumerGroup        string            `yaml:"consumer_group" env:"KAFKA_CONSUMER_GROUP"`
+	Postgres             Postgres          `yaml:"postgres"`
+	Outbox               Outbox            `yaml:"outbox"`
+	KafkaBrokers         []string          `yaml:"kafka_brokers" env:"KAFKA_BROKERS" env-separator:","`
+	KafkaProducerBrokers []string          `yaml:"kafka_producer_brokers" env:"KAFKA_PRODUCER_BROKERS" env-separator:","`
+	Targets              map[string]string `yaml:"service" env:"SERVICE_TARGETS"`
+	GrpcServer           GrpcServer        `yaml:"grpc_server"`
+	HttpServer           HttpServer        `yaml:"http_server"`
+	Graceful             Graceful          `yaml:"graceful"`
+	PostgresDSN          string            `yaml:"postgres_dsn" env:"POSTGRES_DSN"`
 }
 
 // Read загружает конфигурацию из YAML и применяет переменные окружения.
@@ -52,6 +53,11 @@ func Read() (*Config, error) {
 
 	if err := cleanenv.ReadConfig(path, cfg); err != nil {
 		return nil, fmt.Errorf("read config %s: %w", path, err)
+	}
+
+	// Отдельный listener нужен для сетевого демо; без него producer использует общий список.
+	if len(cfg.KafkaProducerBrokers) == 0 {
+		cfg.KafkaProducerBrokers = cfg.KafkaBrokers
 	}
 
 	if err := cfg.Validate(); err != nil {

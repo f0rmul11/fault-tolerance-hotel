@@ -57,6 +57,18 @@ func Dependencies() []Dependency {
 			Deployment: "booking-kafka",
 		},
 		{
+			Name:       "kafka-2",
+			Deployment: "booking-kafka-2",
+		},
+		{
+			Name:       "kafka-3",
+			Deployment: "booking-kafka-3",
+		},
+		{
+			Name:       "kafka-proxy",
+			Deployment: "kafka-proxy",
+		},
+		{
 			Name:       "config-etcd",
 			Deployment: "config-etcd",
 			Port: PortBinding{

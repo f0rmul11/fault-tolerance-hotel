@@ -24,12 +24,12 @@ func MustSyncProducer() sarama.SyncProducer {
 	saramaConfig.Producer.Partitioner = sarama.NewHashPartitioner
 
 	saramaConfig.Producer.Timeout = 10 * time.Second // таймаут на запись
-	saramaConfig.Net.MaxOpenRequests = 1             // для идемпотентного продьюсера MaxOpenRequests должен быть 1
+	saramaConfig.Net.MaxOpenRequests = 1             // Sarama требует 1 при включённой идемпотентности
 
 	saramaConfig.Metadata.Retry.Max = 5
 	saramaConfig.Metadata.Retry.Backoff = 500 * time.Millisecond
 
-	producer, err := sarama.NewSyncProducer(config.Instance().KafkaBrokers, saramaConfig)
+	producer, err := sarama.NewSyncProducer(config.Instance().KafkaProducerBrokers, saramaConfig)
 	if err != nil {
 		log.Fatalf("[KAFKA] Не удалось создать producer: %v", err)
 		return nil
@@ -49,6 +49,7 @@ func MustConsumerGroup() sarama.ConsumerGroup {
 	cfg.Consumer.Group.Session.Timeout = 30 * time.Second   // таймаут сессии (heartbeat)
 	cfg.Consumer.Group.Heartbeat.Interval = 5 * time.Second // heartbeat для координации
 
+	cfg.Consumer.Return.Errors = true
 	cfg.Consumer.Offsets.AutoCommit.Enable = false
 	cfg.Consumer.Offsets.Initial = sarama.OffsetOldest
 

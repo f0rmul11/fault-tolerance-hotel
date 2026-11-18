@@ -9,5 +9,6 @@ resources:
   - hotels-postgres.yaml
   - review-postgres.yaml
   - kafka.yaml
+  - kafka-proxy.yaml
   - akhq.yaml
   - config-etcd.yaml

@@ -20,6 +20,7 @@ func MustConsumerGroup() sarama.ConsumerGroup {
 	cfg.Consumer.Group.Session.Timeout = 30 * time.Second   // таймаут сессии (heartbeat)
 	cfg.Consumer.Group.Heartbeat.Interval = 5 * time.Second // heartbeat для координации
 
+	cfg.Consumer.Return.Errors = true
 	cfg.Consumer.Offsets.AutoCommit.Enable = false
 	cfg.Consumer.Offsets.Initial = sarama.OffsetOldest
 

@@ -2,7 +2,6 @@ package consumer
 
 import (
 	"context"
-	"log/slog"
 
 	"github.com/IBM/sarama"
 	"go.opentelemetry.io/otel/attribute"
@@ -36,7 +35,7 @@ func (g groupSubscriber) ConsumeClaim(session sarama.ConsumerGroupSession, claim
 
 	for {
 		if ctx.Err() != nil {
-			return ctx.Err()
+			return nil
 		}
 
 		select {
@@ -47,19 +46,17 @@ func (g groupSubscriber) ConsumeClaim(session sarama.ConsumerGroupSession, claim
 
 			err := g.handleMessage(ctx, session, message)
 			if ctx.Err() != nil {
-				return ctx.Err()
+				return nil
 			}
 			if err != nil {
-				slog.Error("handle kafka message", "error", err.Error())
 				return err
 			}
 
 			session.MarkMessage(message, "")
-			// Синхронно делаем commit нашего offset'а
-			// Если не вызвать session.Commit() -> будет срабатывать асинхронный коммит раз в интервал
+			// Подтверждаем offset после успешного handler; ошибки читает ConsumerGroup.Errors().
 			session.Commit()
 		case <-ctx.Done():
-			return ctx.Err()
+			return nil
 		}
 	}
 }

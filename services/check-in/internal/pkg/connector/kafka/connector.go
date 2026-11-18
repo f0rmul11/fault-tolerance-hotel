@@ -2,6 +2,7 @@ package kafka
 
 import (
 	"log"
+	"os"
 	"time"
 
 	"check-in/config"
@@ -24,7 +25,7 @@ func MustSyncProducer() sarama.SyncProducer {
 	saramaConfig.Producer.Partitioner = sarama.NewHashPartitioner
 
 	saramaConfig.Producer.Timeout = 10 * time.Second // таймаут на запись
-	saramaConfig.Net.MaxOpenRequests = 1             // для идемпотентного продьюсера MaxOpenRequests должен быть 1
+	saramaConfig.Net.MaxOpenRequests = 1             // Sarama требует 1 при включённой идемпотентности
 
 	saramaConfig.Metadata.Retry.Max = 5
 	saramaConfig.Metadata.Retry.Backoff = 500 * time.Millisecond
@@ -40,8 +41,11 @@ func MustSyncProducer() sarama.SyncProducer {
 
 func MustConsumerGroup() sarama.ConsumerGroup {
 	cfg := sarama.NewConfig()
+	cfg.ClientID = "check-in-" + os.Getenv("HOSTNAME")
 
-	cfg.Consumer.Group.Rebalance.GroupStrategies = []sarama.BalanceStrategy{sarama.NewBalanceStrategyRoundRobin()}
+	cfg.Consumer.Group.Rebalance.GroupStrategies = []sarama.BalanceStrategy{
+		sarama.NewBalanceStrategyRoundRobin(),
+	}
 
 	cfg.Consumer.Group.Rebalance.Retry.Max = 4                          // количество повторов при ребалансе
 	cfg.Consumer.Group.Rebalance.Retry.Backoff = 500 * time.Millisecond // интервал между попытками
@@ -49,6 +53,7 @@ func MustConsumerGroup() sarama.ConsumerGroup {
 	cfg.Consumer.Group.Session.Timeout = 30 * time.Second   // таймаут сессии (heartbeat)
 	cfg.Consumer.Group.Heartbeat.Interval = 5 * time.Second // heartbeat для координации
 
+	cfg.Consumer.Return.Errors = true
 	cfg.Consumer.Offsets.AutoCommit.Enable = false
 	cfg.Consumer.Offsets.Initial = sarama.OffsetOldest
 

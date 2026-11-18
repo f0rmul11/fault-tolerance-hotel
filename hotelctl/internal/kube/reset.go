@@ -144,7 +144,7 @@ for group in "$@"; do
     fi
 done
 for topic in booking.events.v1 checkin.events.v1; do
-    ./kafka-topics.sh --bootstrap-server kafka:9092 --create --topic "$topic" --partitions 1 --replication-factor 1
+    ./kafka-topics.sh --bootstrap-server kafka:9092 --create --topic "$topic" --partitions 3 --replication-factor 3 --config min.insync.replicas=2
 done
 `
 

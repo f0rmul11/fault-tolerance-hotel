@@ -181,6 +181,9 @@ func (m *Manager) deploy(
 			"hotels-postgres",
 			"review-postgres",
 			"booking-kafka",
+			"booking-kafka-2",
+			"booking-kafka-3",
+			"kafka-proxy",
 			"config-etcd",
 			"akhq",
 		} {

@@ -56,8 +56,16 @@ func (f *Forward) Close() {
 // ForwardEnvoy pins both control and data checks to the same ready Envoy Pod.
 // The returned tunnel outlives ctx cancellation so cleanup can still use it.
 func (c *Client) ForwardEnvoy(ctx context.Context, ports []int, errOut io.Writer) (*Forward, error) {
+	return c.forwardComponent(ctx, "envoy", ports, errOut)
+}
+
+func (c *Client) ForwardKafkaProxy(ctx context.Context, errOut io.Writer) (*Forward, error) {
+	return c.forwardComponent(ctx, "kafka-proxy", []int{8474}, errOut)
+}
+
+func (c *Client) forwardComponent(ctx context.Context, name string, ports []int, errOut io.Writer) (*Forward, error) {
 	pods, err := c.Typed.CoreV1().Pods("hotelflow").List(ctx, metav1.ListOptions{
-		LabelSelector: "app.kubernetes.io/name=envoy",
+		LabelSelector: "app.kubernetes.io/name=" + name,
 	})
 	if err != nil {
 		return nil, err
@@ -74,7 +82,7 @@ func (c *Client) ForwardEnvoy(ctx context.Context, ports []int, errOut io.Writer
 		}
 	}
 	if len(names) != 1 {
-		return nil, fmt.Errorf("нужен ровно один готовый Pod Envoy, найдено %d; выполните hotelctl up", len(names))
+		return nil, fmt.Errorf("нужен ровно один готовый Pod %s, найдено %d; выполните hotelctl up", name, len(names))
 	}
 	cfg := rest.CopyConfig(c.REST)
 	cfg.Timeout = 0
@@ -107,7 +115,7 @@ func (c *Client) ForwardEnvoy(ctx context.Context, ports []int, errOut io.Writer
 		return nil, ctx.Err()
 	case err := <-done:
 		forward.Close()
-		return nil, fmt.Errorf("port-forward Envoy завершился: %v", err)
+		return nil, fmt.Errorf("port-forward %s завершился: %v", name, err)
 	case <-ready:
 	}
 	bound, err := pf.GetPorts()

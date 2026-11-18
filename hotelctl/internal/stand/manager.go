@@ -9,6 +9,7 @@ import (
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/internal/config"
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/internal/fault"
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/internal/iostreams"
+	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/internal/kafkafault"
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/internal/project"
 )
 
@@ -40,6 +41,7 @@ type Interface interface {
 	Smoke(context.Context) error
 	BusinessSmoke(context.Context) error
 	Fault(context.Context, fault.Options) error
+	KafkaFault(context.Context, kafkafault.Options) error
 	Logs(context.Context, config.Service, bool, int64) error
 	Control(context.Context, string, []config.Service) error
 	Stop(context.Context) error

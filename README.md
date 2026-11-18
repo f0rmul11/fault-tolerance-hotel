@@ -64,7 +64,7 @@ make -C services/booking generate       # собственный API и внеш
 | Prometheus — API и собственный UI | Прямой локальный endpoint не опубликован | — | Метрики доступны через Grafana → Explore → Prometheus; внутри k3s `http://prometheus:9090` |
 | Loki — API логов | Прямой локальный endpoint не опубликован | — | Логи доступны через Grafana → Explore → Loki; внутри k3s `http://loki:3100` |
 | OTel Collector — приём телеметрии | Прямой локальный endpoint не опубликован | — | Сервисы в k3s отправляют OTLP на `otel-collector:4317` (gRPC); также есть `4318` (HTTP) |
-| Kafka — брокер | Прямой локальный endpoint не опубликован | — | Для просмотра используйте AKHQ; внутри k3s `kafka:9092`. Локальный `9092` занят gRPC Check-in |
+| Kafka — кластер из 3 брокеров | Прямой локальный endpoint не опубликован | — | Для просмотра используйте AKHQ; внутри k3s `kafka:9092`. Локальный `9092` занят gRPC Check-in |
 
 Все gRPC endpoints работают без TLS и открываются gRPC-клиентом, например `grpcurl -plaintext`, а не браузером.
 На каждом admin-порту доступны `/healthcheck/live`, `/healthcheck/ready`, `/healthcheck/startup` и `/debug/` (pprof). В таблице ссылки ведут на readiness; ответ `503` означает, что приложение ещё не готово. Admin-порт публикуется и для неготового Pod, пока сам процесс и admin-сервер работают.
@@ -103,7 +103,7 @@ Gateway задаёт общий deadline **5 секунд** на обработ�
 
 ```bash
 ./bin/hotelctl components                 # все имена приложений и зависимостей
-./bin/hotelctl stop kafka                 # остановить брокер; сохранить данные
+./bin/hotelctl stop kafka                 # остановить брокер 1; сохранить данные
 ./bin/hotelctl start kafka                # вернуть исходное число реплик
 ./bin/hotelctl restart booking            # остановка и запуск без пересборки
 ./bin/hotelctl logs booking-postgres -f    # логи также доступны для зависимостей
@@ -121,6 +121,31 @@ AKHQ доступен сразу после `hotelctl up`; адрес — в [о
 Отдельный `port-forward` не нужен. Выберите `hotelflow` → топик → Data → Oldest.
 Видны payload, key, headers, partition и offset. Kafka внутри кластера: `kafka:9092`;
 наружу опубликован UI, а не брокер с внутренним advertised address.
+
+Урок 7 использует три брокера/controller KRaft с отдельными PVC и адресами
+`kafka-1`, `kafka-2`, `kafka-3`; bootstrap `kafka:9092` направляет к живым брокерам.
+Рабочие топики: 3 партиции, replication factor 3, `min.insync.replicas=2`.
+Check-in запускается в трёх экземплярах. Это устойчивость к отказу процесса брокера
+на одном локальном k3s-узле; весь компьютер остаётся общей точкой отказа.
+
+**Итоговая конфигурация урока 7:** producer Booking и Check-in использует
+`WaitForAll`, идемпотентность, retries и `Net.MaxOpenRequests=1` (требование Sarama).
+Во всех трёх consumer автокоммит выключен. После успешного handler выполняются
+`MarkMessage` и синхронный `Commit()`. Ошибки коммита читаются из `ConsumerGroup.Errors()`.
+Новые группы начинают с `OffsetOldest`; существующие продолжают с committed offset.
+Check-in сохраняет событие в inbox до подтверждения. Доставка at-least-once,
+повторы после сбоя покрываются идемпотентной обработкой Booking/Check-in.
+Notification может повторить уведомление при повторной доставке.
+
+Из Check-in удалены демонстрационные ранняя отметка, задержка и panic.
+Шпаргалки consumer описывают прежнюю учебную версию с этими переключателями.
+Сценарии: [consumer](demo/module-7/lesson-07-consumer-demo-cheatsheet.md),
+[producer](demo/module-7/lesson-07-producer-demo-cheatsheet.md),
+[rebalance](demo/module-7/lesson-07-rebalance-demo-cheatsheet.md).
+
+Booking producer подключается через Toxiproxy на отдельном Kafka listener.
+`hotelctl fault-kafka` удерживает ответ и разрывает TCP после появления записи;
+consumer, AKHQ и межброкерная репликация используют прямой listener.
 
 Полный сценарий бронирования, заселения, отмены и уведомлений: `make smoke-business`.
 [Что проверяет команда и какие данные оставляет](hotelctl/README.md#проверка-бизнес-сценария).
