@@ -22,6 +22,7 @@ func NewMessageSubscriber(brokers []string, topic, groupName string, router *ret
 	if err != nil {
 		return nil, err
 	}
+	router.InitTopicMetrics(topic)
 	return &MessageSubscriber{
 		subscriber: consumer.NewTopicConsumer(topic, group),
 		router:     router,
@@ -51,7 +52,11 @@ func (m *MessageSubscriber) Handle(ctx context.Context, message *sarama.Consumer
 	if err = ctx.Err(); err != nil {
 		return err
 	}
-	if err = m.handler(ctx, message, headers); err != nil {
+	err = m.handler(ctx, message, headers)
+	// трекаем метрику
+	m.router.ObserveAttempt(message.Topic, err)
+
+	if err != nil {
 		return m.router.Route(ctx, message, headers, started, err)
 	}
 	return nil

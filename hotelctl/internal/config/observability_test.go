@@ -19,8 +19,8 @@ func TestObservabilitySelectionAndReservedPorts(t *testing.T) {
 	c.Observability = Observability{
 		Enabled: true,
 	}
-	components, err := c.SelectComponents([]string{"otel-collector", "jaeger", "loki", "grafana", "prometheus"})
-	if err != nil || len(components) != 5 {
+	components, err := c.SelectComponents([]string{"otel-collector", "jaeger", "loki", "grafana", "prometheus", "kafka-exporter"})
+	if err != nil || len(components) != 6 {
 		t.Fatalf("observability components: %+v, %v", components, err)
 	}
 	for _, host := range []int{16686, 3000} {

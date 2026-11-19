@@ -90,13 +90,12 @@ func (i *Inbox) handleTopicMessages(ctx context.Context, handler Handler, mode M
 
 func (i *Inbox) handleGroup(ctx context.Context, handler Handler, messages message.Messages) message.Messages {
 	var (
-		messagesErrorsLimit = i.config.MaxErrCountForMessage
-		processed           = make(message.Messages, 0, len(messages))
+		processed = make(message.Messages, 0, len(messages))
 	)
 
 	var chunk message.Messages
 	for _, chunk = range lo.Chunk(messages, handler.BatchSize(ctx)) {
-		err := handleMessages(ctx, handler, chunk)
+		err := i.handleMessages(ctx, handler, chunk)
 		// обработка
 		if err == nil {
 			// все штатно и без происшествий
@@ -111,11 +110,9 @@ func (i *Inbox) handleGroup(ctx context.Context, handler Handler, messages messa
 		// помечаем как неуспешный
 		chunk.AnErrorOccurred(err)
 
-		hasMessageWithErrLimit := lo.ContainsBy(chunk, func(message *message.Message) bool {
-			return message.GetErrorsCount() >= int32(messagesErrorsLimit)
+		hasMessageWithErrLimit := lo.ContainsBy(chunk, func(msg *message.Message) bool {
+			return msg.GetErrorsCount() >= int32(i.config.MaxErrCountForMessage)
 		})
-
-		// если превысили максимальное значение -> стреляет alert
 		if hasMessageWithErrLimit {
 			incCanNotHandleMessageByInbox(handler.Topic())
 		}
@@ -126,7 +123,7 @@ func (i *Inbox) handleGroup(ctx context.Context, handler Handler, messages messa
 
 	return processed
 }
-func handleMessages(ctx context.Context, h Handler, messages message.Messages) (err error) {
+func (i *Inbox) handleMessages(ctx context.Context, h Handler, messages message.Messages) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			incPanicHandleMessageByInbox(h.Topic())

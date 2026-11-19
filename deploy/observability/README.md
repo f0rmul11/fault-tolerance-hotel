@@ -1,6 +1,6 @@
 # Наблюдаемость HotelFlow: трейсы, логи и метрики
 
-Шесть приложений отправляют трейсы, структурированные логи и метрики глобального Prometheus registry по OTLP/gRPC в один OpenTelemetry Collector. Он направляет сигналы в Jaeger memory, Loki и Prometheus. Grafana показывает метрики, логи и ссылки на трейсы. JSON stdout сохраняется; повторного сбора stdout нет. Сбор с PostgreSQL, Kafka, etcd и других хранилищ не включен.
+Шесть приложений отправляют трейсы, структурированные логи и метрики глобального Prometheus registry по OTLP/gRPC в один OpenTelemetry Collector. Он направляет сигналы в Jaeger memory, Loki и Prometheus. Grafana показывает метрики, логи и ссылки на трейсы. JSON stdout сохраняется; повторного сбора stdout нет. Метрики Kafka собирает отдельный Kafka Exporter.
 
 ```mermaid
 flowchart LR
@@ -239,7 +239,7 @@ prometheus.DefaultRegisterer / DefaultGatherer
 
 В `internal/pkg/telemetry/metrics` находится только `provider.go`. Он подключает `prometheus.DefaultGatherer` через `prombridge.NewMetricProducer` и `sdkmetric.WithProducer` к PeriodicReader. Metrics SDK и OTLP exporter — 1.47.0, bridge — 0.72.0, client_golang — 1.24.1. Регистрация работает как до `telemetry.Init`, так и после него; после Init не следует подменять сами глобальные DefaultRegisterer/DefaultGatherer.
 
-По выбору пользователя сохранены стандартные Go/process collectors, которые уже регистрирует Prometheus client. Новые прикладные counters, gauges, histograms, heartbeat и инструментация inbox/outbox **не добавлены**. HTTP/gRPC helpers продолжают использовать noop MeterProvider: транспортные метрики автоматически не включаются. Прикладных дашбордов пока нет.
+Prometheus client регистрирует стандартные Go/process collectors. Booking и Check-in добавляют метрики Inbox и Outbox через `WithMetrics()`. Notification экспортирует результаты повторной обработки и публикаций в retry и DLQ. HTTP/gRPC helpers используют noop MeterProvider.
 
 Конфигурация сервиса:
 
@@ -270,7 +270,7 @@ requests.WithLabelValues("create").Inc()
 
 Для ручной регистрации используйте `prometheus.NewCounterVec(...)`, затем один раз `prometheus.MustRegister(requests)`. Bridge собирает значения существующих инструментов; повторно регистрировать их в OTel не нужно. Buckets задаются в `prometheus.HistogramOpts`. Используйте ограниченные значения labels: operation/status, без UUID, raw URL, SQL или error message. Пользовательский `Collector.Collect` должен завершаться быстро: стандартный Prometheus Gather не принимает context и не прерывается export timeout.
 
-Prometheus **3.13.5 LTS** закреплен digest, имеет одну реплику/Recreate и PVC `prometheus-data` 10Gi. Retention — 7d либо 8GB TSDB; WAL/head и свободное место общего диска учитываются отдельно. Запуск с `--web.enable-otlp-receiver`, `scrape_configs: []`. Прикладных HTTP endpoints для scrape не добавляется; PostgreSQL/Kafka/etcd/node/exporters не собираются. Collector отправляет в `http://prometheus:9090/api/v1/otlp/v1/metrics`; очередь ограничена 10000 points, один consumer, retry до 60s, out-of-order window Prometheus — 10m.
+Prometheus **3.13.5 LTS** закреплен digest, имеет одну реплику/Recreate и PVC `prometheus-data` 10Gi. Retention — 7d либо 8GB TSDB; WAL/head и свободное место общего диска учитываются отдельно. Приложения отправляют метрики через существующий OTLP pipeline. Отдельный scrape job `kafka-exporter` раз в 5 секунд собирает лидера и состояние партиций, offsets и consumer lag по бизнес-топикам. Collector отправляет в `http://prometheus:9090/api/v1/otlp/v1/metrics`; очередь ограничена 10000 points, один consumer, retry до 60s, out-of-order window Prometheus — 10m.
 
 В Grafana добавлен datasource **Prometheus** (`hotelflow-prometheus`), адрес внутри кластера `http://prometheus:9090`; он выбран по умолчанию. Постоянный UI остается [localhost:3000](http://localhost:3000), отдельный порт Prometheus наружу не опубликован. Loki datasource и ссылки в Jaeger сохранены.
 
@@ -279,6 +279,18 @@ Prometheus **3.13.5 LTS** закреплен digest, имеет одну реп�
 Prometheus запускается вместе с остальным стеком. Для отдельного эксперимента его можно остановить через `hotelctl stop prometheus`, а затем вернуть через `hotelctl start prometheus`; PVC сохраняется.
 
 Источники: [официальный Prometheus bridge](https://pkg.go.dev/go.opentelemetry.io/contrib/bridges/prometheus@v0.72.0), [Prometheus OTLP](https://prometheus.io/docs/guides/opentelemetry/), [Prometheus 3.13.5 LTS](https://prometheus.io/download/).
+
+
+## Events Pipeline
+
+Дашборд **Events Pipeline** расположен в папке HotelFlow рядом с **Service Overview**. Селектор **Topic** фильтрует панели, кроме числа брокеров. **Inbox / Outbox service** задаёт сервис для очередей. **Kafka consumer group** ограничивает график лага.
+
+- Kafka показывает группы и их лаг, количество партиций, лидера каждой партиции и число партиций с отстающими репликами.
+- Inbox показывает запись и обработку сообщений, достижение лимита ошибок, паники обработчика и количество необработанных сообщений в PostgreSQL.
+- Outbox показывает запись и обработку сообщений, достижение лимита ошибок и количество необработанных сообщений в PostgreSQL.
+- Retry/DLQ показывает результаты повторной обработки, записи в оба retry-топика по метрикам Kafka, результаты публикаций Notification и причины перехода в DLQ.
+
+Лаг Inbox и Outbox отражает состояние общей очереди сервиса, поэтому на дашборде берётся максимум по репликам. Скорости считаются из счётчиков каждой реплики и суммируются. Выберите **All** в **Topic**, чтобы видеть весь путь между разными топиками.
 
 
 ## Проверенный запуск метрик — 26 октября 2026

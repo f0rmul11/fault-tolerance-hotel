@@ -8,6 +8,7 @@ resources:
   - loki-workload.yaml
   - grafana-workload.yaml
   - prometheus-workload.yaml
+  - kafka-exporter-workload.yaml
 configMapGenerator:
   - name: otel-collector-config
     files:
@@ -33,3 +34,4 @@ configMapGenerator:
   - name: grafana-dashboards
     files:
       - service-overview.json=dashboards/service-overview.json
+      - events-pipeline.json=dashboards/events-pipeline.json

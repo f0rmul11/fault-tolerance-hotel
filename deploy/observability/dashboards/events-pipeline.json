@@ -1,0 +1,1632 @@
+{
+  "id": null,
+  "uid": "hotelflow-events-pipeline",
+  "title": "Events Pipeline",
+  "tags": [
+    "hotelflow",
+    "kafka",
+    "events"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 4,
+  "editable": false,
+  "graphTooltip": 1,
+  "refresh": "10s",
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m"
+    ]
+  },
+  "links": [],
+  "annotations": {
+    "list": []
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "service",
+        "label": "Inbox / Outbox service",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "hotelflow-prometheus"
+        },
+        "definition": "label_values(target_info{service_namespace=\"hotelflow\",service_name=~\"booking|check-in\"}, service_name)",
+        "query": {
+          "query": "label_values(target_info{service_namespace=\"hotelflow\",service_name=~\"booking|check-in\"}, service_name)",
+          "refId": "serviceVariable"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "multi": false,
+        "includeAll": false,
+        "current": {
+          "text": "booking",
+          "value": "booking"
+        },
+        "options": [],
+        "allowCustomValue": false
+      },
+      {
+        "name": "kafka_topic",
+        "label": "Topic",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "hotelflow-prometheus"
+        },
+        "definition": "label_values(kafka_topic_partitions{job=\"kafka-exporter\"}, topic)",
+        "query": {
+          "query": "label_values(kafka_topic_partitions{job=\"kafka-exporter\"}, topic)",
+          "refId": "kafka_topicVariable"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "multi": false,
+        "includeAll": true,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": [],
+        "allowCustomValue": false,
+        "allValue": ".*"
+      },
+      {
+        "name": "consumer_group",
+        "label": "Kafka consumer group",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "hotelflow-prometheus"
+        },
+        "definition": "label_values(kafka_consumergroup_lag{job=\"kafka-exporter\",topic=~\"$kafka_topic\"}, consumergroup)",
+        "query": {
+          "query": "label_values(kafka_consumergroup_lag{job=\"kafka-exporter\",topic=~\"$kafka_topic\"}, consumergroup)",
+          "refId": "consumer_groupVariable"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "multi": false,
+        "includeAll": true,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": [],
+        "allowCustomValue": false,
+        "allValue": ".*"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "Kafka",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Brokers",
+      "description": "Число брокеров по метаданным Kafka.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotelflow-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotelflow-prometheus"
+          },
+          "expr": "max(kafka_brokers{job=\"kafka-exporter\"})",
+          "legendFormat": "Brokers",
+          "range": false,
+          "instant": true,
+          "editorMode": "code",
+          "interval": "5s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "min": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "wideLayout": true
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Topics",
+      "description": "Число топиков по фильтру Topic.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotelflow-prometheus"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 1,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotelflow-prometheus"
+          },
+          "expr": "count(max by (topic) (kafka_topic_partitions{job=\"kafka-exporter\",topic=~\"$kafka_topic\"}))",
+          "legendFormat": "Topics",
+          "range": false,
+          "instant": true,
+          "editorMode": "code",
+          "interval": "5s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "min": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "wideLayout": true
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Partitions",
+      "description": "Общее число партиций в выбранных топиках.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotelflow-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 1,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotelflow-prometheus"
+          },
+          "expr": "sum(max by (topic) (kafka_topic_partitions{job=\"kafka-exporter\",topic=~\"$kafka_topic\"}))",
+          "legendFormat": "Partitions",
+          "range": false,
+          "instant": true,
+          "editorMode": "code",
+          "interval": "5s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "min": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "wideLayout": true
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Under-replicated",
+      "description": "Партиция считается недореплицированной, если ISR меньше набора назначенных реплик.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotelflow-prometheus"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 1,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotelflow-prometheus"
+          },
+          "expr": "sum(max by (topic, partition) (kafka_topic_partition_under_replicated_partition{job=\"kafka-exporter\",topic=~\"$kafka_topic\"}))",
+          "legendFormat": "Under-replicated",
+          "range": false,
+          "instant": true,
+          "editorMode": "code",
+          "interval": "5s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "min": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "wideLayout": true
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Consumer lag by group and topic",
+      "description": "Сумма отставания по партициям. Без известного offset партиция не входит в расчёт.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotelflow-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 24,
+        "h": 11
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotelflow-prometheus"
+          },
+          "expr": "sum by (consumergroup, topic) (max by (consumergroup, topic, partition) (kafka_consumergroup_lag{job=\"kafka-exporter\",topic=~\"$kafka_topic\",consumergroup=~\"$consumer_group\"} >= 0))",
+          "legendFormat": "{{consumergroup}} · {{topic}}",
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "interval": "5s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "width": 390
+        }
+      }
+    },
+    {
+      "id": 8,
+      "type": "status-history",
+      "title": "Partition leadership",
+      "description": "Каждая отметка показывает лидера конкретной партиции в момент измерения. Наведите на отметку, чтобы увидеть ID брокера.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotelflow-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 24,
+        "h": 12
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotelflow-prometheus"
+          },
+          "expr": "max by (topic, partition) (kafka_topic_partition_leader{job=\"kafka-exporter\",topic=~\"$kafka_topic\"})",
+          "legendFormat": "{{topic}} · p{{partition}}",
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "interval": "5s"
+        }
+      ],
+      "maxDataPoints": 150,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "green"
+          },
+          "custom": {
+            "fillOpacity": 95,
+            "lineWidth": 0
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "index": 0,
+                  "text": "Broker 1",
+                  "color": "#37872D"
+                },
+                "2": {
+                  "index": 1,
+                  "text": "Broker 2",
+                  "color": "#73BF69"
+                },
+                "3": {
+                  "index": 2,
+                  "text": "Broker 3",
+                  "color": "#96D98D"
+                },
+                "-1": {
+                  "index": 3,
+                  "text": "No leader",
+                  "color": "red"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "showValue": "never",
+        "colWidth": 0.45,
+        "rowHeight": 0.58,
+        "perPage": 12,
+        "legend": {
+          "showLegend": true,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 21,
+      "type": "timeseries",
+      "title": "Records appended per second",
+      "description": "Темп прироста offset по партициям, суммарно по топику. Интервалы со снижением offset исключаются из расчёта.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotelflow-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 28,
+        "w": 24,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotelflow-prometheus"
+          },
+          "expr": "sum by (topic) (max by (topic, partition) (clamp_min(deriv(kafka_topic_partition_current_offset{job=\"kafka-exporter\",topic=~\"$kafka_topic\"}[$__rate_interval]), 0) and (resets(kafka_topic_partition_current_offset{job=\"kafka-exporter\",topic=~\"$kafka_topic\"}[$__rate_interval]) == 0)))",
+          "legendFormat": "{{topic}}",
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "interval": "5s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "width": 390
+        }
+      }
+    },
+    {
+      "id": 9,
+      "type": "row",
+      "title": "Inbox",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 36,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Message flow",
+      "description": "Запись и успешная обработка сообщений в Inbox по топику.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotelflow-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 37,
+        "w": 12,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotelflow-prometheus"
+          },
+          "expr": "sum by (topic) (rate(inbox_inbox_messages_written_total{service_namespace=\"hotelflow\",service_name=\"$service\",topic=~\"$kafka_topic\"}[$__rate_interval]))",
+          "legendFormat": "Written · {{topic}}",
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "interval": "3s"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotelflow-prometheus"
+          },
+          "expr": "sum by (topic) (rate(inbox_inbox_messages_processed_total{service_namespace=\"hotelflow\",service_name=\"$service\",topic=~\"$kafka_topic\"}[$__rate_interval]))",
+          "legendFormat": "Processed · {{topic}}",
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "interval": "3s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^(processed|published|succeeded) · /"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^stored · /"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^failed · /"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^Duplicate writes · /"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        }
+      }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Lag",
+      "description": "Число необработанных сообщений в PostgreSQL по топику.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotelflow-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 37,
+        "w": 12,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotelflow-prometheus"
+          },
+          "expr": "max by (topic) (inbox_pending_messages{service_namespace=\"hotelflow\",service_name=\"$service\",topic=~\"$kafka_topic\"})",
+          "legendFormat": "{{topic}}",
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "interval": "3s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        }
+      }
+    },
+    {
+      "id": 22,
+      "type": "timeseries",
+      "title": "Inbox error limit and panics",
+      "description": "Error limit считает неудачные пакеты, в которых хотя бы одно сообщение достигло лимита ошибок. Panic считает перехваченные паники обработчика.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotelflow-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 47,
+        "w": 24,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotelflow-prometheus"
+          },
+          "expr": "sum by (topic) (rate(inbox_can_not_handler_message_by_inbox_total{service_namespace=\"hotelflow\",service_name=\"$service\",topic=~\"$kafka_topic\"}[$__rate_interval])) or on (topic) (0 * max by (topic) (inbox_pending_messages{service_namespace=\"hotelflow\",service_name=\"$service\",topic=~\"$kafka_topic\"}))",
+          "legendFormat": "Error limit · {{topic}}",
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "interval": "3s"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotelflow-prometheus"
+          },
+          "expr": "sum by (topic) (rate(inbox_panic_handler_message_by_inbox_total{service_namespace=\"hotelflow\",service_name=\"$service\",topic=~\"$kafka_topic\"}[$__rate_interval])) or on (topic) (0 * max by (topic) (inbox_pending_messages{service_namespace=\"hotelflow\",service_name=\"$service\",topic=~\"$kafka_topic\"}))",
+          "legendFormat": "Panic · {{topic}}",
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "interval": "3s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^Error limit · /"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^Panic · /"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "width": 390
+        }
+      }
+    },
+    {
+      "id": 13,
+      "type": "row",
+      "title": "Outbox",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 54,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "Message flow",
+      "description": "Запись и успешная обработка сообщений в Outbox по топику.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotelflow-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 55,
+        "w": 12,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotelflow-prometheus"
+          },
+          "expr": "sum by (topic) (rate(outbox_messages_written_total{service_namespace=\"hotelflow\",service_name=\"$service\",topic=~\"$kafka_topic\"}[$__rate_interval]))",
+          "legendFormat": "Written · {{topic}}",
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "interval": "3s"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotelflow-prometheus"
+          },
+          "expr": "sum by (topic) (rate(outbox_messages_processed_total{service_namespace=\"hotelflow\",service_name=\"$service\",topic=~\"$kafka_topic\"}[$__rate_interval]))",
+          "legendFormat": "Processed · {{topic}}",
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "interval": "3s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^(processed|published|succeeded) · /"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^stored · /"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^failed · /"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        }
+      }
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "title": "Lag",
+      "description": "Число необработанных сообщений в PostgreSQL по топику.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotelflow-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 55,
+        "w": 12,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotelflow-prometheus"
+          },
+          "expr": "max by (topic) (outbox_pending_messages{service_namespace=\"hotelflow\",service_name=\"$service\",topic=~\"$kafka_topic\"})",
+          "legendFormat": "{{topic}}",
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "interval": "3s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        }
+      }
+    },
+    {
+      "id": 16,
+      "type": "timeseries",
+      "title": "Outbox error limit",
+      "description": "Число неудачных пакетов, в которых хотя бы одно сообщение достигло лимита ошибок отправки.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotelflow-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 65,
+        "w": 24,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotelflow-prometheus"
+          },
+          "expr": "sum by (topic) (rate(outbox_can_not_handler_message_by_outbox_total{service_namespace=\"hotelflow\",service_name=\"$service\",topic=~\"$kafka_topic\"}[$__rate_interval])) or on (topic) (0 * max by (topic) (outbox_pending_messages{service_namespace=\"hotelflow\",service_name=\"$service\",topic=~\"$kafka_topic\"}))",
+          "legendFormat": "Error limit · {{topic}}",
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "interval": "3s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^Error limit · /"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^Panic · /"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "width": 390
+        }
+      }
+    },
+    {
+      "id": 17,
+      "type": "row",
+      "title": "Retry/DLQ",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 72,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 18,
+      "type": "timeseries",
+      "title": "Retry attempts",
+      "description": "Результаты повторной обработки в Notification по входному retry-топику.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotelflow-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 73,
+        "w": 8,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotelflow-prometheus"
+          },
+          "expr": "sum by (topic, outcome) (rate(notification_retry_attempts_total{service_namespace=\"hotelflow\",service_name=\"notification\",topic=~\"$kafka_topic\"}[$__rate_interval]))",
+          "legendFormat": "{{outcome}} · {{topic}}",
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "interval": "3s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^(processed|published|succeeded) · /"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^stored · /"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^failed · /"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        }
+      }
+    },
+    {
+      "id": 19,
+      "type": "timeseries",
+      "title": "Retry topic traffic",
+      "description": "Записи в retry-топики по данным Kafka и результаты публикаций Notification по данным приложения.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotelflow-prometheus"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 73,
+        "w": 8,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotelflow-prometheus"
+          },
+          "expr": "sum by (topic, outcome) (rate(notification_retry_publications_total{service_namespace=\"hotelflow\",service_name=\"notification\",topic=~\"$kafka_topic\",topic!=\"notification.booking.dlq.v1\"}[$__rate_interval]))",
+          "legendFormat": "{{outcome}} · {{topic}}",
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "interval": "3s"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotelflow-prometheus"
+          },
+          "expr": "sum by (topic) (max by (topic, partition) (clamp_min(deriv(kafka_topic_partition_current_offset{job=\"kafka-exporter\",topic=~\"$kafka_topic\",topic=~\"notification[.]booking[.]retry[.][12][.]v1\"}[$__rate_interval]), 0) and (resets(kafka_topic_partition_current_offset{job=\"kafka-exporter\",topic=~\"$kafka_topic\",topic=~\"notification[.]booking[.]retry[.][12][.]v1\"}[$__rate_interval]) == 0)))",
+          "legendFormat": "Kafka records · {{topic}}",
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "interval": "5s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^(processed|published|succeeded) · /"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^stored · /"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^failed · /"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        }
+      }
+    },
+    {
+      "id": 20,
+      "type": "timeseries",
+      "title": "Dead letters by reason",
+      "description": "Попытки публикации в DLQ по причине маршрутизации и результату записи в Kafka.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotelflow-prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 73,
+        "w": 8,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotelflow-prometheus"
+          },
+          "expr": "sum by (reason, outcome) (rate(notification_retry_publications_total{service_namespace=\"hotelflow\",service_name=\"notification\",topic=~\"$kafka_topic\",topic=\"notification.booking.dlq.v1\"}[$__rate_interval]))",
+          "legendFormat": "{{outcome}} · {{reason}}",
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "interval": "3s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^(processed|published|succeeded) · /"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^stored · /"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^failed · /"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        }
+      }
+    }
+  ]
+}

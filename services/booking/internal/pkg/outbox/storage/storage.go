@@ -135,3 +135,27 @@ func (s Storage) GetPendingMessages(ctx context.Context, keysLimit, messagesLimi
 		return msg.Convert()
 	}), nil
 }
+
+// GetTopicsLag возвращает число необработанных сообщений по топикам.
+func (s Storage) GetTopicsLag(ctx context.Context) (map[string]int64, error) {
+	const query = `
+		select topic, count(*) as lag
+		from outbox
+		where processed_at is null
+		group by topic
+	`
+
+	var rows []struct {
+		Topic string
+		Lag   int64
+	}
+	if err := pgxscan.Select(ctx, s.wrapper.Pool(ctx), &rows, query); err != nil {
+		return nil, err
+	}
+
+	lag := make(map[string]int64, len(rows))
+	for _, row := range rows {
+		lag[row.Topic] = row.Lag
+	}
+	return lag, nil
+}

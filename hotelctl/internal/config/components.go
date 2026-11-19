@@ -142,6 +142,7 @@ func (c Config) ObservabilityComponents() []Service {
 		{Name: "loki", Deployment: "loki", Namespace: "hotelflow"},
 		{Name: "grafana", Deployment: "grafana", Namespace: "hotelflow"},
 		{Name: "prometheus", Deployment: "prometheus", Namespace: "hotelflow"},
+		{Name: "kafka-exporter", Deployment: "kafka-exporter", Namespace: "hotelflow"},
 	}
 }
 

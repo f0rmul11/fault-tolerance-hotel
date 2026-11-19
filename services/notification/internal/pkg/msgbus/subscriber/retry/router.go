@@ -72,12 +72,22 @@ func (r *Router) Route(ctx context.Context, src *sarama.ConsumerMessage, h map[s
 	if r.attempt == 0 || failure.code == "invalid_retry_metadata" {
 		setOrigin(h, src, started)
 	}
+
 	traces.Inject(ctx, h)
+
 	out := r.buildMessage(src, h, failure)
 	partition, offset, err := r.producer.SendMessage(out)
+
+	reason := failure.code
+	if out.Topic == r.dlqTopic {
+		reason = h["dlq-reason"]
+	}
+
+	observePublication(out.Topic, reason, err)
 	if err != nil {
 		return fmt.Errorf("публикация в %s: %w", out.Topic, err)
 	}
+
 	slog.InfoContext(ctx, "Уведомление перенесено",
 		"topic", out.Topic, "partition", partition, "offset", offset,
 		"original_topic", h["original-topic"], "original_partition", h["original-partition"],

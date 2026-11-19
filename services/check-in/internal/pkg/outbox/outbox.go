@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/samber/lo"
@@ -38,13 +39,16 @@ type Outbox struct {
 	lastError error
 }
 
-func NewOutbox(pool *pgxpool.Pool, config Config) *Outbox {
+func NewOutbox(pool *pgxpool.Pool, config Config, opts ...Option) *Outbox {
 	outbox := &Outbox{
 		storage:  storage.NewStorage(pool),
 		handlers: make(map[Topic]Handler),
 		config:   config,
 	}
 
+	for _, opt := range opts {
+		opt(outbox)
+	}
 	return outbox
 }
 
@@ -52,6 +56,24 @@ func NewOutbox(pool *pgxpool.Pool, config Config) *Outbox {
 func (s *Outbox) RegisterHandler(handler Handler) {
 	topic := handler.Topic()
 	s.handlers[Topic(topic)] = handler
+}
+
+// SendMetrics обновляет метрику лага outbox.
+func (s *Outbox) SendMetrics(ctx context.Context) {
+	ctx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+
+	lag, err := s.storage.GetTopicsLag(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx, "Не удалось получить лаг outbox", "error", err)
+		return
+	}
+	for topic := range s.handlers {
+		if _, ok := lag[string(topic)]; !ok {
+			lag[string(topic)] = 0
+		}
+	}
+	setOutboxMessagesLag(lag)
 }
 
 // Flush кладет сообщение в outbox таблицу для последующей отправки в брокер
@@ -78,11 +100,13 @@ func (s *Outbox) Flush(ctx context.Context, events event.Events) (err error) {
 		return nil
 	}
 
-	err = s.storage.SaveMessages(ctx, messages)
-	if err != nil {
+	if err = s.storage.SaveMessages(ctx, messages); err != nil {
 		return err
 	}
 
+	for _, msg := range messages {
+		incOutboxMessagesWritten(msg.GetTopic())
+	}
 	return nil
 }
 
@@ -150,10 +174,17 @@ func (s *Outbox) processMessagesByTopic(ctx context.Context, topic string, messa
 		// переходим к следующему чанку, если ошибок нет
 		if err == nil {
 			chunk.MarkAsProcessed()
+			incOutboxMessagesProcessed(topic, float64(len(chunk)))
 			continue
 		}
 
 		chunk.AnErrorOccurred(err)
+		if lo.ContainsBy(chunk, func(message *message.Message) bool {
+			return message.GetErrorsCount() >= int32(messagesErrorsLimit)
+		}) {
+			incCanNotHandleMessageByOutbox(topic)
+		}
+
 		hasMessageWithErrLimit := lo.ContainsBy(chunk, func(message *message.Message) bool {
 			return message.GetErrorsCount() == int32(messagesErrorsLimit)
 		})

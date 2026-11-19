@@ -61,10 +61,10 @@ func TestObservabilityRenderHasOneCollectorAndAllBackends(t *testing.T) {
 			}
 		}
 	}
-	if len(deployments) != 5 || collectorConfigs != 1 {
+	if len(deployments) != 6 || collectorConfigs != 1 {
 		t.Fatalf("wrong infrastructure: deployments=%v collector configs=%d", deployments, collectorConfigs)
 	}
-	for _, name := range []string{"otel-collector", "jaeger", "loki", "grafana", "prometheus"} {
+	for _, name := range []string{"otel-collector", "jaeger", "loki", "grafana", "prometheus", "kafka-exporter"} {
 		if !deployments[name] {
 			t.Fatalf("missing deployment %s", name)
 		}

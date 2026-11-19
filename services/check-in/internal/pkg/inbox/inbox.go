@@ -2,9 +2,10 @@ package inbox
 
 import (
 	"context"
+	"log/slog"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/samber/lo"
 
 	"check-in/internal/pkg/inbox/message"
 	"check-in/internal/pkg/inbox/storage"
@@ -58,6 +59,24 @@ func (i *Inbox) RegisterHandler(handler Handler) {
 	i.handlers[Topic(topic)] = handler
 }
 
+// SendMetrics обновляет метрику лага inbox.
+func (i *Inbox) SendMetrics(ctx context.Context) {
+	ctx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+
+	lag, err := i.storage.GetTopicsLag(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx, "Не удалось получить лаг inbox", "error", err)
+		return
+	}
+	for topic := range i.handlers {
+		if _, ok := lag[string(topic)]; !ok {
+			lag[string(topic)] = 0
+		}
+	}
+	setInboxMessagesLag(lag)
+}
+
 func (i *Inbox) SaveMessages(ctx context.Context, messages message.Messages) (err error) {
 	ctx, span := traces.Start(ctx, "inbox.SaveMessages")
 	defer span.End()
@@ -65,12 +84,11 @@ func (i *Inbox) SaveMessages(ctx context.Context, messages message.Messages) (er
 		traces.RecordError(span, err)
 	}()
 
-	if err := i.storage.SaveMessages(ctx, messages); err != nil {
+	if err = i.storage.SaveMessages(ctx, messages); err != nil {
 		return err
 	}
-
-	lo.ForEach(messages, func(message *message.Message, _ int) {
-		incInboxMessagesWritten(message.GetTopic())
-	})
+	for _, msg := range messages {
+		incInboxMessagesWritten(msg.GetTopic())
+	}
 	return nil
 }

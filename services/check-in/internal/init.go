@@ -32,6 +32,7 @@ import (
 	"check-in/internal/pkg/grpc/intercept"
 	"check-in/internal/pkg/healthcheck"
 	"check-in/internal/pkg/ratelimit"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	chimw "github.com/go-chi/chi/v5/middleware"
@@ -271,14 +272,14 @@ func (a *App) initMessageBus(_ context.Context) error {
 }
 
 func (a *App) initOutbox(ctx context.Context) error {
-	a.outbox = outbox.NewOutbox(a.pool, config.Instance().Outbox.Limits)
+	a.outbox = outbox.NewOutbox(a.pool, config.Instance().Outbox.Limits, outbox.WithMetrics())
 	handlerConfig := config.Instance().OutboxConfig(config.CheckinEventsTopic)
 	a.outbox.RegisterHandler(checkin_events.NewHandler(
 		config.CheckinEventsTopic,
 		handlerConfig.BatchSize,
 		a.messageBus.Producers.CheckinEvents,
 	))
-	a.messageRelay = worker.NewWorker(ctx, a.outbox.HandlePendingMessages,
+	relay := worker.NewWorker(ctx, a.outbox.HandlePendingMessages,
 		func(context.Context) time.Duration {
 			return handlerConfig.Worker.Interval
 		},
@@ -286,15 +287,38 @@ func (a *App) initOutbox(ctx context.Context) error {
 			return handlerConfig.Worker.Concurrency
 		},
 	)
+
+	metricsWorker := worker.NewWorker(ctx, a.outbox.SendMetrics,
+		func(context.Context) time.Duration {
+			return 3 * time.Second
+		}, func(context.Context) int {
+			return 1
+		})
+
+	a.outboxWorkers = append(a.outboxWorkers, relay, metricsWorker)
+	a.publicCloser.Add(metricsWorker.Stop)
+
 	// Stop workers before global closers release the producer and database.
-	a.publicCloser.Add(a.messageRelay.Stop)
+	a.publicCloser.Add(relay.Stop)
 	return nil
 }
 
-func (a *App) initInbox(_ context.Context) error {
-	a.inbox = inbox.NewInbox(a.pool, config.Instance().Inbox.Config)
+func (a *App) initInbox(ctx context.Context) error {
+	a.inbox = inbox.NewInbox(a.pool, config.Instance().Inbox.Config, inbox.WithMetrics())
+
+	metricsWorker := worker.NewWorker(ctx, a.inbox.SendMetrics,
+		func(context.Context) time.Duration {
+			return 3 * time.Second
+		}, func(context.Context) int {
+			return 1
+		},
+	)
+	a.inboxWorkers = append(a.inboxWorkers, metricsWorker)
+	a.publicCloser.Add(metricsWorker.Stop)
+
 	return nil
 }
+
 func (a *App) initInboxWorkers(ctx context.Context) error {
 	for _, mode := range []inbox.Mode{inbox.ModeNormal, inbox.ModeError} {
 		interval := config.Instance().Inbox.Config.NormalMessagesPollInterval

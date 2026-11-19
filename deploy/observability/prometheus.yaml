@@ -22,4 +22,13 @@ otlp:
     - service.namespace
     - deployment.environment.name
     - k8s.namespace.name
-scrape_configs: []
+scrape_configs:
+  - job_name: kafka-exporter
+    scrape_interval: 5s
+    scrape_timeout: 4s
+    static_configs:
+      - targets: [kafka-exporter:9308]
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'kafka_(brokers|broker_info|topic_partitions|topic_partition_(leader|current_offset|in_sync_replica|replicas|under_replicated_partition)|consumergroup_(lag|lag_sum|members))'
+        action: keep

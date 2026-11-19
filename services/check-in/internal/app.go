@@ -35,18 +35,23 @@ import (
 
 // App application
 type App struct {
-	rateLimiter  *ratelimit.Limiter
-	telemetry    *telemetry.Telemetry
-	inbox        *inbox.Inbox
-	eventRouter  *event_router.EventRouter[string, []byte]
-	inboxWorkers []worker.Worker
-	storage      *storage.Registry
-	messageBus   *messagebus.Registry
-	outbox       *outbox.Outbox
-	messageRelay worker.Worker
-	pool         *pgxpool.Pool
-	usecases     *usecase.Registry
-	mainServer   *server.Server
+	rateLimiter *ratelimit.Limiter
+	telemetry   *telemetry.Telemetry
+
+	eventRouter *event_router.EventRouter[string, []byte]
+
+	storage    *storage.Registry
+	messageBus *messagebus.Registry
+
+	inbox  *inbox.Inbox
+	outbox *outbox.Outbox
+
+	inboxWorkers  []worker.Worker
+	outboxWorkers []worker.Worker
+
+	pool       *pgxpool.Pool
+	usecases   *usecase.Registry
+	mainServer *server.Server
 
 	adminListener net.Listener
 	adminMux      *chi.Mux
@@ -134,16 +139,20 @@ func (a *App) Run(ctx context.Context) {
 		}()
 	}
 
-	if err := a.messageRelay.Start(ctx); err != nil {
-		slog.ErrorContext(ctx, "Не удалось запустить outbox worker", "error", err)
+	for _, background := range a.outboxWorkers {
+		if err := background.Start(ctx); err != nil {
+			slog.ErrorContext(ctx, "Не удалось запустить воркер Outbox", "error", err)
+		}
 	}
 
 	a.messageBus.Run(ctx)
 	for _, background := range a.inboxWorkers {
 		if err := background.Start(ctx); err != nil {
+			slog.ErrorContext(ctx, "Не удалось запустить воркер Inbox", "error", err)
 			return
 		}
 	}
+
 	// start signal
 	atomic.StoreInt32(&a.started, 1)
 

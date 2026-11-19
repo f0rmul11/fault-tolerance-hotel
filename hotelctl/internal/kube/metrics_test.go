@@ -23,8 +23,8 @@ func TestObservabilityUsesOTLPForAllSignals(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(c.ObservabilityComponents()) != 5 {
-		t.Fatal("observability must contain five backends")
+	if len(c.ObservabilityComponents()) != 6 {
+		t.Fatal("observability must contain five backends and the Kafka exporter")
 	}
 	deployments, pvcs := 0, 0
 	for _, object := range objects {
@@ -53,8 +53,11 @@ func TestObservabilityUsesOTLPForAllSignals(t *testing.T) {
 						t.Fatal("collector must not scrape applications or infrastructure")
 					}
 				}
-				if strings.HasPrefix(object.GetName(), "prometheus-config-") && len(parsed["scrape_configs"].([]any)) != 0 {
-					t.Fatal("Prometheus must receive pushed OTLP only")
+				if strings.HasPrefix(object.GetName(), "prometheus-config-") {
+					jobs := parsed["scrape_configs"].([]any)
+					if len(jobs) != 1 || jobs[0].(map[string]any)["job_name"] != "kafka-exporter" {
+						t.Fatal("Prometheus must scrape the Kafka exporter and receive application metrics via OTLP")
+					}
 				}
 				if strings.HasPrefix(object.GetName(), "grafana-datasources-") {
 					sources := parsed["datasources"].([]any)
@@ -65,7 +68,7 @@ func TestObservabilityUsesOTLPForAllSignals(t *testing.T) {
 			}
 		}
 	}
-	if deployments != 5 || pvcs != 3 {
+	if deployments != 6 || pvcs != 3 {
 		t.Fatalf("deployments=%d PVCs=%d", deployments, pvcs)
 	}
 }

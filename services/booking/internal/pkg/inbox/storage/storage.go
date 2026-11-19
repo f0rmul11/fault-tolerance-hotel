@@ -188,3 +188,27 @@ func (s Storage) MarkAsProcessed(ctx context.Context, messages message.Messages)
 	)
 	return err
 }
+
+// GetTopicsLag возвращает число необработанных сообщений по топикам.
+func (s Storage) GetTopicsLag(ctx context.Context) (map[string]int64, error) {
+	const query = `
+		select topic, count(*) as lag
+		from inbox
+		where processed_at is null
+		group by topic
+	`
+
+	var rows []struct {
+		Topic string
+		Lag   int64
+	}
+	if err := pgxscan.Select(ctx, s.wrapper.Pool(ctx), &rows, query); err != nil {
+		return nil, err
+	}
+
+	lag := make(map[string]int64, len(rows))
+	for _, row := range rows {
+		lag[row.Topic] = row.Lag
+	}
+	return lag, nil
+}
