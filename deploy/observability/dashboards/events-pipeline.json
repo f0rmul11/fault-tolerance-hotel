@@ -9,7 +9,7 @@
   ],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 4,
+  "version": 5,
   "editable": false,
   "graphTooltip": 1,
   "refresh": "10s",
@@ -1096,7 +1096,7 @@
       "id": 15,
       "type": "timeseries",
       "title": "Lag",
-      "description": "Число необработанных сообщений в PostgreSQL по топику.",
+      "description": "Число сообщений за подтверждёнными курсорами в PostgreSQL по топику. Для booking значение 10 000 означает 10 000 и более. У check-in отображается полный размер очереди.",
       "datasource": {
         "type": "prometheus",
         "uid": "hotelflow-prometheus"
@@ -1163,8 +1163,8 @@
     {
       "id": 16,
       "type": "timeseries",
-      "title": "Outbox error limit",
-      "description": "Число неудачных пакетов, в которых хотя бы одно сообщение достигло лимита ошибок отправки.",
+      "title": "Outbox delivery failures",
+      "description": "Неудачные попытки отправки пачек в секунду. Booking учитывает каждую попытку, Check-in — пачки с сообщением, достигшим порога ошибок.",
       "datasource": {
         "type": "prometheus",
         "uid": "hotelflow-prometheus"
@@ -1183,7 +1183,7 @@
             "uid": "hotelflow-prometheus"
           },
           "expr": "sum by (topic) (rate(outbox_can_not_handler_message_by_outbox_total{service_namespace=\"hotelflow\",service_name=\"$service\",topic=~\"$kafka_topic\"}[$__rate_interval])) or on (topic) (0 * max by (topic) (outbox_pending_messages{service_namespace=\"hotelflow\",service_name=\"$service\",topic=~\"$kafka_topic\"}))",
-          "legendFormat": "Error limit · {{topic}}",
+          "legendFormat": "Delivery failures · {{topic}}",
           "range": true,
           "instant": false,
           "editorMode": "code",
@@ -1214,7 +1214,7 @@
           {
             "matcher": {
               "id": "byRegexp",
-              "options": "/^Error limit · /"
+              "options": "/^Delivery failures · /"
             },
             "properties": [
               {

@@ -22,11 +22,15 @@ begin
     select string_agg(format('%I.%I', schemaname, tablename), ', ')
     into tables
     from pg_tables
-    where schemaname = 'public' and tablename <> 'goose_db_version';
+    where schemaname = 'public' and tablename not in ('goose_db_version', 'outbox_offsets');
     if tables is null then
         raise exception 'Нет таблиц приложения: сначала выполните hotelctl up';
     end if;
     execute 'truncate table ' || tables || ' restart identity';
+    -- Топики заданы миграциями; после очистки сообщений начинаем чтение сначала.
+    if to_regclass('public.outbox_offsets') is not null then
+        update public.outbox_offsets set last_xid = default, last_id = default;
+    end if;
 end $$;
 `
 

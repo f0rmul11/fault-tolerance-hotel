@@ -79,7 +79,7 @@ func TestBatchRetainsIndependentParentsAndRetryIdentity(t *testing.T) {
 	fake := &producerFake{}
 	producer := &MessageProducer{producer: fake}
 	for attempt := 0; attempt < 2; attempt++ {
-		if err := producer.Handle(t.Context(), events); err != nil {
+		if err := producer.HandlePartition(t.Context(), 2, events); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -89,6 +89,9 @@ func TestBatchRetainsIndependentParentsAndRetryIdentity(t *testing.T) {
 	var attempts []trace.SpanContext
 	for attempt, messages := range fake.messages {
 		for index, message := range messages {
+			if message.Partition != 2 {
+				t.Fatalf("producer изменил партицию на %d", message.Partition)
+			}
 			headers := make(map[string]string)
 			for _, header := range message.Headers {
 				headers[string(header.Key)] = string(header.Value)
@@ -148,10 +151,10 @@ func TestProducerFailureMarksOnlyAffectedSpans(t *testing.T) {
 				partial: test.partial,
 			}}
 			events := event.Events{
-				{Schema: "events.v1", Headers: event.Raw("{}")},
-				{Schema: "events.v1", Headers: event.Raw("{}")},
+				{Schema: "events.v1", Key: []byte("a"), Headers: event.Raw("{}")},
+				{Schema: "events.v1", Key: []byte("b"), Headers: event.Raw("{}")},
 			}
-			if producer.Handle(t.Context(), events) == nil {
+			if producer.HandlePartition(t.Context(), 2, events) == nil {
 				t.Fatal("send error was lost")
 			}
 			failed := 0
@@ -164,5 +167,30 @@ func TestProducerFailureMarksOnlyAffectedSpans(t *testing.T) {
 				t.Fatalf("marked %d failed spans, want %d", failed, test.failed)
 			}
 		})
+	}
+}
+
+func TestPartialFailureHoldsNextEventForSameKey(t *testing.T) {
+	fake := &producerFake{failure: errors.New("broker failure"), partial: true}
+	producer := &MessageProducer{producer: fake}
+	events := event.Events{
+		{Key: []byte("other"), Body: []byte("B")},
+		{Key: []byte("booking"), Body: []byte("A1")},
+		{Key: []byte("booking"), Body: []byte("A2")},
+	}
+	if err := producer.HandlePartition(t.Context(), 1, events); err == nil ||
+		len(fake.messages) != 1 || len(fake.messages[0]) != 2 {
+		t.Fatalf("отправка продолжилась после частичного отказа: %v, пачки %v", err, fake.messages)
+	}
+	fake.failure, fake.partial = nil, false
+	if err := producer.HandlePartition(t.Context(), 1, events); err != nil {
+		t.Fatal(err)
+	}
+	if len(fake.messages) != 3 || len(fake.messages[1]) != 2 || len(fake.messages[2]) != 1 {
+		t.Fatalf("ожидалось подтверждение A1 перед отправкой A2: %v", fake.messages)
+	}
+	last, err := fake.messages[2][0].Value.Encode()
+	if err != nil || string(last) != "A2" {
+		t.Fatalf("последнее сообщение %q: %v", last, err)
 	}
 }

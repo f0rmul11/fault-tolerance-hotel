@@ -36,13 +36,14 @@ type Postgres struct {
 }
 
 type Outbox struct {
-	Limits outbox.Config            `yaml:"limits"`
+	Limits outbox.Config          `yaml:"limits"`
 	Topics map[string]OutboxHandler `yaml:"topics"`
 }
 
 type OutboxHandler struct {
-	BatchSize int    `yaml:"batch_size"`
-	Worker    Worker `yaml:"worker"`
+	PartitionsCount int32  `yaml:"partitions_count"`
+	BatchSize       int    `yaml:"batch_size"`
+	Worker          Worker `yaml:"worker"`
 }
 
 type Worker struct {

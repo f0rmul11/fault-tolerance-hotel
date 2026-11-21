@@ -91,14 +91,12 @@ func (c *Config) Validate() error {
 		return err
 	}
 
-	if c.Outbox.Limits.LockedKeysLimit < 1 ||
-		c.Outbox.Limits.MessagesLimit < 1 ||
-		c.Outbox.Limits.MaxErrCountForMessage < 1 {
+	if c.Outbox.Limits.MessagesLimit < 1 {
 		return fmt.Errorf("лимиты outbox должны быть положительными")
 	}
 
 	handler := c.OutboxConfig(BookingEventsTopic)
-	if handler.BatchSize < 1 || handler.Worker.Concurrency < 1 || handler.Worker.Interval <= 0 {
+	if handler.PartitionsCount < 1 || handler.BatchSize < 1 || handler.Worker.Concurrency < 1 || handler.Worker.Interval <= 0 {
 		return fmt.Errorf("некорректные настройки обработчика outbox")
 	}
 

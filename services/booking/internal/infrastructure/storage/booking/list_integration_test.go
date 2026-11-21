@@ -19,7 +19,9 @@ import (
 	"booking/internal/domain/entity"
 	"booking/internal/domain/vo"
 
+	"booking/config"
 	checkindto "booking/internal/dto/checkin"
+	"booking/internal/infrastructure/outbox/booking_events"
 	storage "booking/internal/infrastructure/storage/booking"
 	app "booking/internal/pkg/bookingerror"
 	"booking/internal/pkg/outbox"
@@ -40,7 +42,8 @@ func TestBookingsVersionPostgres(t *testing.T) {
 	}
 	t.Cleanup(pool.Close)
 	store := storage.New(wrapper.NewDatabase(pool))
-	flusher := outbox.NewOutbox(pool, outbox.Config{})
+	flusher := outbox.NewOutbox(pool, outbox.Config{MessagesLimit: 10})
+	flusher.RegisterHandler(booking_events.NewHandler(config.BookingEventsTopic, 10, 3, nil))
 	service := confirm.New(store, flusher)
 	guest := uuid.Must(uuid.NewV4())
 	at := time.Now().UTC().Truncate(time.Microsecond)
@@ -96,7 +99,7 @@ func TestBookingsVersionPostgres(t *testing.T) {
 	list := assertList(1, 1)
 	saved := list.Bookings[0]
 	var events int
-	if err := pool.QueryRow(ctx, "select count(*) from outbox where entity_id = any($1)", []string{bookings[0].ID().String(), bookings[1].ID().String()}).Scan(&events); err != nil || events != 1 {
+	if err := pool.QueryRow(ctx, "select count(*) from public.outbox_messages where topic = $1 and key = any($2::bytea[])", config.BookingEventsTopic, [][]byte{[]byte(bookings[0].ID().String()), []byte(bookings[1].ID().String())}).Scan(&events); err != nil || events != 1 {
 		t.Fatalf("expected exactly one committed outbox event: %d %v", events, err)
 	}
 

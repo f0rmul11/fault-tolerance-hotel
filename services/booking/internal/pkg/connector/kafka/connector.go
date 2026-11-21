@@ -21,7 +21,7 @@ func MustSyncProducer() sarama.SyncProducer {
 	saramaConfig.Producer.Retry.Max = 10 // максимальное количество повторов при ошибках
 	saramaConfig.Producer.Retry.Backoff = 100 * time.Millisecond
 	saramaConfig.Producer.Idempotent = true
-	saramaConfig.Producer.Partitioner = sarama.NewHashPartitioner
+	saramaConfig.Producer.Partitioner = sarama.NewManualPartitioner
 
 	saramaConfig.Producer.Timeout = 10 * time.Second // таймаут на запись
 	saramaConfig.Net.MaxOpenRequests = 1             // Sarama требует 1 при включённой идемпотентности

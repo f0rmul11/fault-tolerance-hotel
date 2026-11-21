@@ -241,18 +241,24 @@ func (a *App) initStorage(_ context.Context) error {
 func (a *App) initMessageBus(_ context.Context) error {
 	a.messageBus = messagebus.NewRegistry(a.inbox)
 	a.publicCloser.Add(a.messageBus.Stop)
+
 	return nil
 }
 
 func (a *App) initOutbox(ctx context.Context) error {
-	a.outbox = outbox.NewOutbox(a.pool, config.Instance().Outbox.Limits, outbox.WithMetrics())
+	a.outbox = outbox.NewOutbox(a.pool, config.Instance().Outbox.Limits)
+
 	handlerConfig := config.Instance().OutboxConfig(config.BookingEventsTopic)
 	a.outbox.RegisterHandler(booking_events.NewHandler(
 		config.BookingEventsTopic,
 		handlerConfig.BatchSize,
-		a.messageBus.Producers.BookingEvents,
+		handlerConfig.PartitionsCount,
+		a.messageBus.BookingEvents,
 	))
-	relay := worker.NewWorker(ctx, a.outbox.HandlePendingMessages,
+
+	relay := worker.NewWorker(
+		ctx,
+		a.outbox.HandlePendingMessages,
 		func(context.Context) time.Duration {
 			return handlerConfig.Worker.Interval
 		},
@@ -266,13 +272,15 @@ func (a *App) initOutbox(ctx context.Context) error {
 			return 3 * time.Second
 		}, func(context.Context) int {
 			return 1
-		})
+		},
+	)
 
 	a.outboxWorkers = append(a.outboxWorkers, relay, metricsWorker)
 	a.publicCloser.Add(metricsWorker.Stop)
 
-	// Stop workers before global closers release the producer and database.
+	// Завершаем текущую отправку, пока Kafka-продьюсер и пул PostgreSQL ещё открыты.
 	a.publicCloser.Add(relay.Stop)
+
 	return nil
 }
 

@@ -27,11 +27,10 @@ postgres:
   max_conn_lifetime: 1h
 outbox:
   limits:
-    locked_keys_limit: 100
     messages_limit: 100
-    max_err_count_for_message: 10
   topics:
     booking.events.v1:
+      partitions_count: 3
       batch_size: 50
       worker:
         interval: 1s
