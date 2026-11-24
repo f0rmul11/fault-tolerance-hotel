@@ -13,5 +13,7 @@ func (row Rating) ConvertTo() *entity.Rating {
 	return entity.With(row.HotelID,
 		entity.WithTotalStars(row.TotalStars.Int64),
 		entity.WithReviewCount(row.ReviewCount.Int64),
+		entity.WithVersion(row.Version.Int64),
+		entity.WithUpdatedAt(row.UpdatedAt),
 	)
 }

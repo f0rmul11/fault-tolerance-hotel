@@ -1,6 +1,8 @@
 package rating
 
 import (
+	"time"
+
 	"github.com/gofrs/uuid"
 )
 
@@ -23,5 +25,17 @@ func WithTotalStars(value int64) Option {
 func WithReviewCount(value int64) Option {
 	return func(v *Rating) {
 		v.reviewCount = value
+	}
+}
+
+func WithVersion(value int64) Option {
+	return func(v *Rating) {
+		v.version = version{Old: value}
+	}
+}
+
+func WithUpdatedAt(value time.Time) Option {
+	return func(v *Rating) {
+		v.updatedAt = value
 	}
 }

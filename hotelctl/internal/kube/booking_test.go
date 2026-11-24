@@ -76,6 +76,7 @@ func TestBookingDependenciesUseCanonicalSQLAndSeparateOwners(t *testing.T) {
 	if topics.Name != "topics" ||
 		!strings.Contains(topics.Args[0], "--topic booking.events.v1") ||
 		!strings.Contains(topics.Args[0], "--topic checkin.events.v1") ||
+		!strings.Contains(topics.Args[0], "--topic review.rating.events.v1") ||
 		!strings.Contains(topics.Args[0], "--if-not-exists") {
 		t.Fatalf("outbox topics must exist before service rollout: %+v", topics)
 	}
@@ -121,6 +122,7 @@ func TestBookingDependenciesUseCanonicalSQLAndSeparateOwners(t *testing.T) {
 			t.Fatal(err)
 		}
 		found := false
+		foundKafka := false
 		for _, object := range objects {
 			if object.GetKind() != "Deployment" {
 				continue
@@ -130,8 +132,11 @@ func TestBookingDependenciesUseCanonicalSQLAndSeparateOwners(t *testing.T) {
 				container := raw.(map[string]any)
 				for _, rawEnv := range container["env"].([]any) {
 					env := rawEnv.(map[string]any)
-					if env["name"] == "KAFKA_BROKERS" && (service.Name == "hotels" || service.Name == "review") {
+					if env["name"] == "KAFKA_BROKERS" && service.Name == "hotels" {
 						t.Fatalf("%s must not depend on Kafka", service.Name)
+					}
+					if env["name"] == "KAFKA_BROKERS" && env["value"] == "kafka:9092" {
+						foundKafka = true
 					}
 					if env["name"] == "POSTGRES_DSN" {
 						key, _, _ := unstructured.NestedString(env, "valueFrom", "secretKeyRef", "key")
@@ -146,6 +151,9 @@ func TestBookingDependenciesUseCanonicalSQLAndSeparateOwners(t *testing.T) {
 		}
 		if !found {
 			t.Fatalf("%s missing database configuration", service.Name)
+		}
+		if service.Name == "review" && !foundKafka {
+			t.Fatal("review missing Kafka configuration")
 		}
 	}
 }

@@ -93,8 +93,8 @@ make reset
 
 Команда предназначена для работающего локального стенда с текущей схемой и конфигурацией.
 Она очищает четыре БД, включая HTTP-ключи и записи inbox/outbox, и восстанавливает
-3 отеля, 11 номеров и 2 рейтинга. В Kafka reset пересоздаёт пять топиков:
-`booking.events.v1`, `checkin.events.v1`, `notification.booking.retry.1.v1`,
+3 отеля, 11 номеров и 2 рейтинга. В Kafka reset пересоздаёт шесть топиков:
+`booking.events.v1`, `checkin.events.v1`, `review.rating.events.v1`, `notification.booking.retry.1.v1`,
 `notification.booking.retry.2.v1` и `notification.booking.dlq.v1`. У каждого три
 партиции, replication factor 3 и min ISR 2. Команда удаляет offsets групп Booking,
 Check-in и Notification, включая обе retry-группы.

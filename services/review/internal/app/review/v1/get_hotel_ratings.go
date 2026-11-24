@@ -23,9 +23,10 @@ func (s *Service) GetHotelRatings(ctx context.Context, req *pb.GetHotelRatingsRe
 	}
 	return &pb.GetHotelRatingsResponse{Ratings: lo.Map(ratings, func(r *entity.Rating, _ int) *pb.HotelRating {
 		return &pb.HotelRating{
-			HotelId:     r.ID().String(),
-			Rating:      r.Value(),
-			ReviewCount: r.ReviewCount(),
+			HotelId:       r.ID().String(),
+			Rating:        r.Value(),
+			ReviewCount:   r.ReviewCount(),
+			RatingVersion: r.Version(),
 		}
 	})}, nil
 }

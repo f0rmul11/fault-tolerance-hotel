@@ -3,6 +3,7 @@ package xo
 
 import (
 	"database/sql"
+	"time"
 
 	"github.com/gofrs/uuid"
 )
@@ -12,4 +13,6 @@ type Rating struct {
 	HotelID     uuid.UUID     `db:"hotel_id"`
 	TotalStars  sql.NullInt64 `db:"total_stars"`
 	ReviewCount sql.NullInt64 `db:"review_count"`
+	Version     sql.NullInt64 `db:"version"`
+	UpdatedAt   time.Time     `db:"updated_at"`
 }

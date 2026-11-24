@@ -6,6 +6,9 @@ option go_package = "review/internal/pkg/pb/review/review/v1;reviewV1";
 
 // Пакетное чтение пользовательских рейтингов отелей.
 service ReviewService {
+  // Добавляет одну оценку. Повторный вызов означает новую оценку; автоматических повторов нет.
+  rpc AddHotelRating(AddHotelRatingRequest) returns (AddHotelRatingResponse);
+
   // Читает рейтинги всех переданных отелей одним запросом к БД.
   rpc GetHotelRatings(GetHotelRatingsRequest) returns (GetHotelRatingsResponse);
 }
@@ -32,4 +35,21 @@ message HotelRating {
 
   // Количество пользовательских оценок отеля.
   int64 review_count = 3;
+
+  // Версия агрегата рейтинга, согласованная с rating и review_count.
+  int64 rating_version = 4;
+}
+
+// Оценка отеля. История и текст отзывов в этом учебном сценарии не сохраняются.
+message AddHotelRatingRequest {
+  // UUID отеля.
+  string hotel_id = 1;
+  // Целая оценка от 1 до 5.
+  int32 stars = 2;
+}
+
+// Состояние агрегата после commit рейтинга и события outbox.
+message AddHotelRatingResponse {
+  // Новые значение, количество оценок и версия агрегата.
+  HotelRating rating = 1;
 }

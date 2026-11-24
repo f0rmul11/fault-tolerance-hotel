@@ -57,3 +57,16 @@ load_shedding:
         alpha_func_coefficient: 6
         beta_func_coefficient: 12
         rtt_no_load_probe_multiplier: 1000
+
+kafka_brokers: ["localhost:9092"]
+outbox:
+  limits:
+    locked_keys_limit: 100
+    messages_limit: 1000
+    max_err_count_for_message: 10
+  topics:
+    review.rating.events.v1:
+      batch_size: 50
+      worker:
+        interval: 1s
+        concurrency: 1

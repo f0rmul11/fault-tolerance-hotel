@@ -6,10 +6,10 @@ import (
 	"os"
 	"sync"
 
+	"github.com/ilyakaznacheev/cleanenv"
+
 	"review/internal/pkg/loadshedding"
 	"review/internal/pkg/telemetry"
-
-	"github.com/ilyakaznacheev/cleanenv"
 )
 
 var (
@@ -29,6 +29,8 @@ func Instance() *Config {
 }
 
 type Config struct {
+	KafkaBrokers []string            `yaml:"kafka_brokers" env:"KAFKA_BROKERS" env-separator:","`
+	Outbox       Outbox              `yaml:"outbox"`
 	LoadShedding loadshedding.Config `yaml:"load_shedding"`
 	Telemetry    telemetry.Config    `yaml:"telemetry"`
 	Postgres     Postgres            `yaml:"postgres"`
@@ -57,6 +59,18 @@ func Read() (*Config, error) {
 }
 
 func (c *Config) Validate() error {
+	if len(c.KafkaBrokers) == 0 {
+		return fmt.Errorf("не указаны адреса Kafka")
+	}
+	if c.Outbox.Limits.LockedKeysLimit <= 0 || c.Outbox.Limits.MessagesLimit <= 0 || c.Outbox.Limits.MaxErrCountForMessage <= 0 {
+		return fmt.Errorf("лимиты outbox должны быть положительными")
+	}
+
+	handler := c.OutboxConfig(RatingEventsTopic)
+	if handler.BatchSize < 1 || handler.Worker.Concurrency < 1 || handler.Worker.Interval <= 0 {
+		return fmt.Errorf("некорректные настройки обработчика outbox")
+	}
+
 	for name, port := range map[string]int{
 		"HTTP_PORT":       c.HttpServer.Port,
 		"GRPC_PORT":       c.GrpcServer.Port,
@@ -79,4 +93,8 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("graceful timeout must be positive")
 	}
 	return nil
+}
+
+func (c *Config) OutboxConfig(topic string) OutboxHandler {
+	return c.Outbox.Topics[topic]
 }

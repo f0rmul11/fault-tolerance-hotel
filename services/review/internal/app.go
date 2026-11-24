@@ -20,19 +20,25 @@ import (
 
 	"review/config"
 	"review/internal/application/usecase"
+	"review/internal/infrastructure/messagebus"
 	"review/internal/infrastructure/storage"
 	"review/internal/pkg/closer"
 	"review/internal/pkg/healthcheck"
+	"review/internal/pkg/outbox"
 	"review/internal/pkg/telemetry"
+	"review/internal/pkg/worker"
 )
 
 // App application
 type App struct {
-	telemetry  *telemetry.Telemetry
-	pool       *pgxpool.Pool
-	storage    *storage.Registry
-	usecases   *usecase.Registry
-	mainServer *server.Server
+	messageBus   *messagebus.Registry
+	outbox       *outbox.Outbox
+	outboxWorker worker.Worker
+	telemetry    *telemetry.Telemetry
+	pool         *pgxpool.Pool
+	storage      *storage.Registry
+	usecases     *usecase.Registry
+	mainServer   *server.Server
 
 	adminListener net.Listener
 	adminMux      *chi.Mux
@@ -70,6 +76,8 @@ func New(ctx context.Context) *App {
 	app.runAdminServer(ctx)
 
 	if err := app.init(ctx); err != nil {
+		closer.CloseAll()
+		app.adminCloser.CloseAll()
 		_ = app.telemetry.Shutdown(ctx)
 		log.Fatalf("[APP] Не удалось инициализировать приложение: %s", err.Error())
 	}
@@ -104,6 +112,11 @@ func (a *App) runAdminServer(_ context.Context) {
 func (a *App) Run(ctx context.Context) {
 	defer func() {
 		a.publicCloser.CloseAll()
+		if a.outboxWorker != nil {
+			if err := a.outboxWorker.Stop(); err != nil {
+				slog.Error("Не удалось остановить outbox", "error", err)
+			}
+		}
 		closer.CloseAll()
 		a.adminCloser.CloseAll()
 		if err := a.telemetry.Shutdown(ctx); err != nil {
@@ -111,6 +124,12 @@ func (a *App) Run(ctx context.Context) {
 		}
 	}()
 
+	if a.outboxWorker != nil {
+		if err := a.outboxWorker.Start(ctx); err != nil {
+			slog.Error("Не удалось запустить outbox", "error", err)
+			return
+		}
+	}
 	if a.mainServer != nil {
 		go func() {
 			if err := a.mainServer.Run(a.controllers...); err != nil {
@@ -140,6 +159,8 @@ func (a *App) init(ctx context.Context) error {
 		a.initGrpcConn,
 		a.initPostgres,
 		a.initStorage,
+		a.initMessageBus,
+		a.initOutbox,
 		a.initUsecases,
 		a.initControllers,
 	}

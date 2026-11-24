@@ -22,6 +22,8 @@ import (
 	"review/internal/app/echo/v1"
 	reviewapp "review/internal/app/review/v1"
 	"review/internal/application/usecase"
+	"review/internal/infrastructure/messagebus"
+	"review/internal/infrastructure/outbox/rating_events"
 	"review/internal/infrastructure/storage"
 	"review/internal/pkg/closer"
 	"review/internal/pkg/connector/postgres"
@@ -29,11 +31,13 @@ import (
 	"review/internal/pkg/grpcdesc"
 	"review/internal/pkg/healthcheck"
 	"review/internal/pkg/loadshedding"
+	"review/internal/pkg/outbox"
 	echoV1 "review/internal/pkg/pb/review/echo/v1"
 	businessV1 "review/internal/pkg/pb/review/review/v1"
 	"review/internal/pkg/telemetry"
 	"review/internal/pkg/telemetry/metrics"
 	"review/internal/pkg/telemetry/traces"
+	"review/internal/pkg/worker"
 )
 
 func (a *App) initControllers(_ context.Context) error {
@@ -237,7 +241,7 @@ func (a *App) initStorage(context.Context) error {
 }
 
 func (a *App) initUsecases(context.Context) error {
-	a.usecases = usecase.NewRegistry(a.storage)
+	a.usecases = usecase.NewRegistry(a.storage, a.outbox)
 	return nil
 }
 
@@ -259,4 +263,30 @@ func reviewUnaryInterceptors(cfg loadshedding.Config) []grpc.UnaryServerIntercep
 		intercept.ErrorInterceptor(),
 		intercept.DemoDelayInterceptor(),
 	}
+}
+
+func (a *App) initMessageBus(_ context.Context) error {
+	registry, err := messagebus.NewRegistry()
+	if err != nil {
+		return err
+	}
+	a.messageBus = registry
+	return nil
+}
+
+func (a *App) initOutbox(ctx context.Context) error {
+	cfg := config.Instance().Outbox
+	a.outbox = outbox.NewOutbox(a.pool, cfg.Limits)
+	handlerConfig := config.Instance().OutboxConfig(config.RatingEventsTopic)
+	a.outbox.RegisterHandler(rating_events.NewHandler(a.messageBus.RatingEvents, handlerConfig.BatchSize))
+	a.outboxWorker = worker.NewWorker(ctx, a.outbox.HandlePendingMessages,
+		func(context.Context) time.Duration {
+			return handlerConfig.Worker.Interval
+		},
+		func(context.Context) int {
+			return handlerConfig.Worker.Concurrency
+		},
+	)
+
+	return nil
 }

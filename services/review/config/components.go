@@ -1,6 +1,12 @@
 package config
 
-import "time"
+import (
+	"time"
+
+	"review/internal/pkg/outbox"
+)
+
+const RatingEventsTopic = "review.rating.events.v1"
 
 type GrpcServer struct {
 	Port              int           `yaml:"port" env:"GRPC_PORT"`
@@ -18,6 +24,21 @@ type HttpServer struct {
 type Graceful struct {
 	Delay   time.Duration `yaml:"delay" env:"GRACEFUL_DELAY"`
 	Timeout time.Duration `yaml:"timeout" env:"GRACEFUL_TIMEOUT"`
+}
+
+type Outbox struct {
+	Limits outbox.Config            `yaml:"limits"`
+	Topics map[string]OutboxHandler `yaml:"topics"`
+}
+
+type OutboxHandler struct {
+	BatchSize int    `yaml:"batch_size"`
+	Worker    Worker `yaml:"worker"`
+}
+
+type Worker struct {
+	Interval    time.Duration `yaml:"interval"`
+	Concurrency int           `yaml:"concurrency"`
 }
 
 type Postgres struct {

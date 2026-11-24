@@ -1,10 +1,57 @@
 # Review
 
-Рейтинг только отеля, связанный по hotel_id. Рейтингов номеров нет. На этом этапе только gRPC чтение и seed.
+Review владеет агрегатами пользовательских оценок отелей и топиком `review.rating.events.v1`.
+Кеш и его инвалидация находятся в Hotels. Вызовов Hotels и проверки существования отеля по сети здесь нет.
 
-GetHotelRatings принимает список UUID без произвольного ограничения в 100 и делает один SQL по всей коллекции. Пропущенный ID или review_count=0 означает отсутствие оценки. Целые total_stars/review_count в БД сохраняют исходные суммы; дробный рейтинг 0–5 вычисляется при чтении. Нулевая оценка с положительным числом отзывов является настоящим рейтингом.
+## API
 
-Own PostgreSQL `review`. Нет запросов в Hotels, Kafka, outbox или проверки существования отеля по сети. `make generate` — Buf; `make test` — race-тесты.
+- `GetHotelRatings(hotel_ids)` читает всю коллекцию одним SQL, возвращая рейтинг, количество оценок и `rating_version` из одного снимка строки.
+- `AddHotelRating(hotel_id, stars)` добавляет целую оценку от 1 до 5. Возвращает новый агрегат после commit рейтинга и outbox. Для нового hotel_id создаётся агрегат с версией 1.
+- Повтор AddHotelRating означает новую оценку. HTTP-идемпотентность и автоматический повтор записи не добавлены. Конфликт конкурентного сохранения возвращает gRPC Aborted; некорректный UUID или оценка — InvalidArgument.
+
+Сумма и количество сохраняются целыми, среднее вычисляется при чтении без округления. Версия меняется доменным методом; storage сохраняет с проверкой предыдущей версии. Сохранение агрегата и `event.Buffer.Flush` выполняются в одной `transaction.Exec`.
+
+## События и outbox
+
+`review.rating.changed.v1`: `hotel_id`, `rating_version`, `occurred_at`, `correlation_id`, пустой `payload`. Request ID не добавляется; span-контекст передаётся в Kafka headers. `occurred_at` — время изменения сущности, не точная отметка commit PostgreSQL.
+
+Kafka key — hotel_id. Envelope и `x-correlation-id` содержат один UUID, сохраняющийся при повторной отправке outbox. Доставка at-least-once; после send и до commit возможен дубль. Событие уведомляет об изменении, полный рейтинг читается через API.
+
+Outbox/event/pipe/worker перенесены из уже адаптированного образца order-service в Check-in. Relay работает всегда. Конфиг совпадает с Check-in: `outbox.limits`, `outbox.topics.<topic>.batch_size`, `worker.interval` и `worker.concurrency`. Метрики outbox не включены. Worker завершается до закрытия producer и PostgreSQL.
+
+Producer использует WaitForAll, идемпотентный режим и hash partitioner. Недоступность Kafka во время работы оставляет сообщения pending; relay повторяет отправку. При недоступности Kafka во время создания producer запуск сервиса может завершиться ошибкой. Версии событий используются потребителем для интерпретации изменений; exactly-once и отсутствие запоздалых повторов не обещаются.
+
+## Топик и миграции
+
+Топик `review.rating.events.v1` принадлежит Review и создаётся через `hotelctl` в init-контейнере `topics` общего migration Job, как `booking.events.v1` и `checkin.events.v1`. Используется `--if-not-exists`, 3 партиции, RF=3 и minISR=2. Топик также включён в общий механизм `hotelctl reset`.
+
+Исходная миграция ratings обновлена inplace по правилам учебного стенда. Для уже существующей БД перед запуском нового Review нужно явно применить добавление колонок, без удаления рейтингов:
+
+```sql
+alter table public.ratings add column if not exists version bigint default 1;
+alter table public.ratings add column if not exists updated_at timestamptz default current_timestamp;
+```
+
+Затем `make migrate-review` с `POSTGRES_DSN` этой БД применяет новую миграцию outbox. На новой БД достаточно всех миграций. Генерация xo выполняется отдельно через `make xo-review` на изолированной мигрированной БД. Proto — `make -C services/review generate`; клиенты других сервисов в этой задаче не меняются.
+
+## Проверки
+
+```bash
+cd services/review
+GOWORK=off go test -race ./...
+GOWORK=off go vet ./...
+# Отдельная мигрированная тестовая PostgreSQL:
+REVIEW_TEST_POSTGRES_DSN=... go test -tags=integration ./internal/application/usecase/rating/add -v
+```
+
+Unit-тесты проверяют доменное изменение, ошибочные оценки, согласованность события, общий transaction context, rollback при ошибках и передачу ошибки commit. Отдельная интеграционная проверка выполняет SQL, настоящий rollback рейтинга при ошибке outbox и детерминированную гонку двух записей с одной исходной версией.
+
+Пример вызова напрямую в локальный Review:
+
+```bash
+grpcurl -plaintext -d '{"hotel_id":"cdd4685e-c610-4e7e-95ee-c51fb6807400","stars":5}' localhost:9093 review.review.v1.ReviewService/AddHotelRating
+grpcurl -plaintext -d '{"hotel_ids":["cdd4685e-c610-4e7e-95ee-c51fb6807400"]}' localhost:9093 review.review.v1.ReviewService/GetHotelRatings
+```
 
 ## Load shedding (перенос старого стенда)
 

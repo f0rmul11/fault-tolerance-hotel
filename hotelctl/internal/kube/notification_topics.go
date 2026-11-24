@@ -9,7 +9,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const businessTopics = "booking.events.v1 checkin.events.v1"
+const businessTopics = "booking.events.v1 checkin.events.v1 review.rating.events.v1"
 const notificationTopics = "notification.booking.retry.1.v1 notification.booking.retry.2.v1 notification.booking.dlq.v1"
 
 const createNotificationTopics = `cd /opt/kafka/bin
