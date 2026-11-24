@@ -3,7 +3,6 @@ package booking_confirmed
 import (
 	"context"
 	"encoding/json"
-
 	"notification/internal/application/usecase/notification/confirmed"
 	"notification/internal/dto/bookingevent"
 	"notification/internal/pkg/notificationerror"

@@ -394,3 +394,10 @@ retry внутри Sarama. Без идемпотентности в Kafka поя
 выполнить `--clear`; если восстановление не удалось, команда возвращает ошибку.
 Прямой consumer listener, AKHQ и репликация не проходят через proxy.
 Полный [сценарий producer](../demo/module-7/lesson-07-producer-demo-cheatsheet.md).
+
+### Valkey
+
+`hotelctl up` применяет `deploy/booking-dependencies/valkey.yaml` и инициализирует
+кластер в init-контейнере `valkey-cluster` общего migration Job, вместе с подготовкой
+БД и топиков. Три шарда имеют по одной реплике; перед запуском приложений ожидается
+готовность всех шести Pod. Подробности: [Valkey](../deploy/booking-dependencies/valkey.md).

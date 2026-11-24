@@ -14,6 +14,7 @@ import (
 	chimw "github.com/go-chi/chi/v5/middleware"
 	"github.com/not-for-prod/clay/server"
 	"github.com/not-for-prod/clay/transport"
+	valkey "github.com/valkey-io/valkey-go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
@@ -287,5 +288,22 @@ func (a *App) initTelemetry(ctx context.Context) error {
 		return err
 	}
 	a.telemetry = instance
+	return nil
+}
+
+func (a *App) initValkey(_ context.Context) error {
+	client, err := valkey.NewClient(valkey.ClientOption{
+		InitAddress:  config.Instance().ValkeyAddresses,
+		DisableCache: true,
+	})
+	if err != nil {
+		return fmt.Errorf("[VALKEY] Не удалось инициализировать клиент: %w", err)
+	}
+
+	a.valkey = client
+	closer.Add(func() error {
+		client.Close()
+		return nil
+	})
 	return nil
 }

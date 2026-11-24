@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/not-for-prod/clay/server"
 	"github.com/not-for-prod/clay/transport"
+	"github.com/valkey-io/valkey-go"
 	"google.golang.org/grpc"
 
 	"hotels/config"
@@ -42,7 +43,9 @@ type App struct {
 	adminListener net.Listener
 	adminMux      *chi.Mux
 
-	pool          *pgxpool.Pool
+	pool   *pgxpool.Pool
+	valkey valkey.Client
+
 	runtimeConfig atomic.Pointer[rtconfig.Manager]
 	telemetry     *telemetry.Telemetry
 
@@ -152,6 +155,7 @@ func (a *App) init(ctx context.Context) error {
 		a.initMainServer,
 		a.initGrpcConn,
 		a.initPostgres,
+		a.initValkey,
 		a.initStorage,
 		a.initGateway,
 		a.initServices,

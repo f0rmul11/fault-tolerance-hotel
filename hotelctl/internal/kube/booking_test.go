@@ -67,12 +67,16 @@ func TestBookingDependenciesUseCanonicalSQLAndSeparateOwners(t *testing.T) {
 		t.Fatal("изменение топиков должно выполняться отдельным Job до запуска Notification")
 	}
 	if job.Name != resources.JobName ||
-		len(job.Spec.Template.Spec.InitContainers) != 5 ||
+		len(job.Spec.Template.Spec.InitContainers) != 6 ||
 		len(job.Spec.Template.Spec.Containers) != 2 ||
 		*job.Spec.BackoffLimit != 0 {
 		t.Fatalf("incorrect migration/seed sequence: %+v", job.Spec)
 	}
-	topics := job.Spec.Template.Spec.InitContainers[4]
+	topics := job.Spec.Template.Spec.InitContainers[5]
+	valkey := job.Spec.Template.Spec.InitContainers[4]
+	if valkey.Name != "valkey-cluster" || valkey.Image != valkeyImage || valkey.Command[2] != bootstrapValkey {
+		t.Fatal("Valkey must be initialized before service rollout")
+	}
 	if topics.Name != "topics" ||
 		!strings.Contains(topics.Args[0], "--topic booking.events.v1") ||
 		!strings.Contains(topics.Args[0], "--topic checkin.events.v1") ||

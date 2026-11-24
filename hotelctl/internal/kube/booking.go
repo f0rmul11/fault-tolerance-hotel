@@ -21,7 +21,7 @@ import (
 
 const bookingNamespace = "hotelflow"
 const gooseImage = "ghcr.io/kukymbr/goose-docker:3.26.0@sha256:0cd025636df126e7f66472861ca4db3683bc649be46cd1f6ef1a316209058e23"
-const migrationJobRevision = "v11-review-rating-topic"
+const migrationJobRevision = "v12-valkey-cluster"
 
 type BookingResources struct {
 	Infrastructure []*unstructured.Unstructured
@@ -106,7 +106,7 @@ func RenderBookingDependencies(root string) (BookingResources, error) {
 		return BookingResources{}, err
 	}
 
-	checksum := sha256.Sum256(append(encoded, gooseImage+migrationJobRevision...))
+	checksum := sha256.Sum256(append(encoded, gooseImage+migrationJobRevision+bootstrapValkey...))
 	name := fmt.Sprintf("booking-migrations-%x", checksum[:6])
 	configMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -135,6 +135,7 @@ func RenderBookingDependencies(root string) (BookingResources, error) {
 						migrationContainer("hotels"),
 						migrationContainer("review"),
 						migrationContainer("check-in"),
+						valkeyInitContainer(),
 						{
 							Name:  "topics",
 							Image: "apache/kafka:3.9.1",

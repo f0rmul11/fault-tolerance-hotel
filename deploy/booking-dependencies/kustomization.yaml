@@ -12,3 +12,4 @@ resources:
   - kafka-proxy.yaml
   - akhq.yaml
   - config-etcd.yaml
+  - valkey.yaml

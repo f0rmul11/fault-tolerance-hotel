@@ -171,7 +171,7 @@ func (m *Manager) deploy(
 		if err != nil {
 			return err
 		}
-		fmt.Fprintln(m.Streams.Out, "Запуск PostgreSQL, Kafka и отдельного config-etcd")
+		fmt.Fprintln(m.Streams.Out, "Запуск PostgreSQL, Kafka, Valkey и отдельного config-etcd")
 		if err = client.Apply(ctx, resources.Infrastructure, m.Streams.Out); err != nil {
 			return err
 		}
@@ -195,7 +195,7 @@ func (m *Manager) deploy(
 				return err
 			}
 		}
-		fmt.Fprintln(m.Streams.Out, "Применение миграций, учебных данных и топиков Kafka")
+		fmt.Fprintln(m.Streams.Out, "Применение миграций, инициализация Valkey, учебных данных и топиков Kafka")
 		if err = client.Apply(ctx, resources.Migrations, m.Streams.Out); err != nil {
 			return err
 		}
@@ -203,6 +203,9 @@ func (m *Manager) deploy(
 			return err
 		}
 		if err = client.WaitJob(ctx, "hotelflow", resources.TopicsJobName); err != nil {
+			return err
+		}
+		if err = client.WaitValkey(ctx); err != nil {
 			return err
 		}
 	}

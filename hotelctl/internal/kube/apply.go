@@ -4,18 +4,22 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"path/filepath"
 	"strings"
 
 	"github.com/f0rmul11/fault-tolerance-hotel/hotelctl/internal/config"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	k8syaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/restmapper"
 	"sigs.k8s.io/kustomize/api/krusty"
 	"sigs.k8s.io/kustomize/kyaml/filesys"
@@ -86,26 +90,59 @@ func (c *Client) Apply(ctx context.Context, objects []*unstructured.Unstructured
 		if err != nil {
 			return err
 		}
-		data, err := json.Marshal(object.Object)
-		if err != nil {
-			return err
-		}
-		resource := c.Dynamic.Resource(mapping.Resource)
-		options := metav1.PatchOptions{
-			FieldManager:    "hotelctl",
-			FieldValidation: "Strict",
-		}
+		client := c.Dynamic.Resource(mapping.Resource)
+		var resource dynamic.ResourceInterface = client
 		if mapping.Scope.Name() == meta.RESTScopeNameNamespace {
-			_, err = resource.Namespace(object.GetNamespace()).Patch(ctx, object.GetName(), types.ApplyPatchType, data, options)
-		} else {
-			_, err = resource.Patch(ctx, object.GetName(), types.ApplyPatchType, data, options)
+			resource = client.Namespace(object.GetNamespace())
 		}
-		if err != nil {
+		if err := applyResource(ctx, resource, object); err != nil {
 			return fmt.Errorf("apply %s/%s: %w", object.GetKind(), object.GetName(), err)
 		}
 		fmt.Fprintf(out, "%s/%s applied\n", strings.ToLower(object.GetKind()), object.GetName())
 	}
 	return nil
+}
+
+func applyResource(ctx context.Context, resource dynamic.ResourceInterface, object *unstructured.Unstructured) error {
+	data, err := json.Marshal(object.Object)
+	if err != nil {
+		return err
+	}
+	options := metav1.PatchOptions{
+		FieldManager:    "hotelctl",
+		FieldValidation: "Strict",
+	}
+	_, err = resource.Patch(ctx, object.GetName(), types.ApplyPatchType, data, options)
+	if object.GroupVersionKind().GroupKind() != (schema.GroupKind{Group: "apps", Kind: "Deployment"}) || !onlyReplicaConflict(err) {
+		return err
+	}
+
+	// Let the scale manager keep the live replica count.
+	object = object.DeepCopy()
+	unstructured.RemoveNestedField(object.Object, "spec", "replicas")
+	data, err = json.Marshal(object.Object)
+	if err != nil {
+		return err
+	}
+	_, err = resource.Patch(ctx, object.GetName(), types.ApplyPatchType, data, options)
+	return err
+}
+
+func onlyReplicaConflict(err error) bool {
+	var statusError apierrors.APIStatus
+	if !errors.As(err, &statusError) {
+		return false
+	}
+	status := statusError.Status()
+	if status.Reason != metav1.StatusReasonConflict || status.Details == nil || len(status.Details.Causes) == 0 {
+		return false
+	}
+	for _, cause := range status.Details.Causes {
+		if cause.Type != metav1.CauseTypeFieldManagerConflict || cause.Field != ".spec.replicas" {
+			return false
+		}
+	}
+	return true
 }
 
 func configureNodePorts(object *unstructured.Unstructured, s config.Service) {
