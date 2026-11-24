@@ -19,6 +19,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
+	ReviewService_AddHotelRating_FullMethodName  = "/review.review.v1.ReviewService/AddHotelRating"
 	ReviewService_GetHotelRatings_FullMethodName = "/review.review.v1.ReviewService/GetHotelRatings"
 )
 
@@ -28,6 +29,8 @@ const (
 //
 // Пакетное чтение пользовательских рейтингов отелей.
 type ReviewServiceClient interface {
+	// Добавляет одну оценку. Повторный вызов означает новую оценку; автоматических повторов нет.
+	AddHotelRating(ctx context.Context, in *AddHotelRatingRequest, opts ...grpc.CallOption) (*AddHotelRatingResponse, error)
 	// Читает рейтинги всех переданных отелей одним запросом к БД.
 	GetHotelRatings(ctx context.Context, in *GetHotelRatingsRequest, opts ...grpc.CallOption) (*GetHotelRatingsResponse, error)
 }
@@ -38,6 +41,16 @@ type reviewServiceClient struct {
 
 func NewReviewServiceClient(cc grpc.ClientConnInterface) ReviewServiceClient {
 	return &reviewServiceClient{cc}
+}
+
+func (c *reviewServiceClient) AddHotelRating(ctx context.Context, in *AddHotelRatingRequest, opts ...grpc.CallOption) (*AddHotelRatingResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AddHotelRatingResponse)
+	err := c.cc.Invoke(ctx, ReviewService_AddHotelRating_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *reviewServiceClient) GetHotelRatings(ctx context.Context, in *GetHotelRatingsRequest, opts ...grpc.CallOption) (*GetHotelRatingsResponse, error) {
@@ -56,6 +69,8 @@ func (c *reviewServiceClient) GetHotelRatings(ctx context.Context, in *GetHotelR
 //
 // Пакетное чтение пользовательских рейтингов отелей.
 type ReviewServiceServer interface {
+	// Добавляет одну оценку. Повторный вызов означает новую оценку; автоматических повторов нет.
+	AddHotelRating(context.Context, *AddHotelRatingRequest) (*AddHotelRatingResponse, error)
 	// Читает рейтинги всех переданных отелей одним запросом к БД.
 	GetHotelRatings(context.Context, *GetHotelRatingsRequest) (*GetHotelRatingsResponse, error)
 	mustEmbedUnimplementedReviewServiceServer()
@@ -68,6 +83,9 @@ type ReviewServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedReviewServiceServer struct{}
 
+func (UnimplementedReviewServiceServer) AddHotelRating(context.Context, *AddHotelRatingRequest) (*AddHotelRatingResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AddHotelRating not implemented")
+}
 func (UnimplementedReviewServiceServer) GetHotelRatings(context.Context, *GetHotelRatingsRequest) (*GetHotelRatingsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetHotelRatings not implemented")
 }
@@ -90,6 +108,24 @@ func RegisterReviewServiceServer(s grpc.ServiceRegistrar, srv ReviewServiceServe
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&ReviewService_ServiceDesc, srv)
+}
+
+func _ReviewService_AddHotelRating_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AddHotelRatingRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ReviewServiceServer).AddHotelRating(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ReviewService_AddHotelRating_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ReviewServiceServer).AddHotelRating(ctx, req.(*AddHotelRatingRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _ReviewService_GetHotelRatings_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -117,6 +153,10 @@ var ReviewService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "review.review.v1.ReviewService",
 	HandlerType: (*ReviewServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "AddHotelRating",
+			Handler:    _ReviewService_AddHotelRating_Handler,
+		},
 		{
 			MethodName: "GetHotelRatings",
 			Handler:    _ReviewService_GetHotelRatings_Handler,

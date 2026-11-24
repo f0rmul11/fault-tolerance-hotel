@@ -40,6 +40,7 @@ func (s *Service) ListHotels(ctx context.Context, req *pb.ListHotelsRequest) (*p
 			Latitude:        h.Latitude(),
 			Longitude:       h.Longitude(),
 			ReviewCount:     rating.ReviewCount,
+			RatingVersion:   rating.Version,
 			RatingsDegraded: rating.Degraded,
 		}
 		if !rating.Degraded && rating.ReviewCount > 0 {

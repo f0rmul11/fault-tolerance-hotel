@@ -111,7 +111,7 @@ func ResetResources(root, name string) (*corev1.ConfigMap, *batchv1.Job, error) 
 
 func resetConsumerGroups(root string) ([]string, error) {
 	groups := []string{}
-	for _, owner := range []string{"booking", "check-in", "notification"} {
+	for _, owner := range []string{"booking", "check-in", "notification", "hotels"} {
 		body, err := os.ReadFile(filepath.Join(root, "services", owner, "config", "config.yaml"))
 		if err != nil {
 			return nil, err

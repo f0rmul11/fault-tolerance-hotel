@@ -82,6 +82,14 @@
             "in": "path",
             "required": true,
             "type": "string"
+          },
+          {
+            "name": "minRatingVersion",
+            "description": "Минимально допустимая версия рейтинга этого отеля. 0 — без требования.\nЕсли версия недоступна, возвращается Unavailable вместо старого рейтинга.",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "int64"
           }
         ],
         "tags": [
@@ -230,6 +238,11 @@
         "ratingsDegraded": {
           "type": "boolean",
           "description": "Рейтинги временно недоступны: rating отсутствует, review_count неизвестен.\nПри false отсутствие rating означает, что оценок ещё нет."
+        },
+        "ratingVersion": {
+          "type": "string",
+          "format": "int64",
+          "description": "Версия агрегата рейтинга в Review; неизвестна при ratings_degraded = true."
         }
       },
       "description": "Основные сведения об отеле без вложенного списка номеров."

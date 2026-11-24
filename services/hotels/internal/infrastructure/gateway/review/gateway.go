@@ -55,6 +55,7 @@ func (c *Client) GetHotelRatings(ctx context.Context, ids []uuid.UUID) (map[uuid
 		result[uuid.FromStringOrNil(rating.GetHotelId())] = dto.Rating{
 			Value:       rating.GetRating(),
 			ReviewCount: rating.GetReviewCount(),
+			Version:     rating.GetRatingVersion(),
 		}
 	}
 	return result, nil

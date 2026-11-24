@@ -5,4 +5,7 @@ type Rating struct {
 	Degraded    bool
 	Value       float64
 	ReviewCount int64
+
+	// Version — версия агрегата в Review, не CAS-токен кеша.
+	Version int64
 }

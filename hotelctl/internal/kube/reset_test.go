@@ -18,7 +18,7 @@ import (
 
 func TestResetUsesConfiguredConsumerGroups(t *testing.T) {
 	root := t.TempDir()
-	for _, owner := range []string{"booking", "check-in", "notification"} {
+	for _, owner := range []string{"booking", "check-in", "notification", "hotels"} {
 		dir := filepath.Join(root, "services", owner, "config")
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			t.Fatal(err)
@@ -49,7 +49,7 @@ retry:
 		t.Fatal(err)
 	}
 	slices.Sort(groups)
-	if !slices.Equal(groups, []string{"booking-test", "check-in-test", "long-delay", "main", "short-delay"}) {
+	if !slices.Equal(groups, []string{"booking-test", "check-in-test", "hotels-test", "long-delay", "main", "short-delay"}) {
 		t.Fatalf("ignored explicit consumer groups: %v", groups)
 	}
 }

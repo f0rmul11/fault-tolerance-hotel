@@ -11,7 +11,10 @@ func (i *Implementation) GetHotel(ctx context.Context, req *pb.GetHotelRequest) 
 	ctx, span := traces.Start(ctx, "handler.hotels.GetHotel")
 	defer span.End()
 
-	response, err := i.external.GetHotel(ctx, &external.GetHotelRequest{HotelId: req.GetHotelId()})
+	response, err := i.external.GetHotel(ctx, &external.GetHotelRequest{
+		HotelId:          req.GetHotelId(),
+		MinRatingVersion: req.GetMinRatingVersion(),
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -27,6 +30,7 @@ func (i *Implementation) GetHotel(ctx context.Context, req *pb.GetHotelRequest) 
 		Latitude:        r.GetLatitude(),
 		Longitude:       r.GetLongitude(),
 		ReviewCount:     r.GetReviewCount(),
+		RatingVersion:   r.GetRatingVersion(),
 		RatingsDegraded: r.GetRatingsDegraded(),
 		Rating:          r.Rating,
 	}}, nil

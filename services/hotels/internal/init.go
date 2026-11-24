@@ -25,11 +25,15 @@ import (
 	"hotels/internal/application/service"
 	"hotels/internal/application/usecase"
 	runtimeconfig "hotels/internal/config"
+	"hotels/internal/infrastructure/adapter"
 	"hotels/internal/infrastructure/gateway"
+	"hotels/internal/infrastructure/messagebus"
+	"hotels/internal/infrastructure/messagebus/subscriber/scheme/review_events/rating_changed"
 	"hotels/internal/infrastructure/storage"
 	"hotels/internal/pkg/circuit"
 	"hotels/internal/pkg/closer"
 	"hotels/internal/pkg/connector/postgres"
+	event_router "hotels/internal/pkg/event-router"
 	"hotels/internal/pkg/grpc/intercept"
 	"hotels/internal/pkg/grpcdesc"
 	"hotels/internal/pkg/healthcheck"
@@ -263,7 +267,7 @@ func (a *App) initUsecases(context.Context) error {
 	a.usecases = usecase.NewRegistry(
 		a.storage,
 		a.services,
-		a.gateway,
+		a.adapters,
 		runtimeconfig.NewClient(a.runtimeConfig.Load()),
 	)
 	return nil
@@ -271,6 +275,23 @@ func (a *App) initUsecases(context.Context) error {
 
 func (a *App) initGateway(context.Context) error {
 	a.gateway = gateway.NewRegistry(a.grpcConn)
+	return nil
+}
+
+func (a *App) initAdapters(context.Context) error {
+	a.adapters = adapter.NewRegistry(a.valkey, a.storage, a.services)
+	return nil
+}
+
+func (a *App) initMessageBus(context.Context) error {
+	router := event_router.NewEventRouter[string, []byte](
+		event_router.WithSkipUnknownEventType[string, []byte](),
+	)
+	router.RegisterAll(rating_changed.NewHandler(a.usecases.RefreshHotel))
+
+	a.messageBus = messagebus.NewRegistry(router)
+	// Consumer останавливается до закрытия клиента Valkey глобальным closer.
+	a.publicCloser.Add(a.messageBus.Stop)
 	return nil
 }
 

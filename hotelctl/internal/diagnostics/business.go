@@ -17,7 +17,7 @@ import (
 )
 
 type NotificationLogs interface {
-	Logs(context.Context, config.Service, bool, int64, io.Writer) error
+	LogsAll(context.Context, config.Service, int64, io.Writer) error
 }
 
 // BusinessSmoke создаёт собственную бронь и освобождает номер отменой в конце проверки.
@@ -55,7 +55,7 @@ func BusinessSmoke(ctx context.Context, cfg config.Config, logs NotificationLogs
 	}
 	if err := awaitBusiness(ctx, func() (bool, error) {
 		var output bytes.Buffer
-		if err := logs.Logs(ctx, notification, false, 1000, &output); err != nil {
+		if err := logs.LogsAll(ctx, notification, 1000, &output); err != nil {
 			return false, err
 		}
 		return notificationDelivered(&output, bookingID)

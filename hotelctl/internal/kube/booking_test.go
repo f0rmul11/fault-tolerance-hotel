@@ -136,9 +136,6 @@ func TestBookingDependenciesUseCanonicalSQLAndSeparateOwners(t *testing.T) {
 				container := raw.(map[string]any)
 				for _, rawEnv := range container["env"].([]any) {
 					env := rawEnv.(map[string]any)
-					if env["name"] == "KAFKA_BROKERS" && service.Name == "hotels" {
-						t.Fatalf("%s must not depend on Kafka", service.Name)
-					}
 					if env["name"] == "KAFKA_BROKERS" && env["value"] == "kafka:9092" {
 						foundKafka = true
 					}
@@ -156,8 +153,8 @@ func TestBookingDependenciesUseCanonicalSQLAndSeparateOwners(t *testing.T) {
 		if !found {
 			t.Fatalf("%s missing database configuration", service.Name)
 		}
-		if service.Name == "review" && !foundKafka {
-			t.Fatal("review missing Kafka configuration")
+		if (service.Name == "review" || service.Name == "hotels") && !foundKafka {
+			t.Fatalf("%s missing Kafka configuration", service.Name)
 		}
 	}
 }

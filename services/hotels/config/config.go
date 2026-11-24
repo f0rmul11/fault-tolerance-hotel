@@ -30,6 +30,9 @@ func Instance() *Config {
 }
 
 type Config struct {
+	KafkaBrokers    []string          `yaml:"kafka_brokers" env:"KAFKA_BROKERS" env-separator:","`
+	ConsumerGroup   string            `yaml:"consumer_group" env:"CONSUMER_GROUP"`
+	Cache           Cache             `yaml:"cache"`
 	ValkeyAddresses []string          `yaml:"valkey_addresses" env:"VALKEY_ADDRESSES" env-separator:","`
 	Circuit         circuit.Config    `yaml:"circuit"`
 	RuntimeConfig   rtconfig.Config   `yaml:"runtime_config"`
@@ -61,6 +64,16 @@ func Read() (*Config, error) {
 }
 
 func (c *Config) Validate() error {
+	if len(c.KafkaBrokers) == 0 || c.ConsumerGroup == "" {
+		return fmt.Errorf("не указаны Kafka brokers или consumer group")
+	}
+	if c.Cache.SoftTTL <= 0 || c.Cache.HardTTL <= c.Cache.SoftTTL {
+		return fmt.Errorf("TTL кеша должны удовлетворять 0 < soft_ttl < hard_ttl")
+	}
+	if c.Cache.RefreshTimeout <= 0 || c.Cache.RefreshTimeout >= c.Cache.HardTTL {
+		return fmt.Errorf("refresh_timeout должен быть положительным и меньше hard_ttl")
+	}
+
 	for name, port := range map[string]int{
 		"HTTP_PORT":       c.HttpServer.Port,
 		"GRPC_PORT":       c.GrpcServer.Port,

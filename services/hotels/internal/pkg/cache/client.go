@@ -85,8 +85,9 @@ func (c *Client[TValue, TValuePtr]) Cas(ctx context.Context, entry Entry[TValue,
 
 		// если ключик существует и нас попросили сделать обновление (передали какую-то версию),
 		// то надо понять, а можно ли это делать?
-		if entry.Version != 0 && exists {
-			if version != entry.Version {
+		if entry.Version != 0 {
+			// Исчезновение ключа тоже аннулирует ранее полученный токен.
+			if !exists || version != entry.Version {
 				return hotelserror.NewConflictErr("modification conflict") // Конкурентная модификация
 			}
 		}

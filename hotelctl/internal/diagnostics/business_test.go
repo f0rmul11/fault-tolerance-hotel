@@ -263,8 +263,8 @@ type notificationLogStub struct {
 	bookingID string
 }
 
-func (s notificationLogStub) Logs(_ context.Context, service config.Service, follow bool, tail int64, out io.Writer) error {
-	if service.Name != "notification" || follow || tail <= 0 {
+func (s notificationLogStub) LogsAll(_ context.Context, service config.Service, tail int64, out io.Writer) error {
+	if service.Name != "notification" || tail <= 0 {
 		return errors.New("некорректные параметры чтения логов Kubernetes")
 	}
 	for _, title := range []string{"Бронирование подтверждено", "Добро пожаловать!", "Бронирование отменено"} {

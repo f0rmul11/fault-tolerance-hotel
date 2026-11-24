@@ -32,6 +32,7 @@ func (i *Implementation) ListHotels(ctx context.Context, req *pb.ListHotelsReque
 			Latitude:        r.GetLatitude(),
 			Longitude:       r.GetLongitude(),
 			ReviewCount:     r.GetReviewCount(),
+			RatingVersion:   r.GetRatingVersion(),
 			RatingsDegraded: r.GetRatingsDegraded(),
 			Rating:          r.Rating,
 		}

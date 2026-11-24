@@ -50,8 +50,10 @@ type Hotel struct {
 	// Рейтинги временно недоступны: rating отсутствует, review_count неизвестен.
 	// При false отсутствие rating означает, что оценок ещё нет.
 	RatingsDegraded bool `protobuf:"varint,12,opt,name=ratings_degraded,json=ratingsDegraded,proto3" json:"ratings_degraded,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// Версия агрегата рейтинга в Review; неизвестна при ratings_degraded = true.
+	RatingVersion int64 `protobuf:"varint,13,opt,name=rating_version,json=ratingVersion,proto3" json:"rating_version,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Hotel) Reset() {
@@ -166,6 +168,13 @@ func (x *Hotel) GetRatingsDegraded() bool {
 		return x.RatingsDegraded
 	}
 	return false
+}
+
+func (x *Hotel) GetRatingVersion() int64 {
+	if x != nil {
+		return x.RatingVersion
+	}
+	return 0
 }
 
 // Номер в отеле, его оснащение и ограничения длительности бронирования.
@@ -427,9 +436,12 @@ func (x *ListHotelsResponse) GetHotels() []*Hotel {
 type GetHotelRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// UUID отеля в Hotels.
-	HotelId       string `protobuf:"bytes,1,opt,name=hotel_id,json=hotelId,proto3" json:"hotel_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	HotelId string `protobuf:"bytes,1,opt,name=hotel_id,json=hotelId,proto3" json:"hotel_id,omitempty"`
+	// Минимально допустимая версия рейтинга этого отеля. 0 — без требования.
+	// Если версия недоступна, возвращается Unavailable вместо старого рейтинга.
+	MinRatingVersion int64 `protobuf:"varint,2,opt,name=min_rating_version,json=minRatingVersion,proto3" json:"min_rating_version,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *GetHotelRequest) Reset() {
@@ -467,6 +479,13 @@ func (x *GetHotelRequest) GetHotelId() string {
 		return x.HotelId
 	}
 	return ""
+}
+
+func (x *GetHotelRequest) GetMinRatingVersion() int64 {
+	if x != nil {
+		return x.MinRatingVersion
+	}
+	return 0
 }
 
 // Сведения о выбранном отеле.
@@ -703,7 +722,7 @@ var File_api_gateway_hotels_v1_hotels_proto protoreflect.FileDescriptor
 
 const file_api_gateway_hotels_v1_hotels_proto_rawDesc = "" +
 	"\n" +
-	"\"api-gateway/hotels/v1/hotels.proto\x12\x15api_gateway.hotels.v1\x1a\x1cgoogle/api/annotations.proto\"\xdb\x02\n" +
+	"\"api-gateway/hotels/v1/hotels.proto\x12\x15api_gateway.hotels.v1\x1a\x1cgoogle/api/annotations.proto\"\x82\x03\n" +
 	"\x05Hotel\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
@@ -717,7 +736,8 @@ const file_api_gateway_hotels_v1_hotels_proto_rawDesc = "" +
 	"\x06rating\x18\n" +
 	" \x01(\x01H\x00R\x06rating\x88\x01\x01\x12!\n" +
 	"\freview_count\x18\v \x01(\x03R\vreviewCount\x12)\n" +
-	"\x10ratings_degraded\x18\f \x01(\bR\x0fratingsDegradedB\t\n" +
+	"\x10ratings_degraded\x18\f \x01(\bR\x0fratingsDegraded\x12%\n" +
+	"\x0erating_version\x18\r \x01(\x03R\rratingVersionB\t\n" +
 	"\a_rating\"\xc2\x03\n" +
 	"\x04Room\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x19\n" +
@@ -741,9 +761,10 @@ const file_api_gateway_hotels_v1_hotels_proto_rawDesc = "" +
 	"\x06offset\x18\x02 \x01(\x05R\x06offsetB\b\n" +
 	"\x06_limit\"J\n" +
 	"\x12ListHotelsResponse\x124\n" +
-	"\x06hotels\x18\x01 \x03(\v2\x1c.api_gateway.hotels.v1.HotelR\x06hotels\",\n" +
+	"\x06hotels\x18\x01 \x03(\v2\x1c.api_gateway.hotels.v1.HotelR\x06hotels\"Z\n" +
 	"\x0fGetHotelRequest\x12\x19\n" +
-	"\bhotel_id\x18\x01 \x01(\tR\ahotelId\"F\n" +
+	"\bhotel_id\x18\x01 \x01(\tR\ahotelId\x12,\n" +
+	"\x12min_rating_version\x18\x02 \x01(\x03R\x10minRatingVersion\"F\n" +
 	"\x10GetHotelResponse\x122\n" +
 	"\x05hotel\x18\x01 \x01(\v2\x1c.api_gateway.hotels.v1.HotelR\x05hotel\"-\n" +
 	"\x10ListRoomsRequest\x12\x19\n" +

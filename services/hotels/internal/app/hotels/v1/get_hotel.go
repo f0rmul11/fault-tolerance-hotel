@@ -6,6 +6,7 @@ import (
 	"github.com/gofrs/uuid"
 	"github.com/samber/lo"
 
+	"hotels/internal/application/usecase/hotel/get"
 	pb "hotels/internal/pkg/pb/hotels/hotels/v1"
 	"hotels/internal/pkg/telemetry/traces"
 )
@@ -14,7 +15,10 @@ func (s *Service) GetHotel(ctx context.Context, req *pb.GetHotelRequest) (*pb.Ge
 	ctx, span := traces.Start(ctx, "handler.hotels.GetHotel")
 	defer span.End()
 
-	h, err := s.usecases.GetHotel.Execute(ctx, uuid.FromStringOrNil(req.GetHotelId()))
+	h, err := s.usecases.GetHotel.Execute(ctx, get.Input{
+		HotelID:          uuid.FromStringOrNil(req.GetHotelId()),
+		MinRatingVersion: req.GetMinRatingVersion(),
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -30,6 +34,7 @@ func (s *Service) GetHotel(ctx context.Context, req *pb.GetHotelRequest) (*pb.Ge
 		Latitude:        h.Latitude(),
 		Longitude:       h.Longitude(),
 		ReviewCount:     rating.ReviewCount,
+		RatingVersion:   rating.Version,
 		RatingsDegraded: rating.Degraded,
 	}
 	if !rating.Degraded && rating.ReviewCount > 0 {

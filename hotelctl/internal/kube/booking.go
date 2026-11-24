@@ -313,7 +313,7 @@ func configureBookingRuntime(object *unstructured.Unstructured, service config.S
 			})
 		}
 
-		if (service.Name == "booking" || service.Name == "check-in" || service.Name == "notification" || service.Name == "review") && !names["KAFKA_BROKERS"] {
+		if (service.Name == "booking" || service.Name == "check-in" || service.Name == "notification" || service.Name == "review" || service.Name == "hotels") && !names["KAFKA_BROKERS"] {
 			env = append(env, map[string]any{
 				"name":  "KAFKA_BROKERS",
 				"value": "kafka:9092",

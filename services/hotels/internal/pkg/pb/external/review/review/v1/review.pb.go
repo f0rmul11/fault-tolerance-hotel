@@ -121,7 +121,9 @@ type HotelRating struct {
 	// Средняя пользовательская оценка от 0 до 5.
 	Rating float64 `protobuf:"fixed64,2,opt,name=rating,proto3" json:"rating,omitempty"`
 	// Количество пользовательских оценок отеля.
-	ReviewCount   int64 `protobuf:"varint,3,opt,name=review_count,json=reviewCount,proto3" json:"review_count,omitempty"`
+	ReviewCount int64 `protobuf:"varint,3,opt,name=review_count,json=reviewCount,proto3" json:"review_count,omitempty"`
+	// Версия агрегата рейтинга, согласованная с rating и review_count.
+	RatingVersion int64 `protobuf:"varint,4,opt,name=rating_version,json=ratingVersion,proto3" json:"rating_version,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -177,6 +179,114 @@ func (x *HotelRating) GetReviewCount() int64 {
 	return 0
 }
 
+func (x *HotelRating) GetRatingVersion() int64 {
+	if x != nil {
+		return x.RatingVersion
+	}
+	return 0
+}
+
+// Оценка отеля. История и текст отзывов в этом учебном сценарии не сохраняются.
+type AddHotelRatingRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// UUID отеля.
+	HotelId string `protobuf:"bytes,1,opt,name=hotel_id,json=hotelId,proto3" json:"hotel_id,omitempty"`
+	// Целая оценка от 1 до 5.
+	Stars         int32 `protobuf:"varint,2,opt,name=stars,proto3" json:"stars,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AddHotelRatingRequest) Reset() {
+	*x = AddHotelRatingRequest{}
+	mi := &file_review_review_v1_review_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AddHotelRatingRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AddHotelRatingRequest) ProtoMessage() {}
+
+func (x *AddHotelRatingRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_review_review_v1_review_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AddHotelRatingRequest.ProtoReflect.Descriptor instead.
+func (*AddHotelRatingRequest) Descriptor() ([]byte, []int) {
+	return file_review_review_v1_review_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *AddHotelRatingRequest) GetHotelId() string {
+	if x != nil {
+		return x.HotelId
+	}
+	return ""
+}
+
+func (x *AddHotelRatingRequest) GetStars() int32 {
+	if x != nil {
+		return x.Stars
+	}
+	return 0
+}
+
+// Состояние агрегата после commit рейтинга и события outbox.
+type AddHotelRatingResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Новые значение, количество оценок и версия агрегата.
+	Rating        *HotelRating `protobuf:"bytes,1,opt,name=rating,proto3" json:"rating,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AddHotelRatingResponse) Reset() {
+	*x = AddHotelRatingResponse{}
+	mi := &file_review_review_v1_review_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AddHotelRatingResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AddHotelRatingResponse) ProtoMessage() {}
+
+func (x *AddHotelRatingResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_review_review_v1_review_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AddHotelRatingResponse.ProtoReflect.Descriptor instead.
+func (*AddHotelRatingResponse) Descriptor() ([]byte, []int) {
+	return file_review_review_v1_review_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *AddHotelRatingResponse) GetRating() *HotelRating {
+	if x != nil {
+		return x.Rating
+	}
+	return nil
+}
+
 var File_review_review_v1_review_proto protoreflect.FileDescriptor
 
 const file_review_review_v1_review_proto_rawDesc = "" +
@@ -185,12 +295,19 @@ const file_review_review_v1_review_proto_rawDesc = "" +
 	"\x16GetHotelRatingsRequest\x12\x1b\n" +
 	"\thotel_ids\x18\x01 \x03(\tR\bhotelIds\"R\n" +
 	"\x17GetHotelRatingsResponse\x127\n" +
-	"\aratings\x18\x01 \x03(\v2\x1d.review.review.v1.HotelRatingR\aratings\"c\n" +
+	"\aratings\x18\x01 \x03(\v2\x1d.review.review.v1.HotelRatingR\aratings\"\x8a\x01\n" +
 	"\vHotelRating\x12\x19\n" +
 	"\bhotel_id\x18\x01 \x01(\tR\ahotelId\x12\x16\n" +
 	"\x06rating\x18\x02 \x01(\x01R\x06rating\x12!\n" +
-	"\freview_count\x18\x03 \x01(\x03R\vreviewCount2w\n" +
-	"\rReviewService\x12f\n" +
+	"\freview_count\x18\x03 \x01(\x03R\vreviewCount\x12%\n" +
+	"\x0erating_version\x18\x04 \x01(\x03R\rratingVersion\"H\n" +
+	"\x15AddHotelRatingRequest\x12\x19\n" +
+	"\bhotel_id\x18\x01 \x01(\tR\ahotelId\x12\x14\n" +
+	"\x05stars\x18\x02 \x01(\x05R\x05stars\"O\n" +
+	"\x16AddHotelRatingResponse\x125\n" +
+	"\x06rating\x18\x01 \x01(\v2\x1d.review.review.v1.HotelRatingR\x06rating2\xdc\x01\n" +
+	"\rReviewService\x12c\n" +
+	"\x0eAddHotelRating\x12'.review.review.v1.AddHotelRatingRequest\x1a(.review.review.v1.AddHotelRatingResponse\x12f\n" +
 	"\x0fGetHotelRatings\x12(.review.review.v1.GetHotelRatingsRequest\x1a).review.review.v1.GetHotelRatingsResponseB2Z0review/internal/pkg/pb/review/review/v1;reviewV1b\x06proto3"
 
 var (
@@ -205,21 +322,26 @@ func file_review_review_v1_review_proto_rawDescGZIP() []byte {
 	return file_review_review_v1_review_proto_rawDescData
 }
 
-var file_review_review_v1_review_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_review_review_v1_review_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_review_review_v1_review_proto_goTypes = []any{
 	(*GetHotelRatingsRequest)(nil),  // 0: review.review.v1.GetHotelRatingsRequest
 	(*GetHotelRatingsResponse)(nil), // 1: review.review.v1.GetHotelRatingsResponse
 	(*HotelRating)(nil),             // 2: review.review.v1.HotelRating
+	(*AddHotelRatingRequest)(nil),   // 3: review.review.v1.AddHotelRatingRequest
+	(*AddHotelRatingResponse)(nil),  // 4: review.review.v1.AddHotelRatingResponse
 }
 var file_review_review_v1_review_proto_depIdxs = []int32{
 	2, // 0: review.review.v1.GetHotelRatingsResponse.ratings:type_name -> review.review.v1.HotelRating
-	0, // 1: review.review.v1.ReviewService.GetHotelRatings:input_type -> review.review.v1.GetHotelRatingsRequest
-	1, // 2: review.review.v1.ReviewService.GetHotelRatings:output_type -> review.review.v1.GetHotelRatingsResponse
-	2, // [2:3] is the sub-list for method output_type
-	1, // [1:2] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	2, // 1: review.review.v1.AddHotelRatingResponse.rating:type_name -> review.review.v1.HotelRating
+	3, // 2: review.review.v1.ReviewService.AddHotelRating:input_type -> review.review.v1.AddHotelRatingRequest
+	0, // 3: review.review.v1.ReviewService.GetHotelRatings:input_type -> review.review.v1.GetHotelRatingsRequest
+	4, // 4: review.review.v1.ReviewService.AddHotelRating:output_type -> review.review.v1.AddHotelRatingResponse
+	1, // 5: review.review.v1.ReviewService.GetHotelRatings:output_type -> review.review.v1.GetHotelRatingsResponse
+	4, // [4:6] is the sub-list for method output_type
+	2, // [2:4] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_review_review_v1_review_proto_init() }
@@ -233,7 +355,7 @@ func file_review_review_v1_review_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_review_review_v1_review_proto_rawDesc), len(file_review_review_v1_review_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

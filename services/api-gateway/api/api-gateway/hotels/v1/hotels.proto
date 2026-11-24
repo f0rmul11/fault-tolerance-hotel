@@ -67,6 +67,9 @@ message Hotel {
   // Рейтинги временно недоступны: rating отсутствует, review_count неизвестен.
   // При false отсутствие rating означает, что оценок ещё нет.
   bool ratings_degraded = 12;
+
+  // Версия агрегата рейтинга в Review; неизвестна при ratings_degraded = true.
+  int64 rating_version = 13;
 }
 
 // Номер в отеле, его оснащение и ограничения длительности бронирования.
@@ -130,6 +133,10 @@ message ListHotelsResponse {
 message GetHotelRequest {
   // UUID отеля в Hotels.
   string hotel_id = 1;
+
+  // Минимально допустимая версия рейтинга этого отеля. 0 — без требования.
+  // Если версия недоступна, возвращается Unavailable вместо старого рейтинга.
+  int64 min_rating_version = 2;
 }
 
 // Сведения о выбранном отеле.

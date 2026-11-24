@@ -2,6 +2,14 @@ package config
 
 import "time"
 
+const ReviewEventsTopic = "review.rating.events.v1"
+
+type Cache struct {
+	SoftTTL        time.Duration `yaml:"soft_ttl"`
+	HardTTL        time.Duration `yaml:"hard_ttl"`
+	RefreshTimeout time.Duration `yaml:"refresh_timeout"`
+}
+
 type GrpcServer struct {
 	Port              int           `yaml:"port" env:"GRPC_PORT"`
 	MaxConnectionIdle time.Duration `yaml:"max_connection_idle"`

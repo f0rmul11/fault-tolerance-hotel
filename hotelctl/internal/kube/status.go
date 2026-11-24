@@ -46,38 +46,65 @@ func (c *Client) Services(ctx context.Context, services []config.Service) ([]Ser
 	return result, nil
 }
 
+// Logs читает выбранный Pod для интерактивной команды logs.
 func (c *Client) Logs(ctx context.Context, s config.Service, follow bool, tail int64, out io.Writer) error {
-	d, err := c.Typed.AppsV1().Deployments(s.Namespace).Get(ctx, s.Deployment, metav1.GetOptions{})
+	pods, err := c.servicePods(ctx, s)
 	if err != nil {
 		return err
+	}
+	return c.podLogs(ctx, s.Namespace, pods[0].Name, follow, tail, out)
+}
+
+// LogsAll собирает логи всех реплик: Kafka-событие может обработать любая из них.
+func (c *Client) LogsAll(ctx context.Context, s config.Service, tail int64, out io.Writer) error {
+	pods, err := c.servicePods(ctx, s)
+	if err != nil {
+		return err
+	}
+	for _, pod := range pods {
+		if err := c.podLogs(ctx, s.Namespace, pod.Name, false, tail, out); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *Client) servicePods(ctx context.Context, s config.Service) ([]corev1.Pod, error) {
+	d, err := c.Typed.AppsV1().Deployments(s.Namespace).Get(ctx, s.Deployment, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
 	}
 	selector, err := metav1.LabelSelectorAsSelector(d.Spec.Selector)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	pods, err := c.Typed.CoreV1().Pods(s.Namespace).List(ctx, metav1.ListOptions{
-		LabelSelector: selector.String(),
-	})
+	pods, err := c.Typed.CoreV1().Pods(s.Namespace).List(ctx, metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if len(pods.Items) == 0 {
-		return fmt.Errorf("no pods for %s", s.Name)
+		return nil, fmt.Errorf("no pods for %s", s.Name)
 	}
 	sort.Slice(pods.Items, func(i, j int) bool {
 		return pods.Items[j].CreationTimestamp.Before(&pods.Items[i].CreationTimestamp)
 	})
-	pod := pods.Items[0]
-	fmt.Fprintf(out, "Pod: %s\n", pod.Name)
-	stream, err := c.Typed.CoreV1().Pods(s.Namespace).GetLogs(pod.Name, &corev1.PodLogOptions{
-		Follow:    follow,
-		TailLines: &tail,
+	return pods.Items, nil
+}
+
+func (c *Client) podLogs(ctx context.Context, namespace, pod string, follow bool, tail int64, out io.Writer) error {
+	fmt.Fprintf(out, "Pod: %s\n", pod)
+	stream, err := c.Typed.CoreV1().Pods(namespace).GetLogs(pod, &corev1.PodLogOptions{
+		Follow: follow, TailLines: &tail,
 	}).Stream(ctx)
 	if err != nil {
 		return err
 	}
 	defer stream.Close()
-	_, err = io.Copy(out, stream)
+	if _, err = io.Copy(out, stream); err != nil {
+		return err
+	}
+	// Не склеиваем последнюю строку одного Pod с заголовком следующего.
+	_, err = fmt.Fprintln(out)
 	return err
 }
 

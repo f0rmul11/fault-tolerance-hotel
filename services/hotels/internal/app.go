@@ -22,7 +22,9 @@ import (
 	"hotels/config"
 	"hotels/internal/application/service"
 	"hotels/internal/application/usecase"
+	"hotels/internal/infrastructure/adapter"
 	"hotels/internal/infrastructure/gateway"
+	"hotels/internal/infrastructure/messagebus"
 	"hotels/internal/infrastructure/storage"
 	"hotels/internal/pkg/closer"
 	"hotels/internal/pkg/healthcheck"
@@ -32,8 +34,10 @@ import (
 
 // App application
 type App struct {
-	gateway  *gateway.Registry
-	services *service.Registry
+	adapters   *adapter.Registry
+	messageBus *messagebus.Registry
+	gateway    *gateway.Registry
+	services   *service.Registry
 
 	storage  *storage.Registry
 	usecases *usecase.Registry
@@ -136,6 +140,10 @@ func (a *App) Run(ctx context.Context) {
 	}
 
 	// start signal
+	if a.messageBus != nil {
+		a.messageBus.Run(ctx)
+	}
+
 	atomic.StoreInt32(&a.started, 1)
 
 	slog.Info("Приложение запущено",
@@ -159,7 +167,9 @@ func (a *App) init(ctx context.Context) error {
 		a.initStorage,
 		a.initGateway,
 		a.initServices,
+		a.initAdapters,
 		a.initUsecases,
+		a.initMessageBus,
 		a.initControllers,
 	}
 

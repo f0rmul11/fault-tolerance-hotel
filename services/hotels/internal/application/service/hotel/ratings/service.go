@@ -15,7 +15,7 @@ type Review interface {
 	GetHotelRatings(context.Context, []uuid.UUID) (map[uuid.UUID]dto.Rating, error)
 }
 
-// Service applies the same degradation policy to GetHotel and ListHotels.
+// Service применяет управляемый флагом fallback при чтении рейтингов из Review.
 type Service struct {
 	review Review
 	// Читаем текущий локальный snapshot, а не фиксируем флаг при создании сервиса.

@@ -212,6 +212,7 @@ func (r *traceRows) Close() {
 }
 
 type traceReviewClient struct {
+	reviewpb.ReviewServiceClient
 	ctx context.Context
 	ids []string
 }
