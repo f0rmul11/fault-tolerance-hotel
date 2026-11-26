@@ -7,6 +7,8 @@ import (
 
 	entity "hotels/internal/domain/entity/hotel"
 	dto "hotels/internal/dto/hotel"
+	"hotels/internal/infrastructure/adapter/hotel/negative"
+	app "hotels/internal/pkg/hotelserror"
 )
 
 //go:generate go run github.com/mailru/easyjson/easyjson@v0.9.0 -all payload.go
@@ -15,6 +17,8 @@ import (
 //
 //easyjson:json
 type Hotel struct {
+	Negative *negative.Payload `json:"negative,omitempty"`
+
 	ID          string  `json:"id"`
 	Name        string  `json:"name"`
 	Description string  `json:"description"`
@@ -29,26 +33,37 @@ type Hotel struct {
 	ReviewCount   int64   `json:"review_count"`
 	RatingVersion int64   `json:"rating_version"`
 
-	// Deadlines относятся к этому снимку и не сдвигаются при неудачном refresh.
-	SoftDeadline time.Time `json:"soft_deadline"`
-	HardDeadline time.Time `json:"hard_deadline"`
+	CachedAt time.Time `json:"cached_at"`
 }
 
-// CanServe проверяет срок снимка и минимальную версию, запрошенную клиентом.
-func (p Hotel) CanServe(now time.Time, minRatingVersion int64) bool {
-	if p.SoftDeadline.IsZero() || !p.SoftDeadline.Before(p.HardDeadline) {
-		return false
+func (p *Hotel) IsNegative() (err error, negative bool) {
+	if p.Negative == nil {
+		return nil, false
 	}
-	if !now.Before(p.HardDeadline) {
-		return false
-	}
+	return app.New(
+		app.WithCode(int(p.Negative.Code)),
+		app.WithMessage(p.Negative.Message),
+		app.WithClassification(p.Negative.Classification),
+		app.WithBase("Ошибка каталога прочитана из кеша"),
+	), true
+}
 
-	return p.RatingVersion >= minRatingVersion
+func ConvertFromError(err *app.Error) Hotel {
+	return Hotel{Negative: &negative.Payload{
+		Code:           err.Code(),
+		Message:        err.Message(),
+		Classification: err.Classification(),
+	}}
+}
+
+func (p Hotel) Expired(ttl time.Duration) bool {
+	return time.Since(p.CachedAt) >= ttl
 }
 
 // ConvertFrom вызывается после обогащения отеля рейтингом из Review.
 func ConvertFrom(hotel *entity.Hotel) Hotel {
 	return Hotel{
+		CachedAt:      time.Now(),
 		ID:            hotel.ID().String(),
 		Name:          hotel.Name(),
 		Description:   hotel.Description(),

@@ -7,6 +7,8 @@ import (
 	easyjson "github.com/mailru/easyjson"
 	jlexer "github.com/mailru/easyjson/jlexer"
 	jwriter "github.com/mailru/easyjson/jwriter"
+	negative "hotels/internal/infrastructure/adapter/hotel/negative"
+	hotelserror "hotels/internal/pkg/hotelserror"
 )
 
 // suppress unused package warning
@@ -36,6 +38,16 @@ func easyjsonA8a797f8DecodeHotelsInternalInfrastructureAdapterHotelPayload(in *j
 			continue
 		}
 		switch key {
+		case "negative":
+			if in.IsNull() {
+				in.Skip()
+				out.Negative = nil
+			} else {
+				if out.Negative == nil {
+					out.Negative = new(negative.Payload)
+				}
+				easyjsonA8a797f8DecodeHotelsInternalInfrastructureAdapterHotelNegative(in, out.Negative)
+			}
 		case "id":
 			out.ID = string(in.String())
 		case "name":
@@ -60,13 +72,9 @@ func easyjsonA8a797f8DecodeHotelsInternalInfrastructureAdapterHotelPayload(in *j
 			out.ReviewCount = int64(in.Int64())
 		case "rating_version":
 			out.RatingVersion = int64(in.Int64())
-		case "soft_deadline":
+		case "cached_at":
 			if data := in.Raw(); in.Ok() {
-				in.AddError((out.SoftDeadline).UnmarshalJSON(data))
-			}
-		case "hard_deadline":
-			if data := in.Raw(); in.Ok() {
-				in.AddError((out.HardDeadline).UnmarshalJSON(data))
+				in.AddError((out.CachedAt).UnmarshalJSON(data))
 			}
 		default:
 			in.SkipRecursive()
@@ -82,9 +90,20 @@ func easyjsonA8a797f8EncodeHotelsInternalInfrastructureAdapterHotelPayload(out *
 	out.RawByte('{')
 	first := true
 	_ = first
+	if in.Negative != nil {
+		const prefix string = ",\"negative\":"
+		first = false
+		out.RawString(prefix[1:])
+		easyjsonA8a797f8EncodeHotelsInternalInfrastructureAdapterHotelNegative(out, *in.Negative)
+	}
 	{
 		const prefix string = ",\"id\":"
-		out.RawString(prefix[1:])
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
 		out.String(string(in.ID))
 	}
 	{
@@ -143,14 +162,9 @@ func easyjsonA8a797f8EncodeHotelsInternalInfrastructureAdapterHotelPayload(out *
 		out.Int64(int64(in.RatingVersion))
 	}
 	{
-		const prefix string = ",\"soft_deadline\":"
+		const prefix string = ",\"cached_at\":"
 		out.RawString(prefix)
-		out.Raw((in.SoftDeadline).MarshalJSON())
-	}
-	{
-		const prefix string = ",\"hard_deadline\":"
-		out.RawString(prefix)
-		out.Raw((in.HardDeadline).MarshalJSON())
+		out.Raw((in.CachedAt).MarshalJSON())
 	}
 	out.RawByte('}')
 }
@@ -177,4 +191,60 @@ func (v *Hotel) UnmarshalJSON(data []byte) error {
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *Hotel) UnmarshalEasyJSON(l *jlexer.Lexer) {
 	easyjsonA8a797f8DecodeHotelsInternalInfrastructureAdapterHotelPayload(l, v)
+}
+func easyjsonA8a797f8DecodeHotelsInternalInfrastructureAdapterHotelNegative(in *jlexer.Lexer, out *negative.Payload) {
+	isTopLevel := in.IsStart()
+	if in.IsNull() {
+		if isTopLevel {
+			in.Consumed()
+		}
+		in.Skip()
+		return
+	}
+	in.Delim('{')
+	for !in.IsDelim('}') {
+		key := in.UnsafeFieldName(false)
+		in.WantColon()
+		if in.IsNull() {
+			in.Skip()
+			in.WantComma()
+			continue
+		}
+		switch key {
+		case "code":
+			out.Code = hotelserror.Code(in.Int())
+		case "message":
+			out.Message = string(in.String())
+		case "classification":
+			out.Classification = string(in.String())
+		default:
+			in.SkipRecursive()
+		}
+		in.WantComma()
+	}
+	in.Delim('}')
+	if isTopLevel {
+		in.Consumed()
+	}
+}
+func easyjsonA8a797f8EncodeHotelsInternalInfrastructureAdapterHotelNegative(out *jwriter.Writer, in negative.Payload) {
+	out.RawByte('{')
+	first := true
+	_ = first
+	{
+		const prefix string = ",\"code\":"
+		out.RawString(prefix[1:])
+		out.Int(int(in.Code))
+	}
+	{
+		const prefix string = ",\"message\":"
+		out.RawString(prefix)
+		out.String(string(in.Message))
+	}
+	if in.Classification != "" {
+		const prefix string = ",\"classification\":"
+		out.RawString(prefix)
+		out.String(string(in.Classification))
+	}
+	out.RawByte('}')
 }

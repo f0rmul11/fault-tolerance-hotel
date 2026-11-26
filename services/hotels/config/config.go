@@ -74,6 +74,11 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("refresh_timeout должен быть положительным и меньше hard_ttl")
 	}
 
+	negative := c.Cache.Negative
+	if negative.NotFoundTTL < 0 || negative.UnavailableTTL < 0 || negative.ResourceExhaustedTTL < 0 {
+		return fmt.Errorf("TTL в cache.negative должны быть неотрицательными")
+	}
+
 	for name, port := range map[string]int{
 		"HTTP_PORT":       c.HttpServer.Port,
 		"GRPC_PORT":       c.GrpcServer.Port,

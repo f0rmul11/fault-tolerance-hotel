@@ -83,3 +83,31 @@ func TestGracefulDelay(t *testing.T) {
 		})
 	}
 }
+
+func TestNegativeCacheTTL(t *testing.T) {
+	t.Setenv("CONFIG_PATH", "config.yaml")
+	cfg, err := Read()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Cache.Negative != (NegativeCache{NotFoundTTL: 30 * time.Second, UnavailableTTL: time.Second}) {
+		t.Fatalf("negative cache defaults: %+v", cfg.Cache.Negative)
+	}
+	for _, test := range []struct {
+		name   string
+		policy NegativeCache
+		valid  bool
+	}{
+		{"all disabled", NegativeCache{}, true},
+		{"not found", NegativeCache{NotFoundTTL: -time.Second}, false},
+		{"unavailable", NegativeCache{UnavailableTTL: -time.Second}, false},
+		{"resource exhausted", NegativeCache{ResourceExhaustedTTL: -time.Second}, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			cfg.Cache.Negative = test.policy
+			if err := cfg.Validate(); (err == nil) != test.valid {
+				t.Fatalf("validation: %v", err)
+			}
+		})
+	}
+}

@@ -36,13 +36,13 @@ func (a *Adapter) Refresh(ctx context.Context, id uuid.UUID) error {
 	}
 
 	// Fallback без рейтинга не должен стать новым снимком или подтвердить событие.
-	if snapshot.hotel.Rating().Degraded {
+	if snapshot.Rating().Degraded {
 		return errors.New("Не удалось обновить кеш: рейтинг временно недоступен")
 	}
 
 	// 3. Заменяем tombstone полным снимком, только если токен ещё актуален.
 	// При конфликте возвращаем ошибку: старые данные не записываем через Set.
-	return a.publish(ctx, key, snapshot, version)
+	return a.cas(ctx, a.hotelEntry(key, version, snapshot))
 }
 
 // refreshInBackground запускает обновление с токеном исходного чтения.
@@ -58,12 +58,14 @@ func (a *Adapter) refreshInBackground(ctx context.Context, id uuid.UUID, entry E
 
 		// Используем токен исходного чтения; tombstone здесь не нужен.
 		snapshot, err := a.loadSnapshot(ctx, id, entry.Version)
-		if err == nil && snapshot.hotel.Rating().Degraded {
+		if err == nil && snapshot.Rating().Degraded {
 			err = errors.New("Рейтинг временно недоступен")
 		}
+
 		if err == nil {
-			err = a.publish(ctx, entry.Key, snapshot, entry.Version)
+			err = a.cas(ctx, a.hotelEntry(entry.Key, entry.Version, snapshot))
 		}
+
 		if err != nil {
 			traces.RecordError(span, err)
 			slog.DebugContext(ctx, "Фоновое обновление не опубликовано", "hotel_id", id, "error", err)

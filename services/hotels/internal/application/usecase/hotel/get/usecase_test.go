@@ -18,7 +18,7 @@ type adapterFake struct {
 	minVersion int64
 }
 
-func (a *adapterFake) GetWithSoftTTL(_ context.Context, _ uuid.UUID, minVersion int64) (*entity.Hotel, error) {
+func (a *adapterFake) Get(_ context.Context, _ uuid.UUID, minVersion int64) (*entity.Hotel, error) {
 	a.calls++
 	a.minVersion = minVersion
 	return a.hotel, a.err

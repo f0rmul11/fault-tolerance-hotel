@@ -11,7 +11,7 @@ import (
 )
 
 type Adapter interface {
-	GetWithSoftTTL(context.Context, uuid.UUID, int64) (*entity.Hotel, error)
+	Get(context.Context, uuid.UUID, int64) (*entity.Hotel, error)
 }
 
 type UseCase struct {
@@ -37,5 +37,5 @@ func (s *UseCase) Execute(ctx context.Context, input Input) (*entity.Hotel, erro
 	}
 
 	// Адаптер возвращает полный снимок, уже обогащённый рейтингом.
-	return s.adapter.GetWithSoftTTL(ctx, input.HotelID, input.MinRatingVersion)
+	return s.adapter.Get(ctx, input.HotelID, input.MinRatingVersion)
 }

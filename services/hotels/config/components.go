@@ -8,6 +8,13 @@ type Cache struct {
 	SoftTTL        time.Duration `yaml:"soft_ttl"`
 	HardTTL        time.Duration `yaml:"hard_ttl"`
 	RefreshTimeout time.Duration `yaml:"refresh_timeout"`
+	Negative       NegativeCache `yaml:"negative"`
+}
+
+type NegativeCache struct {
+	NotFoundTTL          time.Duration `yaml:"not_found_ttl"`
+	UnavailableTTL       time.Duration `yaml:"unavailable_ttl"`
+	ResourceExhaustedTTL time.Duration `yaml:"resource_exhausted_ttl"`
 }
 
 type GrpcServer struct {

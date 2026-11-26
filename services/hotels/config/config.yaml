@@ -62,6 +62,10 @@ cache:
   soft_ttl: 20s
   hard_ttl: 1m
   refresh_timeout: 3s
+  negative:
+    not_found_ttl: 30s
+    unavailable_ttl: 1s
+    resource_exhausted_ttl: 0s
 
 kafka_brokers: ["localhost:9092"]
 consumer_group: hotels-review-events
