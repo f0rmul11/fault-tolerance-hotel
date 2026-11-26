@@ -70,6 +70,12 @@ func (c *Config) Validate() error {
 	if c.Cache.SoftTTL <= 0 || c.Cache.HardTTL <= c.Cache.SoftTTL {
 		return fmt.Errorf("TTL кеша должны удовлетворять 0 < soft_ttl < hard_ttl")
 	}
+	if jitter := c.Cache.JitterPercentage; !(jitter >= 0 && jitter <= 1) {
+		return fmt.Errorf("cache.jitter_percentage должен быть числом от 0 до 1")
+	}
+	if c.Cache.MaxHardTTL() < c.Cache.HardTTL {
+		return fmt.Errorf("hard_ttl с учётом jitter превышает допустимую длительность")
+	}
 	if c.Cache.RefreshTimeout <= 0 || c.Cache.RefreshTimeout >= c.Cache.HardTTL {
 		return fmt.Errorf("refresh_timeout должен быть положительным и меньше hard_ttl")
 	}

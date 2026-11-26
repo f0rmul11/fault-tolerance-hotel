@@ -5,10 +5,16 @@ import "time"
 const ReviewEventsTopic = "review.rating.events.v1"
 
 type Cache struct {
-	SoftTTL        time.Duration `yaml:"soft_ttl"`
-	HardTTL        time.Duration `yaml:"hard_ttl"`
-	RefreshTimeout time.Duration `yaml:"refresh_timeout"`
-	Negative       NegativeCache `yaml:"negative"`
+	SoftTTL          time.Duration `yaml:"soft_ttl"`
+	HardTTL          time.Duration `yaml:"hard_ttl"`
+	JitterPercentage float64       `yaml:"jitter_percentage" env:"CACHE_JITTER_PERCENTAGE"`
+	RefreshTimeout   time.Duration `yaml:"refresh_timeout"`
+	Negative         NegativeCache `yaml:"negative"`
+}
+
+// MaxHardTTL ограничивает возраст карточки с учётом положительного jitter.
+func (c Cache) MaxHardTTL() time.Duration {
+	return c.HardTTL + time.Duration(float64(c.HardTTL)*c.JitterPercentage)
 }
 
 type NegativeCache struct {

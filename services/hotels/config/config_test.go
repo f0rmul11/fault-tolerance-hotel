@@ -111,3 +111,38 @@ func TestNegativeCacheTTL(t *testing.T) {
 		})
 	}
 }
+
+func TestCacheJitterPercentage(t *testing.T) {
+	t.Setenv("CONFIG_PATH", "config.yaml")
+
+	for _, test := range []struct {
+		percentage string
+		wantMaxTTL time.Duration
+	}{
+		{percentage: "0", wantMaxTTL: time.Minute},
+		{percentage: "0.2", wantMaxTTL: 72 * time.Second},
+		{percentage: "1", wantMaxTTL: 2 * time.Minute},
+		{percentage: "-0.2"},
+		{percentage: "1.1"},
+		{percentage: "NaN"},
+		{percentage: "+Inf"},
+	} {
+		t.Run(test.percentage, func(t *testing.T) {
+			t.Setenv("CACHE_JITTER_PERCENTAGE", test.percentage)
+
+			cfg, err := Read()
+			if test.wantMaxTTL == 0 {
+				if err == nil {
+					t.Fatal("invalid jitter accepted")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := cfg.Cache.MaxHardTTL(); got != test.wantMaxTTL {
+				t.Fatalf("max hard TTL = %v, want %v", got, test.wantMaxTTL)
+			}
+		})
+	}
+}

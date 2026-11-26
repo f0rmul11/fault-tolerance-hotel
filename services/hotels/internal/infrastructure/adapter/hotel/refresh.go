@@ -42,7 +42,11 @@ func (a *Adapter) Refresh(ctx context.Context, id uuid.UUID) error {
 
 	// 3. Заменяем tombstone полным снимком, только если токен ещё актуален.
 	// При конфликте возвращаем ошибку: старые данные не записываем через Set.
-	return a.cas(ctx, a.hotelEntry(key, version, snapshot))
+	return a.cas(ctx, Entry{
+		Key:     key,
+		Value:   payload.ConvertFrom(snapshot),
+		Version: version,
+	})
 }
 
 // refreshInBackground запускает обновление с токеном исходного чтения.
@@ -63,7 +67,11 @@ func (a *Adapter) refreshInBackground(ctx context.Context, id uuid.UUID, entry E
 		}
 
 		if err == nil {
-			err = a.cas(ctx, a.hotelEntry(entry.Key, entry.Version, snapshot))
+			err = a.cas(ctx, Entry{
+				Key:     entry.Key,
+				Value:   payload.ConvertFrom(snapshot),
+				Version: entry.Version,
+			})
 		}
 
 		if err != nil {

@@ -61,6 +61,7 @@ circuit:
 cache:
   soft_ttl: 20s
   hard_ttl: 1m
+  jitter_percentage: 0.2 # Доля от hard_ttl. 0 отключает jitter.
   refresh_timeout: 3s
   negative:
     not_found_ttl: 30s

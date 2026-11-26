@@ -14,6 +14,7 @@ import (
 	dto "hotels/internal/dto/hotel"
 	"hotels/internal/infrastructure/adapter/hotel/payload"
 	"hotels/internal/pkg/cache"
+	"hotels/internal/pkg/cache/jitter"
 	app "hotels/internal/pkg/hotelserror"
 )
 
@@ -86,20 +87,10 @@ func (a *Adapter) loadSnapshot(ctx context.Context, id uuid.UUID, version uint32
 	return snapshot, err
 }
 
-func (a *Adapter) hotelEntry(key string, version uint32, hotel *entity.Hotel) Entry {
-	return Entry{
-		Key:        key,
-		Value:      payload.ConvertFrom(hotel),
-		Version:    version,
-		Expiration: a.cfg.HardTTL,
-	}
-}
-
 func (a *Adapter) casInBackground(ctx context.Context, entry Entry) {
 	go func() {
-		ctx := context.WithoutCancel(ctx)
-		if err := a.cas(ctx, entry); err != nil && !app.IsCode(err, app.Conflict) {
-			slog.WarnContext(ctx, "Не удалось записать карточку в кеш", "key", entry.Key, "error", err)
+		if err := a.cas(context.WithoutCancel(ctx), entry); err != nil && !app.IsCode(err, app.Conflict) {
+			slog.WarnContext(ctx, "Не удалось записать данные в кеш", "key", entry.Key, "error", err)
 		}
 	}()
 }
@@ -111,13 +102,20 @@ func (a *Adapter) cas(ctx context.Context, entry Entry) error {
 	}
 
 	flightKey := fmt.Sprintf("%s:%d:rating:%d", entry.Key, entry.Version, entry.Value.RatingVersion)
-	if n := entry.Value.Negative; n != nil {
-		flightKey = fmt.Sprintf("%s:%d:error:%d", entry.Key, entry.Version, n.Code)
+
+	_, isNegative := entry.Value.IsNegative()
+	if isNegative {
+		flightKey = fmt.Sprintf("%s:%d:error:%d", entry.Key, entry.Version, entry.Value.Negative.Code)
 	}
 
 	_, _, err := a.writes.Do(ctx, flightKey, func(ctx context.Context) (uint32, error) {
 		ctx, cancel := context.WithTimeout(ctx, a.cfg.RefreshTimeout)
 		defer cancel()
+
+		if !entry.IsTombstone() && !isNegative {
+			// При каждой записи карточки выбираем случайную прибавку к hard TTL.
+			entry.Expiration = jitter.UniformPositiveJitter(a.cfg.HardTTL, a.cfg.JitterPercentage)
+		}
 
 		return a.client.Cas(ctx, entry)
 	})
