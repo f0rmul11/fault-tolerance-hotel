@@ -44,11 +44,10 @@ func (a *Adapter) GetWithSoftTTL(ctx context.Context, id uuid.UUID, minRatingVer
 
 	// После hard deadline, при tombstone или недостаточной версии читаем источники синхронно.
 	// Даже если Valkey ещё хранит байты, ответ получаем заново из источников.
-	startedAt := time.Now()
 	loadCtx, cancel := context.WithTimeout(ctx, a.cfg.RefreshTimeout)
 	defer cancel()
 
-	hotel, err := a.loadSnapshot(loadCtx, id)
+	snapshot, err := a.loadSnapshot(loadCtx, id, entry.Version)
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
@@ -56,6 +55,7 @@ func (a *Adapter) GetWithSoftTTL(ctx context.Context, id uuid.UUID, minRatingVer
 		return nil, err
 	}
 
+	hotel := &snapshot.hotel
 	// Проверяем ответ источника до публикации: fallback не выполняет требование версии.
 	if minRatingVersion > 0 && (hotel.Rating().Degraded || hotel.Rating().Version < minRatingVersion) {
 		return nil, app.New(
@@ -74,7 +74,7 @@ func (a *Adapter) GetWithSoftTTL(ctx context.Context, id uuid.UUID, minRatingVer
 		return hotel, nil
 	}
 
-	if err = a.publish(loadCtx, key, hotel, entry.Version, startedAt); err != nil {
+	if err = a.publish(loadCtx, key, snapshot, entry.Version); err != nil {
 		// Свежий ответ уже получен; проигрыш CAS не превращаем в безусловный SET.
 		slog.DebugContext(ctx, "Снимок не опубликован в кеш", "hotel_id", id, "error", err)
 	}

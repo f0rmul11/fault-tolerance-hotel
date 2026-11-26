@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	"time"
 
 	"github.com/gofrs/uuid"
 
@@ -21,7 +20,6 @@ func (a *Adapter) Refresh(ctx context.Context, id uuid.UUID) error {
 	defer cancel()
 
 	key := payload.HotelKey(id)
-	startedAt := time.Now()
 
 	// 1. Устанавливаем tombstone и запоминаем токен для последующей записи.
 	version, err := a.client.Cas(ctx, cache.NewTombstone[payload.Hotel, *payload.Hotel](
@@ -32,23 +30,22 @@ func (a *Adapter) Refresh(ctx context.Context, id uuid.UUID) error {
 	}
 
 	// 2. Читаем актуальные данные напрямую из источников, обходя кеш.
-	hotel, err := a.loadSnapshot(ctx, id)
+	snapshot, err := a.loadSnapshot(ctx, id, version)
 	if err != nil {
 		return err
 	}
 
 	// Fallback без рейтинга не должен стать новым снимком или подтвердить событие.
-	if hotel.Rating().Degraded {
+	if snapshot.hotel.Rating().Degraded {
 		return errors.New("Не удалось обновить кеш: рейтинг временно недоступен")
 	}
 
 	// 3. Заменяем tombstone полным снимком, только если токен ещё актуален.
 	// При конфликте возвращаем ошибку: старые данные не записываем через Set.
-	return a.publish(ctx, key, hotel, version, startedAt)
+	return a.publish(ctx, key, snapshot, version)
 }
 
 // refreshInBackground запускает обновление с токеном исходного чтения.
-// Объединение запросов через singleflight добавим в следующем уроке.
 func (a *Adapter) refreshInBackground(ctx context.Context, id uuid.UUID, entry Entry) {
 	// Завершение запроса не отменяет refresh; время загрузки ограничено отдельно.
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), a.cfg.RefreshTimeout)
@@ -60,13 +57,12 @@ func (a *Adapter) refreshInBackground(ctx context.Context, id uuid.UUID, entry E
 		defer span.End()
 
 		// Используем токен исходного чтения; tombstone здесь не нужен.
-		startedAt := time.Now()
-		hotel, err := a.loadSnapshot(ctx, id)
-		if err == nil && hotel.Rating().Degraded {
+		snapshot, err := a.loadSnapshot(ctx, id, entry.Version)
+		if err == nil && snapshot.hotel.Rating().Degraded {
 			err = errors.New("Рейтинг временно недоступен")
 		}
 		if err == nil {
-			err = a.publish(ctx, entry.Key, hotel, entry.Version, startedAt)
+			err = a.publish(ctx, entry.Key, snapshot, entry.Version)
 		}
 		if err != nil {
 			traces.RecordError(span, err)

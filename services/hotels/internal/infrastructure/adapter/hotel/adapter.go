@@ -3,9 +3,11 @@ package hotel
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/gofrs/uuid"
+	singlectx "resenje.org/singleflight"
 
 	"hotels/config"
 	entity "hotels/internal/domain/entity/hotel"
@@ -32,6 +34,9 @@ type Adapter struct {
 	review Review
 
 	cfg config.Cache
+
+	loads  singlectx.Group[string, loadedSnapshot]
+	writes singlectx.Group[string, uint32]
 }
 
 // NewAdapter объединяет кеш и источники данных карточки отеля.
@@ -49,55 +54,71 @@ func NewAdapter(
 	}
 }
 
-// loadSnapshot допускает явную деградацию рейтинга, но не подменяет её старым значением.
-func (a *Adapter) loadSnapshot(ctx context.Context, id uuid.UUID) (*entity.Hotel, error) {
-	hotel, err := a.origin.Get(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-
-	ratings, err := a.review.GetHotelRatings(ctx, []uuid.UUID{id})
-	if err != nil {
-		if app.IsCode(err, app.Unavailable) || app.IsCode(err, app.DeadlineExceeded) || errors.Is(err, context.DeadlineExceeded) {
-			hotel.SetRating(dto.Rating{Degraded: true})
-			return hotel, nil
-		}
-		return nil, err
-	}
-
-	hotel.SetRating(ratings[id])
-	return hotel, nil
+// Участники одной загрузки отсчитывают TTL от одного момента чтения источников.
+type loadedSnapshot struct {
+	hotel     entity.Hotel
+	startedAt time.Time
 }
 
-// publish назначает deadlines только успешно прочитанному снимку и публикует его через CAS.
-func (a *Adapter) publish(
-	ctx context.Context,
-	key string,
-	hotel *entity.Hotel,
-	version uint32,
-	startedAt time.Time,
-) error {
+// loadSnapshot объединяет чтения одной карточки с одним CAS-токеном.
+// После установки tombstone загрузка получает новый ключ singleflight.
+func (a *Adapter) loadSnapshot(ctx context.Context, id uuid.UUID, version uint32) (loadedSnapshot, error) {
+	key := fmt.Sprintf("%s:%d", id, version)
+	snapshot, _, err := a.loads.Do(ctx, key, func(ctx context.Context) (loadedSnapshot, error) {
+		ctx, cancel := context.WithTimeout(ctx, a.cfg.RefreshTimeout)
+		defer cancel()
+
+		startedAt := time.Now()
+
+		hotel, err := a.origin.Get(ctx, id)
+		if err != nil {
+			return loadedSnapshot{}, err
+		}
+
+		ratings, err := a.review.GetHotelRatings(ctx, []uuid.UUID{id})
+		rating := ratings[id]
+
+		if err != nil {
+			if !app.IsCode(err, app.Unavailable) && !app.IsCode(err, app.DeadlineExceeded) && !errors.Is(err, context.DeadlineExceeded) {
+				return loadedSnapshot{}, err
+			}
+			rating = dto.Rating{Degraded: true}
+		}
+
+		hotel.SetRating(rating)
+		return loadedSnapshot{hotel: *hotel, startedAt: startedAt}, nil
+	})
+	return snapshot, err
+}
+
+// publish объединяет одновременные попытки CAS с одним ожидаемым токеном.
+func (a *Adapter) publish(ctx context.Context, key string, snapshot loadedSnapshot, version uint32) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 
-	value := payload.ConvertFrom(hotel)
-	// Отсчитываем возраст от начала чтения: медленный источник не «омолаживает» данные.
-	value.SoftDeadline = startedAt.Add(a.cfg.SoftTTL)
-	value.HardDeadline = startedAt.Add(a.cfg.HardTTL)
+	flightKey := fmt.Sprintf("%s:%d", key, version)
+	_, _, err := a.writes.Do(ctx, flightKey, func(ctx context.Context) (uint32, error) {
+		ctx, cancel := context.WithTimeout(ctx, a.cfg.RefreshTimeout)
+		defer cancel()
 
-	remaining := time.Until(value.HardDeadline)
-	if remaining <= 0 {
-		return context.DeadlineExceeded
-	}
+		value := payload.ConvertFrom(&snapshot.hotel)
 
-	_, err := a.client.Cas(ctx, Entry{
-		Key:     key,
-		Value:   value,
-		Version: version,
-		// Короткий запас хранения сохраняет CAS-токен для незавершённых чтений.
-		// Разрешение отдавать данные всё равно заканчивается строго по HardDeadline.
-		Expiration: remaining + a.cfg.RefreshTimeout,
+		value.SoftDeadline = snapshot.startedAt.Add(a.cfg.SoftTTL)
+		value.HardDeadline = snapshot.startedAt.Add(a.cfg.HardTTL)
+
+		remaining := time.Until(value.HardDeadline)
+		if remaining <= 0 {
+			return 0, context.DeadlineExceeded
+		}
+
+		return a.client.Cas(ctx, Entry{
+			Key:     key,
+			Value:   value,
+			Version: version,
+			// Сохраняем CAS-токен до завершения уже начатых чтений.
+			Expiration: remaining + a.cfg.RefreshTimeout,
+		})
 	})
 	return err
 }
